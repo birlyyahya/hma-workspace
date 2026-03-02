@@ -5,11 +5,11 @@
         </flux:text>
 
         @if (session('status') == 'verification-link-sent')
-            <flux:text class="text-center font-medium !dark:text-green-400 !text-green-600">
-                {{ __('A new verification link has been sent to the email address you provided during registration.') }}
-            </flux:text>
+        <flux:text class="text-center font-medium !dark:text-green-400 !text-green-600">
+            {{ __('A new verification link has been sent to the email address you provided during registration.') }}
+        </flux:text>
         @endif
-
+        <livewire:auth.update-verify-email />
         <div class="flex flex-col items-center justify-between space-y-3">
             <form method="POST" action="{{ route('verification.send') }}">
                 @csrf
@@ -20,7 +20,7 @@
 
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
-               <flux:button variant="ghost" type="submit" class="text-sm cursor-pointer" data-test="logout-button">
+                <flux:button variant="ghost" type="submit" class="text-sm cursor-pointer" data-test="logout-button">
                     {{ __('Log out') }}
                 </flux:button>
             </form>

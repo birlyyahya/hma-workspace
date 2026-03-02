@@ -27,11 +27,11 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('task_id')
-                ->constrained()
+                ->constrained('tasks', 'id')
                 ->cascadeOnDelete();
 
             $table->foreignId('user_id')
-                ->constrained()
+                ->constrained('users', 'id')
                 ->cascadeOnDelete();
 
             $table->enum('status', [

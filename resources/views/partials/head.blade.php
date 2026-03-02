@@ -3,12 +3,14 @@
 
 <title>{{ $title ?? config('app.name') }}</title>
 
-<link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="img/logo/logo-hma2.png" sizes="any">
+<link rel="icon" href="img/logo/logo-hma2.png" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
 <link rel="preconnect" href="https://fonts.bunny.net">
 <link href="https://fonts.bunny.net/css?family=Poppins:400,500,600" rel="stylesheet" />
+
+@stack('link')
 
 <script>
 	// Force light appearance and disable automatic dark toggles.

@@ -22,7 +22,7 @@ class Tasks extends Model
 
     public function assignments()
     {
-        return $this->hasMany(TaskAssignments::class, 'tasks_id');
+        return $this->hasMany(TaskAssignments::class, 'task_id');
     }
 
     public function creator()

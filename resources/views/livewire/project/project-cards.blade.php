@@ -8,33 +8,33 @@ new class extends Component
 {
     public $project;
 
-    public function mount(){
+    public function mount()
+    {
+        $cacheKey = 'projects_data_' . Auth::user()->username;
 
-        $this->project = Cache::get('projects_data');
-
-        if (!$this->project) {
+        $data = Cache::remember($cacheKey, now()->minutes(30), function () {
 
             $response = Http::withToken(env('TOKEN_KEY'))
-                ->get(env('API_PROJECT') . '/projects')->json();
+                ->timeout(5)
+                ->get(env('API_PROJECT') . '/projects');
 
-                if ($response['status'] === 200) {
-
-                $this->project = $response;
-
-                Cache::put('projects_data', $this->project, now()->addHour());
-
-            } else {
-                // ❌ jangan cache error
-                $this->project = $response;
+            if (!$response->ok()) {
 
                 Toaster::error('Failed to fetch projects data from API.');
-                // opsional: log biar tahu kenapa gagal
-                logger()->error('Project API failed', [
-                    'status' => $response['status'],
-                    'body'   => $response['message'] ?? 'No message',
+
+                \Log::error('Project API failed', [
+                    'status' => $response->status(),
+                    'body'   => $response->body(),
                 ]);
+
+                return [];
             }
-        }
+
+            return $response->json() ?? [];
+        });
+
+        $this->project = $data;
+
     }
 
     public function placeholder(){
@@ -46,18 +46,18 @@ new class extends Component
 
 
 <div>
-    <div class="grid [grid-template-columns:repeat(auto-fit,minmax(270px,270px))] gap-y-10 justify-start">
+    <div class="grid gap-10 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))] md:gap-y-10">
         @forelse($this->project['data'] as $key => $item)
 
-        <div class="card max-w-65 relative flex flex-col bg-white  border border-white rounded-2xl shadow-md hover:shadow-accent hover:shadow-md transition duration-400 space-y-4">
+        <div class="card w-full min-w-0 relative flex flex-col bg-white border border-white rounded-2xl shadow-md hover:shadow-accent hover:shadow-md transition duration-400 space-y-4">
             <div class="card-header px-6 pt-6">
                 <div class="flex">
                     <div class="absolute z-50 -top-6 left-6 rounded-full bg-red-400 w-20 h-20 text-center flex items-center justify-center">
                         <flux:icon name="folder" class="w-9 h-9 z-10 text-white m-2"></flux:icon>
                     </div>
                     <div class="flex ml-auto">
-                        <flux:button icon="pencil-square" iconVariant="outline" class="py-4 px-6 rounded-r-none rounded-l-lg cursor-pointer" variant="outline" size="sm"></flux:button>
-                        <flux:button icon="exclamation-circle" iconVariant="outline" class="py-4 px-6 rounded-l-none rounded-r-lg cursor-pointer" variant="outline" size="sm"></flux:button>
+                        <flux:button icon="pencil-square" iconVariant="outline" class="py-3 px-4 md:py-4 md:px-6 rounded-r-none rounded-l-lg cursor-pointer" variant="outline" size="sm"></flux:button>
+                        <flux:button icon="exclamation-circle" iconVariant="outline" class="py-3 px-4 md:py-4 md:px-6 rounded-l-none rounded-r-lg cursor-pointer" variant="outline" size="sm"></flux:button>
                     </div>
                 </div>
             </div>
@@ -87,7 +87,7 @@ new class extends Component
             </div>
         </div>
         @empty
-            <p class="text-zinc-400 flex items-center gap-2">No Projects Found.</p>
+        <p class="text-zinc-400 flex items-center gap-2 px-4">No Projects Found.</p>
         @endforelse
     </div>
 </div>

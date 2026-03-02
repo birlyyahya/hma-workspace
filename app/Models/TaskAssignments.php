@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
 class TaskAssignments extends Model
 {
     protected $fillable = [
-        'tasks_id',
+        'task_id',
         'user_id',
         'status',
         'reject_reason',
@@ -17,7 +17,7 @@ class TaskAssignments extends Model
 
     public function task()
     {
-        return $this->belongsTo(Tasks::class, 'tasks_id');
+        return $this->belongsTo(Tasks::class, 'task_id');
     }
 
     public function user()
