@@ -21,19 +21,27 @@ class extends Component {
             return Cache::get('ttd_user_' . Auth::user()->id);
         }
 
-        $response = Http::get(env('API_IZIN') . '/global/user/get-user/'.Auth::user()->username)->json();
-
-        if ($response['success']) {
-            Cache::remember(
-            'ttd_user_' . Auth::user()->id,now()->addMonths(6), // key unik per user
-            function () use ($response) {
+        try{
+            $response = Http::get(env('API_IZIN') . '/global/user/get-user/'.Auth::user()->username)->json();
+            if ($response['success']) {
+                Cache::remember(
+                'ttd_user_' . Auth::user()->id,now()->addMonths(6), // key unik per user
+                function () use ($response) {
+                    return $response['data']['signature'];
+                }
+            );
                 return $response['data']['signature'];
+            }else {
+                Toaster::error('Failed to fetch user data from API.');
             }
-        );
-            return $response['data']['signature'];
-        }else {
+        }catch(Exception $e){
             Toaster::error('Failed to fetch user data from API.');
+            \Log::error('User API failed', [
+                'body'   => $e->getMessage(),
+            ]);
+            return [];
         }
+
 
     }
 
@@ -96,10 +104,12 @@ class extends Component {
 
     <div class="space-y-6">
         <div class="w-full h-64 bg-white rounded-sm border border-gray-200 flex items-center justify-center overflow-hidden">
+            @if($this->user )
             @if ($signature)
             <img src="{{ $signature->temporaryUrl() }}" class="max-h-full max-w-full object-contain">
             @else
             <img id="signature-frame" src="{{ $this->user }}" class="max-h-full max-w-full object-contain">
+            @endif
             @endif
         </div>
         <div class="flex gap-4">

@@ -5,19 +5,20 @@ use Livewire\Volt\Component;
 
 new class extends Component {
 
-    public $activeTab = 'Tugas luar kantor';
+    public $activeTab;
     public $report;
     public $data = [];
     public $ready = false;
 
     public function mount() {
-
-            $this->data = collect(Cache::get('izin_widget_' . Auth::user()->username)['group'] ?? [])
-            ->mapWithKeys(fn ($v, $k) => [trim($k) => $v])
-            ->toArray();
-            if (!empty($this->data)) {
-                $this->ready = true;
-            }
+        $this->data = collect(Cache::get('izin_widget_' . Auth::user()->username)['group'] ?? [])
+        ->mapWithKeys(fn ($v, $k) => [trim($k) => $v])
+        ->toArray();
+        // dd(key($this->data));
+        $this->activeTab = key($this->data);
+        if (!empty($this->data)) {
+            $this->ready = true;
+        }
     }
 
     #[On('widget-pengajuan')]
@@ -25,6 +26,7 @@ new class extends Component {
         $this->data = collect($data)
             ->mapWithKeys(fn ($v, $k) => [trim($k) => $v])
             ->toArray();
+        $this->activeTab = key($this->data);
         $this->ready = true;
     }
 
@@ -50,16 +52,16 @@ new class extends Component {
             {{-- Tabs --}}
             <div x-ref="tabs" class="w-full overflow-x-auto">
                 <div class="border-b mb-4 flex gap-4 min-w-max">
-                     @if(isset($data['Tugas luar kantor']))
+                    @if(isset($data['Tugas luar kantor']))
                     <button wire:click="setTab('Tugas luar kantor')" class="text-sm cursor-pointer pb-2 border-b-2 {{ $activeTab === 'Tugas luar kantor' ? 'border-red-500 text-red-600' : 'border-transparent text-gray-500' }}">
                         Tugas Luar Kantor <flux:badge size="xs" variant="pill" :color="$activeTab === 'Tugas luar kantor' ? 'red' : 'gray'" class="">{{ count($data['Tugas luar kantor']) }}</flux:badge>
                     </button>
-                        @endif
-                        @if(isset($data['Sakit']))
+                    @endif
+                    @if(isset($data['Sakit']))
                     <button wire:click="setTab('Sakit')" class="text-sm cursor-pointer pb-2 border-b-2 {{ $activeTab === 'Sakit' ? 'border-red-500 text-red-600' : 'border-transparent text-gray-500' }}">
                         Sakit <flux:badge size="xs" variant="pill" :color="$activeTab === 'Sakit' ? 'red' : 'gray'" class="">{{ count($data['Sakit']) }}</flux:badge>
                     </button>
-                        @endif
+                    @endif
                     @if(isset($data['Dinas luar kota']))
                     <button wire:click="setTab('Dinas luar kota')" class="text-sm cursor-pointer pb-2 border-b-2 {{ $activeTab === 'Dinas luar kota' ? 'border-red-500 text-red-600' : 'border-transparent text-gray-500' }}">
                         Dinas Luar Kota

@@ -80,7 +80,7 @@ new class extends Component
 
                 collect($assignees)->each(function ($userId) use ($task) {
                     TaskAssignments::create([
-                        'tasks_id' => $task->id,
+                        'task_id' => $task->id,
                         'user_id' => $userId,
                         'status' => 'pending',
                         'created_at' => now(),
@@ -396,7 +396,8 @@ new class extends Component
                     @foreach ($assign as $assigned)
 
                     @if ($loop->index
-                    < 3) <flux:avatar name="{{ $assigned['name'] }}" />
+                    < 3)
+                    <flux:avatar name="{{ $assigned['name'] }}" />
                     @endif
 
                     @endforeach

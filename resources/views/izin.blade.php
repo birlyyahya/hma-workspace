@@ -27,8 +27,8 @@
             </div>
            <livewire:izin.izin-search-list />
             <div class="grid grid-cols-1 gap-4 md:grid-cols-1 lg:grid-cols-2">
-                <livewire:widget.izin.report-izin lazy/>
-                <livewire:widget.izin.report-izin-category lazy/>
+                <livewire:izin.widget.report-izin lazy/>
+                <livewire:izin.widget.report-izin-category lazy/>
             </div>
             <livewire:izin.izin-table lazy/>
         </div>

@@ -22,6 +22,9 @@ Route::middleware('auth')->group(function () {
         Volt::route('/show/{id}', 'project.project-show')->name('projects.show');
     });
 
+    // DAR
+    Route::view('dar', 'daily-report')->name('dar');
+
     // Izin
     Route::view('izin', 'izin')->name('izin');
     Volt::route('izin/{id}/detail', 'izin.izin-show')->name('izin.show');
@@ -48,6 +51,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('knowledge')->group(function () {
         Route::redirect('/', 'knowledge/articles');
         Volt::route('/articles', 'knowledge.article')->name('knowledge.articles');
+        Volt::route('/articles-create', 'knowledge.article-create')->name('knowledge.articles-create');
         Volt::route('/announcements', 'knowledge.announcements')->name('knowledge.announcements');
         Volt::route('/policies', 'knowledge.policies')->name('knowledge.policies');
         Volt::route('/documentation', 'knowledge.documentations')->name('knowledge.documentation');
@@ -55,6 +59,8 @@ Route::middleware('auth')->group(function () {
 
 
     Route::view('/users', 'user-management')->name('users');
+
+    Route::view('/test', 'testclean')->name('settings');
 });
 
 require __DIR__.'/settings.php';

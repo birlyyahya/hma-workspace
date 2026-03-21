@@ -26,25 +26,75 @@ new class extends Component {
     public function mount() {
 
         if (!$this->data) {
-            if (!$this->laporan){
-                $response = Http::get(env('API_IZIN') . '/global/izin/list?username='.Auth::user()->username.'&page='.$this->page.'&per_page='.$this->perPage.'&search_alasan='.$this->search.'&start_date='.$this->start_date.'&end_date='.$this->end_date.'&status='.$this->status.'&sort_order='.$this->sort)->json();
-            }else {
-                $response = Http::get(env('API_IZIN') . '/global/izin/list?page='.$this->page.'&per_page='.$this->perPage.'&search_name='.$this->search.'&start_date='.$this->start_date.'&end_date='.$this->end_date.'&status='.$this->status.'&sort_order='.$this->sort)->json();
-            }
 
-            if ($response['success']) {
+            try {
 
-            $this->data = $response;
+                if (!$this->laporan) {
 
-            } else {
-                $this->data = $response;
+                    $response = Http::timeout(5)
+                        ->retry(2, 200)
+                        ->get(env('API_IZIN') . '/global/izin/list', [
+                            'username' => Auth::user()->username,
+                            'page' => $this->page,
+                            'per_page' => $this->perPage,
+                            'search_alasan' => $this->search,
+                            'start_date' => $this->start_date,
+                            'end_date' => $this->end_date,
+                            'status' => $this->status,
+                            'sort_order' => $this->sort,
+                        ]);
 
-                Toaster::error('Failed to fetch izin data from API.');
-                \Log::error('Izin API failed', [
-                    'status' => $response['message'],
-                    'body'   => $response['error'] ?? 'No Error',
+                } else {
+
+                    $response = Http::timeout(5)
+                        ->retry(2, 200)
+                        ->get(env('API_IZIN') . '/global/izin/list', [
+                            'page' => $this->page,
+                            'per_page' => $this->perPage,
+                            'search_name' => $this->search,
+                            'start_date' => $this->start_date,
+                            'end_date' => $this->end_date,
+                            'status' => $this->status,
+                            'sort_order' => $this->sort,
+                        ]);
+                }
+
+                if (!$response->successful()) {
+
+                    \Log::error('Izin API failed', [
+                        'status' => $response->status(),
+                        'body'   => $response->body(),
+                    ]);
+
+                    $this->data = [];
+                    return $this->data;
+                }
+
+                $json = $response->json();
+
+                if (!($json['success'] ?? false)) {
+
+                    Toaster::error('Failed to fetch izin data from API.');
+
+                    \Log::error('Izin API returned error', [
+                        'message' => $json['message'] ?? null,
+                        'error'   => $json['error'] ?? null,
+                    ]);
+
+                    $this->data = $json ?? [];
+                    return $this->data;
+                }
+
+                $this->data = $json;
+
+            } catch (\Throwable $e) {
+
+                Toaster::error('Error Server Izin, silahkan coba lagi atau menghubungi tim IT.');
+                \Log::error('Izin API connection error', [
+                    'message' => $e->getMessage(),
                 ]);
 
+                $this->data = [];
                 return $this->data;
             }
         }
@@ -199,7 +249,7 @@ new class extends Component {
 
 <div>
     <div class="bg-white/80 relative rounded-lg border border-zinc-200 overflow-hidden">
-        <div wire:loading.flex class="absolute inset-0 z-20
+        <div wire:loading.flex wire:target.except="generatePDF" class="absolute inset-0 z-20
                 flex items-center justify-center
                 bg-white/50 backdrop-blur-sm">
 
@@ -282,13 +332,13 @@ new class extends Component {
                         </td>
                         <td class="px-3 py-3 md:px-6">
                             <div class="flex justify-start gap-2">
-                            @if($izin['status'] === '2')
-                            <flux:badge color="green" size="sm">Approved</flux:badge>
-                            @elseif($izin['status'] === '1')
-                            <flux:badge color="red" size="sm">Rejected</flux:badge>
-                            @else
-                            <flux:badge color="yellow" size="sm">Pending</flux:badge>
-                            @endif
+                                @if($izin['status'] === '2')
+                                <flux:badge color="green" size="sm">Approved</flux:badge>
+                                @elseif($izin['status'] === '1')
+                                <flux:badge color="red" size="sm">Rejected</flux:badge>
+                                @else
+                                <flux:badge color="yellow" size="sm">Pending</flux:badge>
+                                @endif
                             </div>
                         </td>
                         <td class="px-3 py-3 md:px-6 text-right">
@@ -313,6 +363,7 @@ new class extends Component {
                 </tbody>
             </table>
         </div>
+        @if($this->data ?? false)
         <nav class="flex flex-col md:flex-row md:items-center md:justify-between p-4 gap-4" aria-label="Table navigation">
 
             <!-- Info -->
@@ -410,5 +461,6 @@ new class extends Component {
                         </li>
             </ul>
         </nav>
+        @endif
     </div>
 </div>

@@ -7,7 +7,7 @@ use function Livewire\Volt\{state};
 ?>
 
 <div>
-    <div class=" bg-white rounded-2xl shadow-md overflow-hidden border border-gray-100">
+    <div class=" overflow-hidden w-full h-full  ">
 
         {{-- Header --}}
         <div class="px-5 pt-4 flex items-center justify-between">

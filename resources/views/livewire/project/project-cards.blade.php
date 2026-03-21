@@ -14,27 +14,37 @@ new class extends Component
 
         $data = Cache::remember($cacheKey, now()->minutes(30), function () {
 
-            $response = Http::withToken(env('TOKEN_KEY'))
-                ->timeout(5)
-                ->get(env('API_PROJECT') . '/projects');
+            try {
 
-            if (!$response->ok()) {
+                $response = Http::withToken(env('TOKEN_KEY'))
+                    ->timeout(5)
+                    ->get(env('API_PROJECT') . '/projects');
 
-                Toaster::error('Failed to fetch projects data from API.');
+                if (!$response->ok()) {
+                    Toaster::error('Project API failed');
+                    \Log::error('Project API failed', [
+                        'status' => $response->status(),
+                        'body'   => $response->body(),
+                    ]);
 
-                \Log::error('Project API failed', [
-                    'status' => $response->status(),
-                    'body'   => $response->body(),
+                    return [];
+                }
+
+                return $response->json() ?? [];
+
+            } catch (\Throwable $e) {
+                Toaster::error('Project API connection error');
+
+                \Log::error('Project API connection error', [
+                    'message' => $e->getMessage(),
                 ]);
 
                 return [];
             }
 
-            return $response->json() ?? [];
         });
 
-        $this->project = $data;
-
+        $this->project = $data ?? [];
     }
 
     public function placeholder(){
@@ -47,8 +57,8 @@ new class extends Component
 
 <div>
     <div class="grid gap-10 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))] md:gap-y-10">
+        @if($this->project['data'] ?? false)
         @forelse($this->project['data'] as $key => $item)
-
         <div class="card w-full min-w-0 relative flex flex-col bg-white border border-white rounded-2xl shadow-md hover:shadow-accent hover:shadow-md transition duration-400 space-y-4">
             <div class="card-header px-6 pt-6">
                 <div class="flex">
@@ -89,5 +99,8 @@ new class extends Component
         @empty
         <p class="text-zinc-400 flex items-center gap-2 px-4">No Projects Found.</p>
         @endforelse
+        @else
+        <p class="text-zinc-400 flex  justify-centeritems-center gap-2">Error Server Down! silahkan coba lagi nanti atau menghubungi tim IT.</p>
+        @endif
     </div>
 </div>

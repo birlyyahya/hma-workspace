@@ -6,6 +6,4 @@
         </h2>
     </x-slot>
 
-
-
 </x-layouts.app>

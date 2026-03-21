@@ -371,7 +371,8 @@ new class extends Component {
                     <option value="4">Asisten Manager</option>
                     <option value="5">SPV IT Infra</option>
                     <option value="6">SPV IT Software</option>
-                    <option value="7">IT Staff</option>
+                    <option value="7">IT Staff Software</option>
+                    <option value="10">IT Staff Infra</option>
                     <option value="8">HRD</option>
                     <option value="9">MAP</option>
                 </flux:select>

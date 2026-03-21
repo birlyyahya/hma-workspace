@@ -4,6 +4,7 @@
     @include('partials.head')
 </head>
 <body class="min-h-screen bg-zinc-50">
+
     <flux:sidebar sticky collapsible class="bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-700">
         <flux:sidebar.header>
             <x-app-logo :sidebar="true" href="{{ route('dashboard') }}" wire:navigate />
@@ -15,16 +16,16 @@
                 Dashboard
 
             </flux:sidebar.item>
-            <flux:sidebar.group icon="document-text" expandable heading="Projects" class="grid">
+            <flux:sidebar.group icon="folder" expandable heading="Projects" class="grid">
                 <livewire:components.sidebar-item />
             </flux:sidebar.group>
             <flux:sidebar.item icon="qr-code" :href="route('events')" :current="request()->routeIs('events') || request()->routeIs('events.show')" wire:navigate>
                 Events
             </flux:sidebar.item>
             <flux:sidebar.item icon="banknotes" :href="route('chartered-accountants')" :current="request()->routeIs('chartered-accountants')" wire:navigate>
-                Chartered Accountants
+                Chartered Accountants (CA)
             </flux:sidebar.item>
-              <flux:sidebar.item icon="bookmark-square" :href="route('izin')" :current="request()->routeIs('izin') || request()->routeIs('izin.show') || request()->routeIs('izin.laporan-pengajuan')" wire:navigate>
+            <flux:sidebar.item icon="bookmark-square" :href="route('dar')" :current="request()->routeIs('dar')" wire:navigate>
                 Daily Activity Report (DAR)
             </flux:sidebar.item>
             <flux:sidebar.item icon="archive-box" :href="route('inventaris')" :current="request()->routeIs('inventaris')" wire:navigate>
@@ -101,25 +102,15 @@
     {{ $slot }}
 
     @fluxScripts
+    @stack('scripts')
+    <script>
+        document.addEventListener('livewire:init', () => {
+            Livewire.on('play-notification-sound', () => {
+                document.getElementById('notifSound').play();
+            });
+        });
+
+    </script>
 </body>
 
-<script>
-    document.addEventListener('alpine:init', () => {
-        Alpine.store('ui', {
-            openSidebar: JSON.parse(localStorage.getItem('sidebarOpen')) ? ? false
-            , pinned: JSON.parse(localStorage.getItem('sidebarPinned')) ? ? false,
-
-            togglePin() {
-                this.pinned = !this.pinned
-                this.openSidebar = this.pinned
-                localStorage.setItem('sidebarPinned', this.pinned)
-                localStorage.setItem('sidebarOpen', this.openSidebar)
-            }
-        , })
-    })
-    Livewire.on('play-notification-sound', () => {
-        document.getElementById('notifSound').play();
-    });
-
-</script>
 </html>

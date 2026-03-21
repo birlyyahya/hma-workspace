@@ -38,72 +38,94 @@ new class extends Component {
     }
 
 }; ?>
-
-
 <div>
-    <div class="relative mb-6 w-full py-6 px-2">
-        <flux:heading size="xl" level="1" class="mb-6">{{ __('Support Center') }}</flux:heading>
+    <div class="relative mb-8 w-full py-6 px-2">
+        <flux:heading size="xl" level="1" class="mb-4">
+            {{ __('Support Center') }}
+        </flux:heading>
         <flux:separator variant="subtle" />
     </div>
+
     <flux:heading class="sr-only">{{ __('Knowledge Hub') }}</flux:heading>
 
-    <x-settings.knowledge-layout :heading="__('Announcements')" :subheading="__('Stay updated with the latest news, system updates, feature releases, and important notices related to the workspace.')" :search="'announcements'">
-        <div class="space-y-3 w-full">
+    <x-settings.knowledge-layout
+        :heading="__('Announcements')"
+        :subheading="__('Stay updated with the latest news, system updates, feature releases, and important notices from the organization.')"
+        :search="'announcements'"
+    >
+
+        <div class="space-y-4 w-full">
 
             {{-- Skeleton --}}
             @if($loading)
                 @for($i=0;$i<3;$i++)
-                    <div class="p-4 rounded-xl border bg-white animate-pulse">
-                        <div class="flex items-center gap-4">
-                            <div class="w-10 h-10 bg-gray-200 rounded-lg"></div>
-                            <div class="flex-1 space-y-2">
-                                <div class="h-4 bg-gray-200 rounded w-1/3"></div>
-                                <div class="h-3 bg-gray-200 rounded w-1/2"></div>
-                            </div>
+                    <div class="flex items-center gap-4 p-5 rounded-xl border border-gray-100 bg-white animate-pulse">
+                        <div class="w-11 h-11 rounded-lg bg-gray-200"></div>
+
+                        <div class="flex-1 space-y-2">
+                            <div class="h-4 bg-gray-200 rounded w-1/3"></div>
+                            <div class="h-3 bg-gray-200 rounded w-1/2"></div>
                         </div>
                     </div>
                 @endfor
             @else
+
                 @foreach($items as $item)
                     <div
-                        class="group p-4 rounded-xl border bg-white hover:bg-gray-50 hover:shadow-sm transition cursor-pointer flex items-center justify-between w-full">
+                        class="group flex items-center justify-between gap-4 p-5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 hover:shadow-sm transition-all cursor-pointer">
 
-                        <div class="flex items-start gap-3">
+                        {{-- Left content --}}
+                        <div class="flex items-start gap-4">
 
                             {{-- Icon --}}
-                            <div class="w-10 h-10 flex items-center justify-center rounded-lg bg-gray-100">
+                            <div class="flex items-center justify-center w-11 h-11 rounded-lg bg-gray-100 group-hover:bg-gray-200 transition">
                                 <flux:icon :name="$item['icon']" class="w-5 h-5 text-gray-600"/>
                             </div>
 
                             {{-- Text --}}
-                            <div>
+                            <div class="space-y-1">
                                 <div class="flex items-center gap-2">
-                                    <p class="font-medium text-gray-900">
+
+                                    <p class="text-sm font-semibold text-gray-900">
                                         {{ $item['title'] }}
                                     </p>
 
                                     @if($item['badge'])
-                                        <span class="text-xs px-2 py-0.5 rounded-full
-                                            {{ $item['badge']=='ALERT' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600' }}">
+                                        <span
+                                            class="text-xs font-medium px-2 py-0.5 rounded-full
+                                            {{ $item['badge']=='ALERT'
+                                                ? 'bg-red-100 text-red-600'
+                                                : 'bg-blue-100 text-blue-600'
+                                            }}">
                                             {{ $item['badge'] }}
                                         </span>
                                     @endif
+
                                 </div>
 
-                                <p class="text-sm text-gray-500">
+                                <p class="text-sm text-gray-500 leading-relaxed">
                                     {{ $item['desc'] }}
                                 </p>
+
+                                @if($item['highlight'])
+                                    <p class="text-xs text-gray-400">
+                                        {{ $item['highlight'] }}
+                                    </p>
+                                @endif
                             </div>
 
                         </div>
 
                         {{-- Arrow --}}
-                        <flux:icon name="arrow-long-right" class="w-4 h-4 hover:translate-x-5 transition text-gray-400"/>
+                        <flux:icon
+                            name="arrow-long-right"
+                            class="w-5 h-5 text-gray-400 transition-transform duration-200 group-hover:translate-x-1"
+                        />
 
                     </div>
                 @endforeach
-            @endif
 
+            @endif
         </div>
 
     </x-settings.knowledge-layout>

@@ -16,17 +16,50 @@ new class extends Component {
 
         $data = Cache::remember($cacheKey, now()->addHour(), function () {
 
-            $response = Http::get(
-                env('API_IZIN') . '/global/izin/dashboard/' . Auth::user()->username
-            )->json();
+            try {
 
-            if (!$response['success']) {
+                $response = Http::timeout(5)
+                    ->retry(2, 200)
+                    ->get(env('API_IZIN') . '/global/izin/dashboard/' . Auth::user()->username);
 
-                Toaster::error('Failed to fetch izin dashboard data from API.');
+                if (!$response->successful()) {
 
-                \Log::error('Izin Dashboard API failed', [
-                    'status' => $response['status'] ?? null,
-                    'body'   => $response['message'] ?? 'No message',
+                    \Log::error('Izin Dashboard API failed', [
+                        'status' => $response->status(),
+                        'body'   => $response->body(),
+                    ]);
+
+                    return [
+                        'approved' => 0,
+                        'rejected' => 0,
+                        'total' => 0,
+                        'group' => [],
+                    ];
+                }
+
+                $json = $response->json();
+
+                if (!($json['success'] ?? false)) {
+
+                    return [
+                        'approved' => 0,
+                        'rejected' => 0,
+                        'total' => 0,
+                        'group' => [],
+                    ];
+                }
+
+                return [
+                    'approved' => $json['data']['approve_izin'] ?? 0,
+                    'rejected' => $json['data']['failed_izin'] ?? 0,
+                    'total' => $json['data']['all_izin'] ?? 0,
+                    'group' => $json['data']['group'] ?? [],
+                ];
+
+            } catch (\Throwable $e) {
+
+                \Log::error('Izin Dashboard API connection error', [
+                    'message' => $e->getMessage(),
                 ]);
 
                 return [
@@ -36,18 +69,13 @@ new class extends Component {
                     'group' => [],
                 ];
             }
-            return [
-                'approved' => $response['data']['approve_izin'],
-                'rejected' => $response['data']['failed_izin'],
-                'total' => $response['data']['all_izin'],
-                'group' => $response['data']['group'],
-                ];
+
         });
 
         $this->dispatch('widget-pengajuan', data: $data['group'] ?? []);
-        $this->approvedCount = $data['approved'];
-        $this->rejectedCount = $data['rejected'];
-        $this->totalCount = $data['total'];
+        $this->approvedCount = $data['approved'] ?? 0;
+        $this->rejectedCount = $data['rejected'] ?? 0;
+        $this->totalCount = $data['total'] ?? 0;
     }
 
     #[On('izinAdded')]

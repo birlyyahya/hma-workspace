@@ -1,6 +1,7 @@
-@import 'tailwindcss';
-@import '../../vendor/livewire/flux/dist/flux.css';
+@import "tailwindcss";
+@import "../../vendor/livewire/flux/dist/flux.css";
 @source '../../vendor/masmerise/livewire-toaster/resources/views/*.blade.php';
+
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -10,9 +11,12 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-    --font-sans: 'Poppins','Inter','Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans:
+        "Poppins", "Inter", "Instrument Sans", ui-sans-serif, system-ui,
+        sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+        "Noto Color Emoji";
 
-     --color-zinc-50: var(--color-slate-50);
+    --color-zinc-50: var(--color-slate-50);
     --color-zinc-100: var(--color-slate-100);
     --color-zinc-200: var(--color-slate-200);
     --color-zinc-300: var(--color-slate-300);
@@ -29,9 +33,7 @@
     --color-accent-foreground: var(--color-white);
 }
 
-
 @layer base {
-
     *,
     ::after,
     ::before,
@@ -46,7 +48,7 @@
 }
 
 [data-flux-label] {
-    @apply  !mb-0 !leading-tight;
+    @apply !mb-0 !leading-tight;
 }
 
 input:focus[data-flux-control],
@@ -58,3 +60,151 @@ select:focus[data-flux-control] {
 /* \[:where(&)\]:size-4 {
     @apply size-4;
 } */
+/* base list */
+ol, ul {
+    padding-left: 1.5rem;
+}
+
+/* ordered list */
+li[data-list="ordered"] {
+    list-style-type: decimal;
+}
+
+/* bullet list */
+li[data-list="bullet"] {
+    list-style-type: disc;
+}
+
+/* indent level */
+.ql-indent-1 {
+    margin-left: 1.5rem;
+}
+
+.ql-indent-2 {
+    margin-left: 3rem;
+}
+
+.ql-indent-3 {
+    margin-left: 4.5rem;
+}
+.select2-container {
+    z-index: 9999;
+}
+
+/* container */
+.select2-container--default .select2-selection--single {
+    height: 40px;
+    border-radius: 0.5rem;
+    border: 1px solid rgb(228 228 231);
+    /* zinc-200 */
+    background-color: white;
+    display: flex;
+    align-items: center;
+    padding-left: 6px;
+    font-size: 0.875rem;
+    align-items: center;
+}
+
+/* text */
+.select2-container--default .select2-selection__rendered {
+    line-height: normal;
+    padding-left: 0;
+    color: rgb(63 63 70);
+    /* zinc-700 */
+}
+
+/* arrow */
+.select2-container--default
+    .select2-selection--single
+    .select2-selection__arrow {
+    height: 100%;
+    right: 0px;
+    top: 0px;
+    display: flex;
+    align-items: center;
+}
+
+/* focus style */
+.select2-container--default.select2-container--focus
+    .select2-selection--single {
+    border-color: black;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05);
+}
+
+/* dropdown */
+.select2-dropdown {
+    border-radius: 0.5rem;
+    border: 1px solid rgb(228 228 231);
+}
+.select2-container--default
+    .select2-selection--single
+    .select2-selection__clear {
+    margin-right: 0px;
+}
+
+@keyframes marquee {
+    0% {
+        transform: translateX(100%);
+    }
+    100% {
+        transform: translateX(-100%);
+    }
+}
+
+.animate-marquee {
+    display: inline-block;
+    min-width: 100%;
+    animation: marquee 10s linear infinite;
+}
+
+/* container */
+.select2-container--default .select2-selection--multiple {
+    min-height: 40px;
+    border-radius: 0.5rem;
+    border: 1px solid var(--color-slate-300); /* zinc-200 */
+    box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1);
+    background-color: white;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding-left: 8px;
+    display: flex;
+    align-items: center;
+}
+
+/* selected tags */
+.select2-container--default
+    .select2-selection--multiple
+    .select2-selection__choice {
+    background-color: rgb(244 244 245); /* zinc-100 */
+    border: none;
+    border-radius: 6px;
+    padding: 2px 5px 2px 20px;
+    font-size: 0.75rem;
+    margin-top: 2px;
+}
+
+/* remove button */
+.select2-container--default
+    .select2-selection--multiple
+    .select2-selection__choice__remove {
+    margin-right: 4px;
+    top: 2px;
+    left: 4px;
+    font-size: 0.75rem;
+    color: rgb(113 113 122);
+    border: none !important;
+}
+
+/* input field */
+.select2-container--default
+    .select2-selection--multiple
+    .select2-search__field {
+    margin-top: 0;
+}
+
+/* focus style */
+.select2-container--default.select2-container--focus
+    .select2-selection--multiple {
+    border-color: black;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05);
+}

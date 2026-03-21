@@ -42,7 +42,7 @@ new class extends Component {
     $daysInPrevMonth = $prevMonth->daysInMonth;
     @endphp
 <div class="h-full">
-    <div class="bg-white rounded-2xl p-6 shadow-sm w-full h-full">
+    <div class="rounded-2xl w-full h-fit">
         <!-- Header -->
         <div class="flex items-center justify-between mb-7">
             <h2 class="text-lg font-semibold">
@@ -61,7 +61,7 @@ new class extends Component {
         </div>
 
         <!-- Day Labels -->
-        <div class="grid grid-cols-7 text-sm text-gray-400 mb-4">
+        <div class="grid grid-cols-7 text-sm text-gray-400 mb-2">
             <div>Su</div>
             <div>Mo</div>
             <div>Tu</div>
@@ -70,7 +70,7 @@ new class extends Component {
             <div>Fr</div>
             <div>Sa</div>
         </div>
-        <div class="grid grid-cols-7 gap-y-5 text-sm">
+        <div class="grid grid-cols-7 gap-y-1 text-sm">
 
             {{-- Tanggal bulan sebelumnya --}}
             @for ($i = $startDay - 1; $i >= 0; $i--)
@@ -93,13 +93,13 @@ new class extends Component {
                     wire:click="selectDate('{{ $dateString }}')">
 
                     <div class="w-9 h-9 mx-auto flex items-center justify-center rounded-full
-                        {{ $isSelected ? 'bg-pink-500 text-white font-semibold' : '' }}
-                        {{ !$isSelected && $isToday ? 'border border-pink-500' : '' }}">
+                        {{ $isSelected ? 'bg-red-500 text-white font-semibold' : '' }}
+                        {{ !$isSelected && $isToday ? 'border border-red-500' : '' }}">
                         {{ $day }}
                     </div>
 
                     @if($hasEvent)
-                        <span class="w-1.5 h-1.5 bg-pink-500 rounded-full absolute bottom-0 left-1/2 -translate-x-1/2"></span>
+                        <span class="w-1.5 h-1.5 bg-red-500 rounded-full absolute bottom-0 left-1/2 -translate-x-1/2"></span>
                     @endif
                 </div>
             @endfor
@@ -115,4 +115,5 @@ new class extends Component {
             @endfor
         </div>
     </div>
+
 </div>

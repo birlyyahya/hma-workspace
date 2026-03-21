@@ -10,9 +10,16 @@
 
     <flux:separator class="md:hidden" />
 
-    <div class="flex-1 self-stretch max-md:pt-6">
-        <flux:heading>{{ $heading ?? '' }}</flux:heading>
-        <flux:subheading>{{ $subheading ?? '' }}</flux:subheading>
+    <div class="flex-1 self-stretch max-md:pt-6  ">
+        <div class="flex justify-between items-center gap-5">
+            <div>
+                <flux:heading>{{ $heading ?? '' }}</flux:heading>
+                <flux:subheading>{{ $subheading ?? '' }}</flux:subheading>
+            </div>
+            @if (isset($button))
+                <flux:button icon="plus">{{ $button ?? '' }}</flux:button>
+            @endif
+        </div>
 
         <flux:separator variant="subtle" class="my-4" />
 
@@ -20,7 +27,7 @@
         <flux:input icon="magnifying-glass" placeholder="{{ __('Search '.$search.'...') }}" class="mt-4 w-full rounded-full" />
         @endisset
 
-        <div class="mt-5 w-full">
+        <div class="mt-5 w-full h-[520px] overflow-auto">
             {{ $slot }}
         </div>
     </div>

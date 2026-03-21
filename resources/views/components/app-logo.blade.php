@@ -8,8 +8,8 @@
         <x-app-logo-icon class="size-5 fill-current text-white dark:text-black" />
     </x-slot>
     <x-slot name="name">
-        <span x-show="$store.ui.openSidebar" x-cloak x-transition.opacity>
-            Spaceship Kit
+        <span >
+            Workspace
         </span>
     </x-slot>
 </flux:sidebar.brand>
