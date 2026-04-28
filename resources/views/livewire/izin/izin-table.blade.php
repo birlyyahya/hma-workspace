@@ -25,78 +25,74 @@ new class extends Component {
 
     public function mount() {
 
-        if (!$this->data) {
 
-            try {
-
-                if (!$this->laporan) {
-
-                    $response = Http::timeout(5)
-                        ->retry(2, 200)
-                        ->get(env('API_IZIN') . '/global/izin/list', [
-                            'username' => Auth::user()->username,
-                            'page' => $this->page,
-                            'per_page' => $this->perPage,
-                            'search_alasan' => $this->search,
-                            'start_date' => $this->start_date,
-                            'end_date' => $this->end_date,
-                            'status' => $this->status,
-                            'sort_order' => $this->sort,
-                        ]);
-
-                } else {
-
-                    $response = Http::timeout(5)
-                        ->retry(2, 200)
-                        ->get(env('API_IZIN') . '/global/izin/list', [
-                            'page' => $this->page,
-                            'per_page' => $this->perPage,
-                            'search_name' => $this->search,
-                            'start_date' => $this->start_date,
-                            'end_date' => $this->end_date,
-                            'status' => $this->status,
-                            'sort_order' => $this->sort,
-                        ]);
-                }
-
-                if (!$response->successful()) {
-
-                    \Log::error('Izin API failed', [
-                        'status' => $response->status(),
-                        'body'   => $response->body(),
+        try {
+            if (!$this->laporan) {
+                $response = Http::timeout(5)
+                    ->retry(2, 200)
+                    ->get(config('services.api_izin') . '/global/izin/list', [
+                        'username' => Auth::user()->username,
+                        'page' => $this->page,
+                        'per_page' => $this->perPage,
+                        'search_alasan' => $this->search,
+                        'start_date' => $this->start_date,
+                        'end_date' => $this->end_date,
+                        'status' => $this->status,
+                        'sort_order' => $this->sort,
                     ]);
 
-                    $this->data = [];
-                    return $this->data;
-                }
+            } else {
 
-                $json = $response->json();
-
-                if (!($json['success'] ?? false)) {
-
-                    Toaster::error('Failed to fetch izin data from API.');
-
-                    \Log::error('Izin API returned error', [
-                        'message' => $json['message'] ?? null,
-                        'error'   => $json['error'] ?? null,
+                $response = Http::timeout(5)
+                    ->retry(2, 200)
+                    ->get(config('services.api_izin') . '/global/izin/list', [
+                        'page' => $this->page,
+                        'per_page' => $this->perPage,
+                        'search_name' => $this->search,
+                        'start_date' => $this->start_date,
+                        'end_date' => $this->end_date,
+                        'status' => $this->status,
+                        'sort_order' => $this->sort,
                     ]);
+            }
 
-                    $this->data = $json ?? [];
-                    return $this->data;
-                }
+            if (!$response->successful()) {
 
-                $this->data = $json;
-
-            } catch (\Throwable $e) {
-
-                Toaster::error('Error Server Izin, silahkan coba lagi atau menghubungi tim IT.');
-                \Log::error('Izin API connection error', [
-                    'message' => $e->getMessage(),
+                \Log::error('Izin API failed', [
+                    'status' => $response->status(),
+                    'body'   => $response->body(),
                 ]);
 
                 $this->data = [];
                 return $this->data;
             }
+
+            $json = $response->json();
+
+            if (!($json['success'] ?? false)) {
+
+                Toaster::error('Failed to fetch izin data from API.');
+
+                \Log::error('Izin API returned error', [
+                    'message' => $json['message'] ?? null,
+                    'error'   => $json['error'] ?? null,
+                ]);
+
+                $this->data = $json ?? [];
+                return $this->data;
+            }
+
+            $this->data = $json;
+
+        } catch (\Throwable $e) {
+
+            Toaster::error('Error Server Izin, silahkan coba lagi atau menghubungi tim IT.');
+            \Log::error('Izin API connection error', [
+                'message' => $e->getMessage(),
+            ]);
+
+            $this->data = [];
+            return $this->data;
         }
 
     }
@@ -147,9 +143,9 @@ new class extends Component {
     public function fetchData()
     {
         if (!$this->laporan){
-            $response = Http::get(env('API_IZIN') . '/global/izin/list?username='.Auth::user()->username.'&page='.$this->page.'&per_page='.$this->perPage.'&search_alasan='.$this->search.'&start_date='.$this->start_date.'&end_date='.$this->end_date.'&status='.$this->status.'&sort_order='.$this->sort)->json();
+            $response = Http::get(config('services.api_izin')  . '/global/izin/list?username='.Auth::user()->username.'&page='.$this->page.'&per_page='.$this->perPage.'&search_alasan='.$this->search.'&start_date='.$this->start_date.'&end_date='.$this->end_date.'&status='.$this->status.'&sort_order='.$this->sort)->json();
         }else {
-            $response = Http::get(env('API_IZIN') . '/global/izin/list?page='.$this->page.'&per_page='.$this->perPage.'&search_name='.$this->search.'&start_date='.$this->start_date.'&end_date='.$this->end_date.'&status='.$this->status.'&sort_order='.$this->sort)->json();
+            $response = Http::get(config('services.api_izin') . '/global/izin/list?page='.$this->page.'&per_page='.$this->perPage.'&search_name='.$this->search.'&start_date='.$this->start_date.'&end_date='.$this->end_date.'&status='.$this->status.'&sort_order='.$this->sort)->json();
         }
 
         if ($response['success']) {
@@ -183,7 +179,7 @@ new class extends Component {
             );
         }
 
-        $response = Http::get(env('API_IZIN') . '/global/izin/detail/' . $id)->json();
+        $response = Http::get(config('services.api_izin') . '/global/izin/detail/' . $id)->json();
 
         if (($response['success'] ?? false) !== true) {
             Toaster::error('Gagal generate PDF. Data izin tidak ditemukan.');

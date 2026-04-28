@@ -7,7 +7,7 @@
                     <flux:text>Manage your Chartered Accountants</flux:text>
                 </div>
             </div>
-            <livewire:charteredaccount.ca-index lazy/>
+            <livewire:cashadvance.ca-index lazy/>
         </div>
     </div>
 </x-layouts.app>

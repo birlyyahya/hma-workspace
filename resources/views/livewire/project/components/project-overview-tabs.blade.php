@@ -1,8 +1,10 @@
 <?php
 
+use App\Models\User;
 use Carbon\Carbon;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
+use Masmerise\Toaster\Toaster;
 
 new class extends Component {
     public $project;
@@ -11,13 +13,15 @@ new class extends Component {
     public $loadingDocuments = false;
     public $loadingSpectech = false;
 
-    // #[On('documentLoad')]
-    // public function documentLoad($data){
-    //     $this->documents = $data;
-    //     $this->loadingDocuments = false;
-    // }
+    public function getUserProperty()
+    {
+        return User::find($this->project['project_leader_id']);
+    }
 
-
+    public function shareLinkCopied(): void
+    {
+        Toaster::success('Link share project berhasil disalin');
+    }
 }
 
 ?>
@@ -39,9 +43,49 @@ new class extends Component {
                             </flux:heading>
                         </div>
 
-                        <div class="flex gap-2">
-                            <flux:button size="sm" variant="outline" icon="plus">
-                                Share
+                        <div
+                            class="flex gap-2"
+                            x-data="{
+                                copied: false,
+                                shareUrl: @js(route('projects.preview', $project['id'])),
+                                copy() {
+                                    const url = this.shareUrl;
+                                    const finish = (ok) => {
+                                        if (ok) {
+                                            this.copied = true;
+                                            $wire.shareLinkCopied();
+                                            setTimeout(() => this.copied = false, 2000);
+                                        } else {
+                                            alert('Gagal menyalin link. Salin manual: ' + url);
+                                        }
+                                    };
+                                    if (navigator.clipboard && window.isSecureContext) {
+                                        navigator.clipboard.writeText(url).then(() => finish(true)).catch(() => finish(false));
+                                        return;
+                                    }
+                                    try {
+                                        const ta = document.createElement('textarea');
+                                        ta.value = url;
+                                        ta.setAttribute('readonly', '');
+                                        ta.style.position = 'fixed';
+                                        ta.style.opacity = '0';
+                                        document.body.appendChild(ta);
+                                        ta.select();
+                                        const ok = document.execCommand('copy');
+                                        document.body.removeChild(ta);
+                                        finish(ok);
+                                    } catch (e) {
+                                        finish(false);
+                                    }
+                                }
+                            }"
+                        >
+                            <flux:button
+                                size="sm"
+                                variant="outline"
+                                icon="link"
+                                x-on:click="copy()"
+                            >
                             </flux:button>
                             <flux:button size="sm" variant="outline" icon="ellipsis-vertical" />
                         </div>
@@ -122,7 +166,7 @@ new class extends Component {
                     </div>
 
                     <!-- ATTACHMENT -->
-                    <div>
+                    {{-- <div>
                         <flux:heading size="sm" class="mb-4">Attachment ({{ $this->loadingDocuments ? '0' : count(collect($this->documents)->take(3) ) }})</flux:heading>
 
                         <div class="space-y-5">
@@ -167,7 +211,7 @@ new class extends Component {
                             @endif
 
                         </div>
-                    </div>
+                    </div> --}}
 
                     <!-- PROJECT GOALS -->
                     <div class="space-y-4">
@@ -241,24 +285,14 @@ new class extends Component {
                 <!-- RECENT ACTIVITY -->
                 <div class="bg-white rounded-2xl p-6 shadow-sm space-y-5">
                     <div class="flex justify-between items-center">
-                        <flux:heading size="sm">Recent Activity</flux:heading>
+                        <flux:heading size="sm">Project Leader</flux:heading>
                         <flux:button size="xs" variant="ghost" icon="ellipsis-vertical" />
                     </div>
 
                     <div class="space-y-4 text-sm">
                         <div>
-                            <p class="font-medium">Leslie Alexander</p>
-                            <p class="text-zinc-500 text-xs">You have a new comment from @asifmahmud</p>
-                        </div>
-
-                        <div>
-                            <p class="font-medium">Jenny Wilson</p>
-                            <p class="text-zinc-500 text-xs">A new system update is available.</p>
-                        </div>
-
-                        <div>
-                            <p class="font-medium">Robert Fox</p>
-                            <p class="text-zinc-500 text-xs">Your password was changed successfully.</p>
+                            <p class="font-medium">{{ $this->user->name }}</p>
+                            <p class="text-zinc-500 text-xs">{{ $this->user->role->name }}</p>
                         </div>
                     </div>
                 </div>

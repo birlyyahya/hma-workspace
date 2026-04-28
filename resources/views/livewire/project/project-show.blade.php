@@ -3,54 +3,42 @@
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
+use Masmerise\Toaster\Toaster;
 
 new #[Lazy] class extends Component {
     public $id;
     public $project;
     public $document;
 
-    #[On('projectLoad')]
+
     public function mount()
     {
-        $this->project = Cache::remember(
-            'project_data_show_' . $this->id,
-            now()->addMinutes(30),
-            function () {
-                $response = Http::get(env('API_PROJECT') . 'projects/' . $this->id)->json();
+        $response = Http::get(env('API_PROJECT') . 'projects/' . $this->id)->json();
 
-                 if ($response['status'] === 200) {
-                    return collect($response['data'])->first(); // langsung ambil object
-                }
+        if ($response['status'] === 200) {
+            $this->project = collect($response['data'])->first();
+        }
 
-                return null;
-            }
-        );
-        $this->documentLoad();
+        $this->dispatch('timelineLoad');
+        $this->dispatch('documentLoad');
     }
 
+    #[On('projectLoad')]
+    public function refreshProject()
+    {
+        $response = Http::get(env('API_PROJECT') . 'projects/' . $this->id)->json();
 
+        if ($response['status'] === 200) {
+            $this->project = collect($response['data'])->first(); // langsung ambil object
+        }
+        $this->dispatch('updateProgress', $this->project['progress']);
+    }
 
     public function placeholder(){
         return view('components.placeholder.ph_project_show');
     }
 
-    public function documentLoad()
-    {
-        $this->document = Cache::remember(
-            'document_project_'.$this->project['id'],
-            now()->addMinutes(30),
-            function () {
-                $response = Http::get(
-                    env('API_PROJECT').'admin-docs/search?project_id='.$this->project['id']
-                )->json();
 
-                return collect($response['data'] ?? [])
-                    ->values()
-                    ->toArray();
-            }
-        );
-        $this->dispatch('documentLoad', $this->document);
-    }
 
 }; ?>
 
@@ -58,17 +46,20 @@ new #[Lazy] class extends Component {
     <div class="max-h-screen overflow-auto px-2 py-4">
         <div class="py-4 mb-5 space-y-4">
             <div class="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
-                <div class="flex flex-col items-start gap-1 md:flex-row md:items-end md:gap-4">
-                    <flex:heading class="font-bold text-xl leading-10">{{ $this->project['name'] }}
+                <div>
+                    <flux:heading class="font-bold text-xl leading-10">
+                        {{ $this->project['name'] }}
                         <flux:badge :color="
-                            match($this->project['status']){
-                                'ON PROGRESS' => 'blue',
-                                'WAITING' => 'yellow',
-                                'CLOSED' => 'red',
-                                default => 'gray'
-                            }
-                        " icon="lock-open" class="rounded-xl ml-4 !px-4">{{ $this->project['status'] }}</flux:badge>
-                    </flex:heading>
+                match($this->project['status']){
+                    'ON PROGRESS' => 'blue',
+                    'WAITING' => 'yellow',
+                    'CLOSED' => 'red',
+                    default => 'gray'
+                }
+            " class="inline-block align-middle ml-2 rounded-xl">
+                            {{ $this->project['status'] }}
+                        </flux:badge>
+                    </flux:heading>
                 </div>
                 <div class="flex items-center gap-2">
                     <flux:avatar.group class="md:mt-2">
@@ -87,7 +78,6 @@ new #[Lazy] class extends Component {
                             </flux:tooltip>
                             @endif
                     </flux:avatar.group>
-                    <flux:button icon="plus" variant="primary" size="sm" class="!rounded-full ml-auto md:mt-2 cursor-pointer"></flux:button>
                 </div>
             </div>
 
@@ -140,22 +130,22 @@ new #[Lazy] class extends Component {
                 <!-- TAB CONTENT -->
                 <div class="py-6">
                     <div x-show="active === 'overview'" wire:key="overview-{{ $this->id }}" x-transition>
-                        <livewire:project.components.project-overview-tabs lazy :project="$this->project" :spectech="$this->project['specktech']" :documents="$this->document" />
+                        <livewire:project.components.project-overview-tabs lazy :project="$this->project" :spectech="$this->project['specktech']" />
                     </div>
 
-                    <div x-show="active === 'spectech'" wire:key="spectech-{{ $this->id }}" x-transition >
+                    <div x-show="active === 'spectech'" wire:key="spectech-{{ $this->id }}" x-transition>
                         <livewire:project.components.project-spectech-tabs lazy :totalproject="$this->project['value']" :spectech="$this->project['specktech']" :id="$this->project['id']" :progress="$this->project['progress']" />
                     </div>
 
                     <div x-show="active === 'timeline'" wire:key="project-{{ $this->id }}" x-transition>
-                        <livewire:project.components.project-timeline-tabs lazy />
+                        <livewire:project.components.project-timeline-tabs lazy :id="$this->id" />
                     </div>
 
                     <div x-show="active === 'team'" wire:key="team-{{ $this->id }}" x-transition>
-                        <livewire:project.components.project-team-tabs lazy :internal="$this->project['support_team_internals']" :timduk="$this->project['support_teams']" />
+                        <livewire:project.components.project-team-tabs lazy :id="$this->id" :internal="$this->project['support_team_internals']" :timduk="$this->project['support_teams']" />
                     </div>
 
-                    <div x-show="active === 'file'" wire:key="files-{{ $this->id }}" x-transition wire:init="documentLoad">
+                    <div x-show="active === 'file'" wire:key="files-{{ $this->id }}" x-transition>
                         <livewire:project.components.project-files-tabs :id="$this->id" lazy />
                     </div>
 

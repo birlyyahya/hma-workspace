@@ -57,6 +57,10 @@
 
                 </div>
 
+
+               <livewire:widget.dashboard.task-in-progress>
+
+
                 <!-- Articles -->
                 <div class="bg-white rounded-xl p-6 shadow-sm space-y-5">
 
@@ -230,11 +234,6 @@
             <!-- Kolom Kanan / Sidebar -->
             <div class="w-full md:basis-1/4 space-y-4">
 
-                <!-- Calendar -->
-                <div class="bg-white rounded-xl p-4 shadow-sm">
-                    <livewire:widget.dashboard.calendar />
-                </div>
-
                 <!-- Upcoming Events -->
                 <div class="bg-white rounded-xl p-5 shadow-sm space-y-4">
 
@@ -299,6 +298,13 @@
                     </div>
 
                 </div>
+
+                <!-- Calendar -->
+                <div class="bg-white rounded-xl p-4 shadow-sm">
+                    <livewire:widget.dashboard.calendar />
+                </div>
+
+
 
                 <!-- Today's Schedule -->
                 <div class="bg-white rounded-xl p-5 shadow-sm space-y-4">

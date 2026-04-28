@@ -1,10 +1,9 @@
 <?php
 
-use Barryvdh\DomPDF\Facade\Pdf;
-use Livewire\Volt\Volt;
+use App\Http\Controllers\ProjectFileChunkUploadController;
 use App\Livewire\Events\EventShow;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Http;
+use Livewire\Volt\Volt;
 
 Route::get('/', function () {
     return redirect('dashboard');
@@ -19,11 +18,15 @@ Route::middleware('auth')->group(function () {
     // Project
     Route::prefix('projects')->group(function () {
         Route::view('/', 'projects')->name('projects');
+        Volt::route('/perusahaan', 'project.perusahaan')->name('perusahaan');
+        Volt::route('/create', 'project.project-create')->name('projects.create');
         Volt::route('/show/{id}', 'project.project-show')->name('projects.show');
+        Volt::route('/preview/{id}', 'project.project-preview')->name('projects.preview');
     });
 
     // DAR
     Route::view('dar', 'daily-report')->name('dar');
+    Volt::route('dar/tasks/{id}', 'dar.dar-show')->name('dar.tasks.show');
 
     // Izin
     Route::view('izin', 'izin')->name('izin');
@@ -31,18 +34,16 @@ Route::middleware('auth')->group(function () {
     Volt::route('izin/{id}/pdf', 'izin.izin-show-pdf')->name('izin.pdf');
     Volt::route('izin/laporan-pengajuan', 'izin.laporan-pengajuan-izin')->name('izin.laporan-pengajuan');
 
-
     // Inventaris
     Route::view('inventaris', 'inventaris')->name('inventaris');
 
-    // Chartered Accountants
-    Route::view('chartered-accountants', 'charteredAccountants')->name('chartered-accountants');
+    // Cash Advance
+    Route::view('cashadvance', 'cashadvance')->name('cashadvance');
 
     // Event
     Route::prefix('event')->group(function () {
         Route::view('/', 'events')->name('events');
         Route::get('/{event}', EventShow::class)->name('events.show');
-        Route::view('chartered-accountants', 'charteredAccountants')->name('chartered-accountants');
         Route::view('/{event}/scan', 'events-scan')->name('event.scan');
         Route::view('/{event}/registration', 'events-registration')->name('event.registration');
     });
@@ -57,8 +58,11 @@ Route::middleware('auth')->group(function () {
         Volt::route('/documentation', 'knowledge.documentations')->name('knowledge.documentation');
     });
 
-
     Route::view('/users', 'user-management')->name('users');
+
+    // Project files (chunk upload proxy for progress + shorter requests)
+    Route::post('project-files/upload-chunk', [ProjectFileChunkUploadController::class, 'uploadChunk'])
+        ->name('project-files.upload-chunk');
 
     Route::view('/test', 'testclean')->name('settings');
 });

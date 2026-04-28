@@ -22,8 +22,8 @@
             <flux:sidebar.item icon="qr-code" :href="route('events')" :current="request()->routeIs('events') || request()->routeIs('events.show')" wire:navigate>
                 Events
             </flux:sidebar.item>
-            <flux:sidebar.item icon="banknotes" :href="route('chartered-accountants')" :current="request()->routeIs('chartered-accountants')" wire:navigate>
-                Chartered Accountants (CA)
+            <flux:sidebar.item icon="banknotes" :href="route('cashadvance')" :current="request()->routeIs('cashadvance')" wire:navigate>
+                Cash Advance (CA)
             </flux:sidebar.item>
             <flux:sidebar.item icon="bookmark-square" :href="route('dar')" :current="request()->routeIs('dar')" wire:navigate>
                 Daily Activity Report (DAR)

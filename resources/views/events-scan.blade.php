@@ -1,12 +1,20 @@
 @include('partials.head')
 
-<div class="bg-zinc-100 h-screen p-10">
+<div class="min-h-screen bg-linear-to-br from-zinc-50 to-zinc-100">
+    <div class="px-6 lg:px-10 py-6">
+        <div class="flex items-center justify-between mb-6">
+            <flux:button variant="ghost" icon="chevron-left" href="{{ route('events') }}" wire:navigate>
+                Back to Events
+            </flux:button>
+            <div class="flex items-center gap-2 text-xs text-zinc-500">
+                <span class="flex h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
+                Kiosk Mode · Check-in
+            </div>
+        </div>
 
-    <flux:button variant="ghost" icon="chevron-left" href="{{ route('events') }}">Back to Events</flux:button>
-
-    <x-toaster-hub />
-    <livewire:events.qrscan />
+        <x-toaster-hub />
+        <livewire:events.qrscan />
+    </div>
 </div>
-
 
 @fluxScripts

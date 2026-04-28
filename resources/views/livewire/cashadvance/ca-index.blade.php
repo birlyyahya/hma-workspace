@@ -8,7 +8,7 @@ new class extends Component {
 }; ?>
 
 <div class="space-y-4">
-    <livewire:charteredaccount.widget.ca-widget />
+    <livewire:cashadvance.widget.ca-widget />
 
     <div class="bg-white">
         <div class="p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

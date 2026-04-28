@@ -12,8 +12,7 @@ new class extends Component {
         now()->addDay(),
         function () {
             try {
-
-                $response = Http::timeout(5)
+                $response = Http::timeout(120)
                     ->get(env('API_PROJECT') . 'projects/search?project_leader_id=' . Auth::user()->id)
                     ->json();
 
@@ -34,25 +33,23 @@ new class extends Component {
 
 <div>
     @if(Auth::user()->role_id <= 5) <flux:sidebar.item :href="route('projects')" icon="document-text" :current="
-                request()->routeIs('projects')" wire:navigate>
+                request()->routeIs('projects') || request()->routeIs('projects.*')" wire:navigate>
+        <div class="flex-1 min-w-0 max-w-39 overflow-hidden">
+            <div class="truncate">
+                All Project
+            </div>
+        </div>
+        </flux:sidebar.item>
+        <flux:sidebar.item :href="route('perusahaan')" icon="document-text" :current="
+                request()->routeIs('perusahaan')" wire:navigate>
             <div class="flex-1 min-w-0 max-w-39 overflow-hidden">
                 <div class="truncate">
-                    All Project
+                    Perusahaan
                 </div>
             </div>
         </flux:sidebar.item>
-        <flux:sidebar.item :href="route('projects')" icon="document-text" :current="
-                request()->routeIs('projects')" wire:navigate>
-                <div class="flex-1 min-w-0 max-w-39 overflow-hidden">
-                    <div class="truncate">
-                        Perusahaan
-                    </div>
-                </div>
-            </flux:sidebar.item>
-            <flux:sidebar.item># Project</flux:sidebar.item>
-            @endif
-    @if(!empty($this->projects))
-            @foreach ($this->projects as $project)
+        <flux:sidebar.item># Project</flux:sidebar.item>
+        @foreach ($this->projects as $project)
         <flux:sidebar.item :href="route('projects.show', $project['id'])" icon="document-text" :current="
         request()->routeIs('projects.show')
         && request()->route('id') == $project['id']" wire:navigate>
@@ -63,7 +60,20 @@ new class extends Component {
             </div>
         </flux:sidebar.item>
         @endforeach
-    @else
+        @endif
+        @if(!empty($this->projects))
+        @foreach ($this->projects as $project)
+        <flux:sidebar.item :href="route('projects.show', $project['id'])" icon="document-text" :current="
+        request()->routeIs('projects.show')
+        && request()->route('id') == $project['id']" wire:navigate>
+            <div class="flex-1 min-w-0 max-w-39 overflow-hidden">
+                <div class="truncate">
+                    {{ $project['code'] }} - {{ $project['name'] }}
+                </div>
+            </div>
+        </flux:sidebar.item>
+        @endforeach
+        @else
 
-    @endif
+        @endif
 </div>

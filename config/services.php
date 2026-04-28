@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    // Custom APIs
+    'api_izin' => env('API_IZIN'),
+    'api_project' => env('API_PROJECT'),
+    'url_project' => env('URL_PROJECT'),
+
 ];

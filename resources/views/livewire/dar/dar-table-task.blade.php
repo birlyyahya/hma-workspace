@@ -25,7 +25,7 @@ new class extends Component {
     public function mount(){
 
         try {
-            $response = Http::get(env('API_IZIN'). '/global/dar/list?page='.$this->page.'&perPage='.$this->perPage.'')->json();
+            $response = Http::get(env('API_IZIN'). '/global/dar/list?page='.$this->page.'&perPage='.$this->perPage.'&user_id='.Auth::user()->id.'&search='.$this->search.'&start_date='.$this->start_date.'&end_date='.$this->end_date.'')->json();
 
             $activities = collect($response['data']);
 
@@ -41,7 +41,7 @@ new class extends Component {
             });
 
             $this->dispatch('initSelect2');
-            $this->dispatch('darList', $activities->toArray());
+            // $this->dispatch('darList', $activities->toArray());
             $this->tasks = $response;
             foreach ($this->tasks['data'] as $task) {
                 $this->taskStatus[$task['id']] = $task['status'];
@@ -88,8 +88,7 @@ new class extends Component {
     public function fetch()
     {
         $this->loading = true;
-        $response = Http::get(env('API_IZIN'). '/global/dar/list?page='.$this->page.'&perPage='.$this->perPage.'&search='.$this->search.'&start_date='.$this->start_date.'&end_date='.$this->end_date)->json();
-
+        $response = Http::get(env('API_IZIN'). '/global/dar/list?page='.$this->page.'&perPage='.$this->perPage.'&search='.$this->search.'&start_date='.$this->start_date.'&end_date='.$this->end_date.'&user_id='.Auth::user()->id)->json();
         $this->tasks = $response;
         $this->loading = false;
     }
@@ -127,7 +126,7 @@ new class extends Component {
 
         if($response['success']) {
             Toaster::success('Update Activity successfully');
-
+            $this->dispatch('updatedTimeline');
             return $this->fetch();
         }
 
@@ -152,6 +151,20 @@ new class extends Component {
         $this->spectech = collect($this->projectData['data'])->where('id', $this->projectSelected)->first()['specktech'];
     }
 
+    public function deleteTask($id){
+        $response = Http::delete(env('API_IZIN').'global/dar/activity/'.$id);
+        if($response['success']){
+            Toaster::success('Delete Activity successfully');
+            $this->dispatch('updatedTimeline');
+            return $this->fetch();
+        }
+        Toaster::error('Delete Activity failed');
+        \Log::error('Activity API failed', [
+            'status' => $response['success'],
+            'body'   => $response['message'] ?? 'No message',
+        ]);
+    }
+
 
     public function placeholder(){
         return view('components.placeholder.ph_dar_table');
@@ -159,8 +172,7 @@ new class extends Component {
 }; ?>
 
 <div>
-    <div class="overflow-x-auto relative bg-white rounded-lg">
-
+    <div class="relative bg-white rounded-lg">
         <div class="flex items-center justify-between px-6 py-4 bg-white">
             <div class="flex items-center gap-3">
                 <flux:icon name="bars-3" class="w-5 h-5 text-gray-400" />
@@ -190,7 +202,7 @@ new class extends Component {
                 <flux:icon name="ellipsis-horizontal" class="w-4 h-4 cursor-pointer hover:text-gray-700" />
             </div>
         </div>
-        <div class="relative">
+        <div class="overflow-visible">
             <table class="min-w-[900px] md:min-w-full text-sm text-left text-gray-600 ">
                 <thead class="bg-zinc-50 border shadow-none text-xs uppercase text-gray-500 ">
                     <tr>
@@ -212,7 +224,7 @@ new class extends Component {
                         <td class="px-3 py-3 md:px-6 whitespace-nowrap">{{ Carbon::parse($task['end_date'])->locale('id')->translatedFormat('l, d M Y') }}</td>
                         <td class="px-3 py-3 md:px-6 whitespace-nowrap">{{ $task['project_id'] ? 'Project' : 'Non Project' }}</td>
                         <td class="px-3 py-3 md:px-6 whitespace-nowrap">
-                            <div wire:loading wire:target="taskStatus.{{ $task['id'] }}"  class="flex items-center h-full py-2 px-3 w-full border rounded-lg bg-gray-50 text-gray-500 text-sm animate-pulse">
+                            <div wire:loading wire:target="taskStatus.{{ $task['id'] }}" class="flex items-center h-full py-2 px-3 w-full border rounded-lg bg-gray-50 text-gray-500 text-sm animate-pulse">
                                 Updating...
                             </div>
                             <flux:select wire:loading.remove wire:key="status-{{ $task['id'] }}" wire:loading.attr="disabled" wire:model.live="taskStatus.{{ $task['id'] }}" placeholder="Status">
@@ -247,7 +259,31 @@ new class extends Component {
                         </td>
                         <td class="px-3 py-3 md:px-6 justify-end flex whitespace-nowrap gap-2">
                             <flux:icon name="pencil-square" class="w-5 h-5 cursor-pointer hover:text-gray-700" />
-                            <flux:icon name="ellipsis-horizontal" class="w-5 h-5 cursor-pointer hover:text-gray-700" />
+                            <div x-data="{ open: false }" class="relative inline-block">
+
+                                <!-- Icon -->
+                                <flux:icon name="ellipsis-horizontal" class="w-5 h-5 cursor-pointer hover:text-gray-700" @click="open = !open" />
+
+                                <!-- Dropdown -->
+                                <div x-show="open" @click.outside="open = false" x-transition class="absolute right-0 top-full mt-2 w-40 bg-white border rounded-lg shadow-md z-9999">
+                                    <div class="flex flex-col">
+                                        <button class="w-full  cursor-pointer text-left px-4 py-2 text-sm hover:bg-gray-100">
+                                            Detail
+                                        </button>
+                                        <button class="w-full flex justify-between cursor-pointer text-left px-4 py-2 text-sm hover:bg-gray-100">
+                                            Share Link <flux:icon name="link" class="w-4 h-4"/>
+                                        </button>
+                                        <button wire:click="deleteTask({{ $task['id'] }})" wire:loading.attr="disabled" class="w-full cursor-pointer text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                                            <span wire:loading.remove wire:target="deleteTask({{ $task['id'] }})">
+                                                Delete
+                                            </span>
+                                            <span class="animate-pulse" wire:loading wire:target="deleteTask({{ $task['id'] }})">
+                                                Deleting...
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                     @endforeach
