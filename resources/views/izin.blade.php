@@ -18,11 +18,13 @@
                             Pengajuan Izin
                         </flux:button>
                     </flux:modal.trigger>
+                    @if(Auth::user()->level > 60)
                     <a href="{{ route('izin.laporan-pengajuan') }}" class="w-full sm:w-auto">
                         <flux:button icon="document-text" variant="outline" class="cursor-pointer w-full sm:w-auto">
                             Laporan Pengajuan Izin
                         </flux:button>
                     </a>
+                    @endif
                 </div>
             </div>
            <livewire:izin.izin-search-list />
