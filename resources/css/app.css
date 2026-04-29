@@ -2,7 +2,6 @@
 @import "../../vendor/livewire/flux/dist/flux.css";
 @source '../../vendor/masmerise/livewire-toaster/resources/views/*.blade.php';
 
-
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../vendor/livewire/flux-pro/stubs/**/*.blade.php';
@@ -207,4 +206,22 @@ li[data-list="bullet"] {
     .select2-selection--multiple {
     border-color: black;
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05);
+}
+
+.ck-content ul {
+    list-style: disc;
+    padding-left: 1.5rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.ck-content ol {
+    list-style: decimal;
+    padding-left: 1.5rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.ck-content li {
+    margin-bottom: 0.25rem;
 }

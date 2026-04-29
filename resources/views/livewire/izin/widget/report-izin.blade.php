@@ -64,7 +64,7 @@ new class extends Component {
         $empty = ['approved' => 0, 'rejected' => 0, 'total' => 0, 'group' => []];
 
         try {
-            $response = Http::timeout(5)
+            $response = Http::timeout(120)
                 ->retry(2, 200)
                 ->get(config('services.api_izin').'/global/izin/dashboard/'.Auth::user()->username);
 

@@ -9,10 +9,13 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
+use Livewire\WithFileUploads;
 use Masmerise\Toaster\Toaster;
 
 new #[Layout('components.layouts.app', ['title' => 'DAR - Task Detail'])]
 class extends Component {
+    use WithFileUploads;
+
     public $id;
 
     public array $task = [];
@@ -20,6 +23,7 @@ class extends Component {
     public array $commentUsers = [];
 
     public string $comment = '';
+    public array $newFiles = [];
 
     // Edit task
     public bool $editing = false;
@@ -28,12 +32,26 @@ class extends Component {
     public int|string $editStatus = 1;
     public string $editStartDate = '';
     public string $editEndDate = '';
+    public array $editTeamUser = [];
+
+    public array $availableUsers = [];
 
     // Edit comment
     public ?int $editingCommentId = null;
     public string $editingCommentBody = '';
 
     public function mount(): void
+    {
+        $this->availableUsers = User::whereNotIn('role_id', [1, 2])
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
+            ->toArray();
+
+        $this->loadTask();
+    }
+
+    protected function loadTask(): void
     {
         $response = Http::get(config('services.api_izin') . "/global/dar/activity?id={$this->id}")->json();
 
@@ -46,7 +64,7 @@ class extends Component {
             ->whereIn('id', $userIds)
             ->get()
             ->keyBy('id')
-            ->map(fn($u) => ['name' => $u->name, 'role_name' => $u->role?->name])
+            ->map(fn ($u) => ['name' => $u->name, 'role_name' => $u->role?->name])
             ->toArray();
     }
 
@@ -65,6 +83,11 @@ class extends Component {
         return User::whereIn('id', $teamUserIds)->get();
     }
 
+    public function getAllAttachmentsProperty()
+    {
+        return collect($this->comments)->pluck('files')->flatten(1)->filter();
+    }
+
     public function startEditing(): void
     {
         $this->editActivity = $this->task['activity'] ?? '';
@@ -76,7 +99,22 @@ class extends Component {
         $this->editEndDate = $this->task['end_date']
             ? Carbon::parse($this->task['end_date'])->format('Y-m-d\TH:i')
             : '';
+        $this->editTeamUser = collect($this->task['team_user'] ?? [])
+            ->pluck('user_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->toArray();
         $this->editing = true;
+    }
+
+    public function toggleTeamUser(int $userId): void
+    {
+        if (in_array($userId, $this->editTeamUser, true)) {
+            $this->editTeamUser = array_values(array_filter($this->editTeamUser, fn ($id) => $id !== $userId));
+        } else {
+            $this->editTeamUser[] = $userId;
+        }
     }
 
     public function cancelEditing(): void
@@ -88,43 +126,52 @@ class extends Component {
     {
         $this->validate([
             'editActivity' => ['required', 'min:3'],
-            'editStatus'   => ['required', 'integer'],
+            'editStatus' => ['required', 'integer'],
             'editStartDate' => ['required'],
-            'editEndDate'   => ['required'],
+            'editEndDate' => ['required'],
+            'editTeamUser' => ['nullable', 'array'],
+            'editTeamUser.*' => ['integer'],
         ]);
 
         $response = null;
 
         try {
-            $response = Http::post(config('services.api_izin') . "/global/dar/activity/{$this->id}", [
-                '_method'     => 'PUT',
-                'activity'    => $this->editActivity,
+            $teamUser = collect($this->editTeamUser)->map(fn ($id) => (int) $id)->values()->toArray();
+
+            $response = Http::post(config('services.api_izin') . "/global/dar/update/{$this->id}", [
+                '_method' => 'PUT',
+                'user_id' => $this->task['user_id'] ?? null,
+                'activity' => $this->editActivity,
                 'description' => $this->editDescription,
-                'status'      => $this->editStatus,
-                'start_date'  => $this->editStartDate,
-                'end_date'    => $this->editEndDate,
+                'status' => $this->editStatus,
+                'start_date' => $this->editStartDate,
+                'end_date' => $this->editEndDate,
+                'team' => $teamUser,
+                'team_user' => $teamUser,
             ]);
 
             if ($response['success']) {
                 $this->task = [
                     ...$this->task,
-                    'activity'    => $this->editActivity,
+                    'activity' => $this->editActivity,
                     'description' => $this->editDescription,
-                    'status'      => (int) $this->editStatus,
-                    'start_date'  => $this->editStartDate,
-                    'end_date'    => $this->editEndDate,
+                    'status' => (int) $this->editStatus,
+                    'start_date' => $this->editStartDate,
+                    'end_date' => $this->editEndDate,
+                    'team_user' => collect($teamUser)->map(fn ($id) => ['user_id' => $id])->toArray(),
                 ];
                 $this->editing = false;
                 Toaster::success('Task updated successfully!');
+
                 return;
             }
 
-            Toaster::error($response['message'] ?? 'Failed to update task.');
+            Toaster::error(getErrorMessages($response['errors']));
         } catch (Exception $e) {
             Toaster::error('An error occurred while updating the task.');
             Log::error('Failed to update task', [
-                'body'   => $response['message'] ?? 'No message',
-                'error'  => $response['errors'] ?? 'No error',
+                'body' => $response['message'] ?? 'No message',
+                'error' => $response['errors'] ?? 'No error',
                 'system' => $e->getMessage(),
             ]);
         }
@@ -137,12 +184,13 @@ class extends Component {
         try {
             $response = Http::post(config('services.api_izin') . "/global/dar/activity/{$this->id}/status", [
                 '_method' => 'PUT',
-                'status'  => 4,
+                'status' => 4,
             ]);
 
             if ($response['success']) {
                 $this->task['status'] = 4;
                 Toaster::success('Task marked as done!');
+
                 return;
             }
 
@@ -150,40 +198,67 @@ class extends Component {
         } catch (Exception $e) {
             Toaster::error('An error occurred while updating status.');
             Log::error('Failed to mark task as done', [
-                'body'   => $response['message'] ?? 'No message',
+                'body' => $response['message'] ?? 'No message',
                 'system' => $e->getMessage(),
             ]);
         }
     }
 
+    public function removeNewFile(int $index): void
+    {
+        if (isset($this->newFiles[$index])) {
+            array_splice($this->newFiles, $index, 1);
+        }
+    }
+
     public function addComment(): void
     {
+        $this->validate([
+            'comment' => ['required_without:newFiles', 'nullable', 'string'],
+            'newFiles' => ['nullable', 'array'],
+            'newFiles.*' => ['file', 'max:10240'],
+        ]);
+
         $response = null;
 
         try {
-            $response = Http::post(config('services.api_izin') . "/global/dar/activity/create-comment", [
+            $request = Http::asMultipart();
+
+            foreach ($this->newFiles as $upload) {
+                $request = $request->attach(
+                    'files[]',
+                    file_get_contents($upload->getRealPath()),
+                    $upload->getClientOriginalName(),
+                );
+            }
+
+            $response = $request->post(config('services.api_izin') . '/global/dar/activity/create-comment', [
                 'activity_id' => $this->id,
-                'user_id'     => Auth::id(),
-                'body'        => $this->comment,
+                'user_id' => Auth::id(),
+                'body' => $this->comment,
             ]);
 
-            if ($response['success']) {
+            $payload = $response->json();
+
+            if ($payload['success'] ?? false) {
                 $userId = Auth::id();
 
-                if (!isset($this->commentUsers[$userId])) {
+                if (! isset($this->commentUsers[$userId])) {
                     $user = Auth::user();
                     $this->commentUsers[$userId] = [
-                        'name'      => $user->name,
+                        'name' => $user->name,
                         'role_name' => $user->role?->name,
                     ];
                 }
 
+                $newComment = $payload['data'] ?? [];
                 $this->comments[] = [
-                    'id'          => $response['data']['id'] ?? null,
+                    'id' => $newComment['id'] ?? null,
                     'activity_id' => $this->id,
-                    'user_id'     => $userId,
-                    'body'        => $this->comment,
-                    'created_at'  => now(),
+                    'user_id' => $userId,
+                    'body' => $this->comment,
+                    'created_at' => $newComment['created_at'] ?? now()->toDateTimeString(),
+                    'files' => $newComment['files'] ?? [],
                 ];
 
                 $taskOwnerId = (int) ($this->task['user_id'] ?? 0);
@@ -206,7 +281,7 @@ class extends Component {
                     Notification::send($recipients, new DarCommentReceived(
                         activityId: (int) $this->id,
                         activityTitle: (string) ($this->task['activity'] ?? ''),
-                        commentId: (int) ($response['data']['id'] ?? 0),
+                        commentId: (int) ($newComment['id'] ?? 0),
                         commenterId: (int) $userId,
                         commenterName: (string) ($commenter->name ?? 'Unknown'),
                         body: (string) $this->comment,
@@ -216,16 +291,19 @@ class extends Component {
                 }
 
                 $this->comment = '';
+                $this->newFiles = [];
+                $this->dispatch('comment-added');
                 Toaster::success('Comment added successfully!');
+
                 return;
             }
 
-            Toaster::error(getErrorMessages($response['errors']));
+            Toaster::error(getErrorMessages($payload['errors'] ?? []));
         } catch (Exception $e) {
             Toaster::error('An error occurred while creating the comment.');
             Log::error('Failed to add comment', [
-                'body'   => $response['message'] ?? 'No message',
-                'error'  => $response['errors'] ?? 'No error',
+                'body' => $response['message'] ?? 'No message',
+                'error' => $response['errors'] ?? 'No error',
                 'system' => $e->getMessage(),
             ]);
         }
@@ -254,7 +332,7 @@ class extends Component {
         try {
             $response = Http::post(config('services.api_izin') . "/global/dar/activity/update-comment/{$this->editingCommentId}", [
                 '_method' => 'PUT',
-                'body'    => $this->editingCommentBody,
+                'body' => $this->editingCommentBody,
             ]);
 
             if ($response['success']) {
@@ -262,11 +340,13 @@ class extends Component {
                     if ($c['id'] === $this->editingCommentId) {
                         $c['body'] = $this->editingCommentBody;
                     }
+
                     return $c;
                 }, $this->comments);
 
                 $this->cancelEditingComment();
                 Toaster::success('Comment updated successfully!');
+
                 return;
             }
 
@@ -274,8 +354,8 @@ class extends Component {
         } catch (Exception $e) {
             Toaster::error('An error occurred while updating the comment.');
             Log::error('Failed to update comment', [
-                'body'   => $response['message'] ?? 'No message',
-                'error'  => $response['errors'] ?? 'No error',
+                'body' => $response['message'] ?? 'No message',
+                'error' => $response['errors'] ?? 'No error',
                 'system' => $e->getMessage(),
             ]);
         }
@@ -289,8 +369,9 @@ class extends Component {
             $response = Http::delete(config('services.api_izin') . "/global/dar/activity/delete-comment/{$commentId}");
 
             if ($response['success']) {
-                $this->comments = array_values(array_filter($this->comments, fn($c) => $c['id'] !== $commentId));
+                $this->comments = array_values(array_filter($this->comments, fn ($c) => $c['id'] !== $commentId));
                 Toaster::success('Comment deleted successfully!');
+
                 return;
             }
 
@@ -298,406 +379,639 @@ class extends Component {
         } catch (Exception $e) {
             Toaster::error('An error occurred while deleting the comment.');
             Log::error('Failed to delete comment', [
-                'body'   => $response['message'] ?? 'No message',
-                'error'  => $response['errors'] ?? 'No error',
+                'body' => $response['message'] ?? 'No message',
+                'error' => $response['errors'] ?? 'No error',
                 'system' => $e->getMessage(),
             ]);
         }
     }
-};
-
-
-?>
+}; ?>
 
 <div>
     <style>
-        [x-cloak] {
-            display: none !important;
-        }
+        [x-cloak] { display: none !important; }
+
+        /* Description prose styling — survives Tailwind reset */
+        .dar-prose { color: rgb(63 63 70); line-height: 1.7; font-size: 0.95rem; }
+        .dar-prose p { margin-top: 0.5rem; margin-bottom: 0.5rem; }
+        .dar-prose ul { list-style: disc; padding-left: 1.5rem; margin: 0.5rem 0; }
+        .dar-prose ol { list-style: decimal; padding-left: 1.5rem; margin: 0.5rem 0; }
+        .dar-prose li { margin: 0.25rem 0; }
+        .dar-prose strong { font-weight: 600; color: rgb(24 24 27); }
+        .dar-prose a { color: rgb(37 99 235); text-decoration: underline; }
+        .dar-prose blockquote { border-left: 3px solid rgb(228 228 231); padding-left: 1rem; color: rgb(82 82 91); font-style: italic; margin: 0.75rem 0; }
+        .dar-prose code { background: rgb(244 244 245); padding: 0.125rem 0.375rem; border-radius: 0.375rem; font-size: 0.85em; }
     </style>
 
-    <div class="min-h-screen bg-linear-to-b from-slate-50 to-slate-100/60 px-4 py-6 sm:px-6 lg:px-8">
-        <div class="mx-auto">
+    <div
+        x-data="darShow()"
+        x-on:comment-added.window="scrollToLatestComment()"
+        class="min-h-screen bg-linear-to-b from-zinc-50 to-white px-4 py-6 sm:px-6 lg:px-8"
+    >
+        <div class="mx-auto max-w-6xl">
 
-            {{-- Header --}}
+            {{-- ── Top bar ── --}}
             <div class="mb-6 flex items-center justify-between gap-4">
-                <div class="flex items-center gap-3">
-                    <a href="{{ route('dar') }}" class="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 shadow-sm hover:bg-slate-50">
-                        <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                            <path d="M15 18l-6-6 6-6" />
-                        </svg>
-                        Back to DAR
+                <div class="flex items-center gap-2 text-sm">
+                    <a
+                        href="{{ route('dar') }}"
+                        class="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 font-medium text-zinc-700 ring-1 ring-zinc-200 shadow-sm hover:bg-zinc-50"
+                    >
+                        <flux:icon name="arrow-left" class="h-4 w-4" />
+                        Back
                     </a>
-                    <div class="text-sm text-slate-400">/</div>
-                    <div class="text-sm font-semibold text-slate-700">Task</div>
+                    <span class="text-zinc-300">/</span>
+                    <span class="font-medium text-zinc-500">DAR</span>
+                    <span class="text-zinc-300">/</span>
+                    <span class="font-semibold text-zinc-800">Task #{{ $task['id'] }}</span>
                 </div>
 
-                {{-- Ellipsis menu --}}
-                <div x-data="{ open: false }" class="relative">
-                    <button type="button" @click="open = !open" class="grid h-10 w-10 place-items-center rounded-full bg-white text-slate-700 ring-1 ring-slate-200 shadow-sm hover:bg-slate-50" aria-label="Task actions">
-                        <svg viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor" aria-hidden="true">
-                            <circle cx="5" cy="12" r="1.6" />
-                            <circle cx="12" cy="12" r="1.6" />
-                            <circle cx="19" cy="12" r="1.6" />
-                        </svg>
-                    </button>
-
-                    <div x-cloak x-show="open" @click.away="open = false" x-transition.origin.top.right class="absolute right-0 z-20 mt-2 w-44 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-slate-200/70">
-                        @if($editing)
-                            <button wire:click="cancelEditing" @click="open = false" type="button" class="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">
-                                Cancel Edit
-                            </button>
-                        @else
-                            <button wire:click="startEditing" @click="open = false" type="button" class="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">
-                                Edit
-                            </button>
-                            <button
-                                wire:click="markAsDone"
-                                @click="open = false"
-                                wire:loading.attr="disabled"
-                                wire:target="markAsDone"
-                                type="button"
-                                class="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                            >
-                                <span wire:loading.remove wire:target="markAsDone">Mark as done</span>
-                                <span wire:loading wire:target="markAsDone" class="animate-pulse">Updating...</span>
-                            </button>
-                        @endif
-                        <div class="h-px bg-slate-200/70"></div>
-                        <button type="button" class="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">Delete</button>
+                @if (! empty($task))
+                    <div x-data="{ open: false }" class="relative">
+                        <button
+                            type="button"
+                            @click="open = !open"
+                            class="grid h-9 w-9 place-items-center rounded-full bg-white text-zinc-600 ring-1 ring-zinc-200 shadow-sm hover:bg-zinc-50"
+                            aria-label="Task actions"
+                        >
+                            <svg viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor" aria-hidden="true">
+                                <circle cx="5" cy="12" r="1.6" />
+                                <circle cx="12" cy="12" r="1.6" />
+                                <circle cx="19" cy="12" r="1.6" />
+                            </svg>
+                        </button>
+                        <div
+                            x-cloak
+                            x-show="open"
+                            @click.away="open = false"
+                            x-transition.origin.top.right
+                            class="absolute right-0 z-20 mt-2 w-48 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-zinc-200/70"
+                        >
+                            @if ($editing)
+                                <button wire:click="cancelEditing" @click="open = false" type="button"
+                                    class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50">
+                                    <flux:icon name="x-mark" class="h-4 w-4" /> Cancel Edit
+                                </button>
+                            @else
+                                <button wire:click="startEditing" @click="open = false" type="button"
+                                    class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50">
+                                    <flux:icon name="pencil-square" class="h-4 w-4" /> Edit task
+                                </button>
+                                <button wire:click="markAsDone" @click="open = false" wire:loading.attr="disabled"
+                                    wire:target="markAsDone" type="button"
+                                    class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-50">
+                                    <flux:icon name="check-circle" class="h-4 w-4" />
+                                    <span wire:loading.remove wire:target="markAsDone">Mark as done</span>
+                                    <span wire:loading wire:target="markAsDone" class="animate-pulse">Updating...</span>
+                                </button>
+                            @endif
+                        </div>
                     </div>
-                </div>
+                @endif
             </div>
 
-            @if(empty($task))
-                <div class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200/70">
-                    <h1 class="text-xl font-semibold text-slate-900">Task not found</h1>
-                    <p class="mt-2 text-sm text-slate-600">Task dengan ID <span class="font-semibold">{{ $id }}</span> tidak ditemukan.</p>
+            @if (empty($task))
+                <div class="rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-zinc-200/70">
+                    <div class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-zinc-100 text-zinc-500">
+                        <flux:icon name="exclamation-triangle" class="h-6 w-6" />
+                    </div>
+                    <h1 class="text-lg font-semibold text-zinc-900">Task not found</h1>
+                    <p class="mt-1 text-sm text-zinc-600">Task dengan ID <span class="font-semibold">{{ $id }}</span> tidak ditemukan.</p>
                 </div>
             @else
                 @php
                     $status = $task['status'] ?? 0;
                     $statusColor = match ($status) {
-                        1 => 'bg-slate-50 text-slate-700 ring-slate-200',
+                        1 => 'bg-zinc-100 text-zinc-700 ring-zinc-200',
                         2 => 'bg-amber-50 text-amber-800 ring-amber-200',
                         3 => 'bg-blue-50 text-blue-700 ring-blue-200',
-                        4 => 'bg-emerald-50 text-emerald-800 ring-emerald-200',
-                        default => 'bg-slate-50 text-slate-700 ring-slate-200',
+                        4 => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+                        default => 'bg-zinc-100 text-zinc-700 ring-zinc-200',
+                    };
+                    $statusDot = match ($status) {
+                        1 => 'bg-zinc-400',
+                        2 => 'bg-amber-500',
+                        3 => 'bg-blue-500',
+                        4 => 'bg-emerald-500',
+                        default => 'bg-zinc-400',
                     };
                     $statusLabel = match ($status) {
                         1 => 'Pending',
-                        2 => 'Hold',
+                        2 => 'On Hold',
                         3 => 'In Progress',
                         4 => 'Completed',
                         default => 'Draft',
                     };
+
+                    $duration = null;
+                    if (! empty($task['start_date']) && ! empty($task['end_date'])) {
+                        $start = Carbon::parse($task['start_date']);
+                        $end = Carbon::parse($task['end_date']);
+                        $duration = $start->diff($end)->format('%h jam %i menit');
+                    }
                 @endphp
 
-                <article class="rounded-3xl bg-white p-8 shadow-sm ring-1 ring-slate-200/70 sm:p-10">
-
-                    @if($editing)
-                        {{-- ── Edit Mode ── --}}
-                        <div class="space-y-6">
-                            <div class="flex items-center gap-3 pb-4 border-b border-slate-100">
-                                <div class="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-500 shrink-0">
-                                    <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                    </svg>
+                <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                    {{-- ── LEFT: Task content ── --}}
+                    <article class="lg:col-span-2 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-zinc-200/70 sm:p-8">
+                        @if ($editing)
+                            {{-- ── Edit Mode ── --}}
+                            <div class="space-y-6">
+                                {{-- Section header --}}
+                                <div class="flex items-start justify-between gap-3 border-b border-zinc-100 pb-4">
+                                    <div class="flex items-center gap-2.5">
+                                        <span class="grid h-9 w-9 place-items-center rounded-xl bg-zinc-100 text-zinc-600">
+                                            <flux:icon name="pencil-square" class="h-4 w-4" />
+                                        </span>
+                                        <div>
+                                            <p class="text-sm font-semibold text-zinc-900">Edit Task</p>
+                                            <p class="text-xs text-zinc-500">Perbarui detail, jadwal, dan anggota tim.</p>
+                                        </div>
+                                    </div>
                                 </div>
-                                <p class="text-sm font-semibold text-slate-500 uppercase tracking-widest">Editing Task</p>
-                            </div>
 
-                            {{-- Title --}}
-                            <div>
-                                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Task Title</label>
-                                <input
-                                    wire:model="editActivity"
-                                    type="text"
-                                    class="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xl font-semibold text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    placeholder="Task title..."
-                                />
-                                @error('editActivity')
-                                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                                @enderror
-                            </div>
-
-                            {{-- Status + Dates --}}
-                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                {{-- Title --}}
                                 <div>
-                                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Status</label>
-                                    <select
-                                        wire:model="editStatus"
-                                        class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800 focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
+                                    <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Title</label>
+                                    <input wire:model="editActivity" type="text"
+                                        class="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-base font-semibold text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-200"
+                                        placeholder="Apa yang dikerjakan?" />
+                                    @error('editActivity')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                                </div>
+
+                                {{-- Status + Dates --}}
+                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                    <div>
+                                        <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</label>
+                                        <select wire:model="editStatus"
+                                            class="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-800 focus:border-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-200">
+                                            <option value="1">Pending</option>
+                                            <option value="2">On Hold</option>
+                                            <option value="3">In Progress</option>
+                                            <option value="4">Completed</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Start</label>
+                                        <input wire:model="editStartDate" type="datetime-local"
+                                            class="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-800 focus:border-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-200" />
+                                        @error('editStartDate')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                                    </div>
+                                    <div>
+                                        <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">End</label>
+                                        <input wire:model="editEndDate" type="datetime-local"
+                                            class="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-800 focus:border-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-200" />
+                                        @error('editEndDate')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                                    </div>
+                                </div>
+
+                                {{-- Team picker --}}
+                                @php
+                                    $userMap = collect($availableUsers)->keyBy('id');
+                                @endphp
+                                <div
+                                    x-data="teamPicker()"
+                                    @click.away="open = false"
+                                    @keydown.escape.window="open = false"
+                                    class="relative"
+                                >
+                                    <div class="mb-1.5 flex items-center justify-between">
+                                        <label class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Team Members</label>
+                                        <span class="text-[11px] text-zinc-400">{{ count($editTeamUser) }} dipilih</span>
+                                    </div>
+
+                                    <div
+                                        @click="open = true; $nextTick(() => $refs.search.focus())"
+                                        class="flex min-h-11.5 cursor-text flex-wrap items-center gap-1.5 rounded-xl border border-zinc-200 bg-zinc-50 px-2 py-1.5 transition focus-within:border-zinc-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-zinc-200"
                                     >
-                                        <option value="1">Pending</option>
-                                        <option value="2">Hold</option>
-                                        <option value="3">In Progress</option>
-                                        <option value="4">Completed</option>
-                                    </select>
-                                    @error('editStatus')
-                                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                                    @enderror
+                                        @foreach ($editTeamUser as $uid)
+                                            @php $u = $userMap[$uid] ?? null; @endphp
+                                            @if ($u)
+                                                <span wire:key="team-chip-{{ $uid }}"
+                                                    class="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-1 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200">
+                                                    <flux:avatar circle name="{{ $u['name'] }}" size="xs" />
+                                                    {{ $u['name'] }}
+                                                    <button
+                                                        type="button"
+                                                        @click.stop="$wire.toggleTeamUser({{ $uid }})"
+                                                        class="grid h-4 w-4 place-items-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-red-600"
+                                                        aria-label="Remove"
+                                                    >
+                                                        <flux:icon name="x-mark" class="h-3 w-3" />
+                                                    </button>
+                                                </span>
+                                            @endif
+                                        @endforeach
+
+                                        <input
+                                            x-ref="search"
+                                            x-model="query"
+                                            @focus="open = true"
+                                            @keydown.enter.prevent
+                                            type="text"
+                                            placeholder="@if (empty($editTeamUser)) Cari & pilih anggota tim... @else Tambah lagi... @endif"
+                                            class="min-w-30 flex-1 border-0 bg-transparent px-2 py-1 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-0"
+                                        />
+                                    </div>
+
+                                    {{-- Dropdown --}}
+                                    <div
+                                        x-show="open"
+                                        x-cloak
+                                        x-transition.origin.top
+                                        class="absolute left-0 right-0 z-30 mt-1 max-h-64 overflow-y-auto rounded-xl bg-white p-1 shadow-lg ring-1 ring-zinc-200/70"
+                                    >
+                                        @forelse ($availableUsers as $u)
+                                            @php $isSelected = in_array($u['id'], $editTeamUser, true); @endphp
+                                            <button
+                                                wire:key="team-opt-{{ $u['id'] }}"
+                                                type="button"
+                                                x-show="matches('{{ addslashes(strtolower($u['name'])) }}')"
+                                                @click="$wire.toggleTeamUser({{ $u['id'] }}); query = ''"
+                                                class="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-zinc-50 {{ $isSelected ? 'bg-zinc-50' : '' }}"
+                                            >
+                                                <span class="inline-flex items-center gap-2 min-w-0">
+                                                    <flux:avatar circle name="{{ $u['name'] }}" size="xs" />
+                                                    <span class="truncate text-zinc-800">{{ $u['name'] }}</span>
+                                                </span>
+                                                @if ($isSelected)
+                                                    <flux:icon name="check" class="h-4 w-4 shrink-0 text-emerald-600" />
+                                                @endif
+                                            </button>
+                                        @empty
+                                            <div class="px-3 py-2 text-xs text-zinc-500">Tidak ada user tersedia.</div>
+                                        @endforelse
+                                    </div>
+
+                                    @error('editTeamUser')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                                 </div>
+
+                                {{-- Description --}}
                                 <div>
-                                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Start Date</label>
-                                    <input
-                                        wire:model="editStartDate"
-                                        type="datetime-local"
-                                        class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800 focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    />
-                                    @error('editStartDate')
-                                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                                    @enderror
+                                    <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Description</label>
+                                    <div x-data="editorComponent(@entangle('editDescription'))" wire:ignore class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+                                        <textarea x-ref="editor" rows="6"
+                                            class="w-full resize-none border-0 bg-transparent px-4 py-3 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-0"
+                                            placeholder="Tulis deskripsi tugas..."></textarea>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">End Date</label>
-                                    <input
-                                        wire:model="editEndDate"
-                                        type="datetime-local"
-                                        class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800 focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    />
-                                    @error('editEndDate')
-                                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
-                                    @enderror
+
+                                {{-- Actions --}}
+                                <div class="flex items-center justify-end gap-2 border-t border-zinc-100 pt-4">
+                                    <button wire:click="cancelEditing" type="button"
+                                        class="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50">
+                                        <flux:icon name="x-mark" class="h-4 w-4" />
+                                        Cancel
+                                    </button>
+                                    <button wire:click="updateTask" wire:loading.attr="disabled" wire:target="updateTask" type="button"
+                                        class="inline-flex items-center gap-1.5 rounded-xl bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-60">
+                                        <flux:icon name="check" class="h-4 w-4" />
+                                        <span wire:loading.remove wire:target="updateTask">Save Changes</span>
+                                        <span wire:loading wire:target="updateTask" class="animate-pulse">Saving...</span>
+                                    </button>
+                                </div>
+                            </div>
+                        @else
+                            {{-- View mode --}}
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 {{ $statusColor }}">
+                                        <span class="h-1.5 w-1.5 rounded-full {{ $statusDot }}"></span>
+                                        {{ $statusLabel }}
+                                    </span>
+                                    <span class="text-xs text-zinc-400">·</span>
+                                    <span class="text-xs font-medium text-zinc-500">Task #{{ $task['id'] ?? $id }}</span>
+                                </div>
+
+                                <h1 class="mt-3 text-2xl font-semibold tracking-tight text-zinc-900 sm:text-3xl">
+                                    {{ $task['activity'] }}
+                                </h1>
+
+                                <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-zinc-600">
+                                    <span class="inline-flex items-center gap-2">
+                                        <flux:avatar circle name="{{ $this->user->name ?? 'Unknown' }}" size="xs" />
+                                        <span class="font-medium text-zinc-800">{{ $this->user->name ?? 'Unknown' }}</span>
+                                    </span>
+                                    @if (! empty($task['start_date']))
+                                        <span class="inline-flex items-center gap-1.5 text-zinc-500">
+                                            <flux:icon name="calendar" class="h-4 w-4" />
+                                            {{ Carbon::parse($task['start_date'])->format('d M Y · H:i') }}
+                                            @if (! empty($task['end_date']))
+                                                <span class="text-zinc-300">→</span>
+                                                {{ Carbon::parse($task['end_date'])->format('H:i') }}
+                                            @endif
+                                        </span>
+                                    @endif
+                                    @if ($duration)
+                                        <span class="inline-flex items-center gap-1.5 text-zinc-500">
+                                            <flux:icon name="clock" class="h-4 w-4" />
+                                            {{ $duration }}
+                                        </span>
+                                    @endif
                                 </div>
                             </div>
 
-                            {{-- Description --}}
-                            <div>
-                                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Description</label>
+                            <div class="mt-6 border-t border-zinc-100 pt-6">
+                                <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">Description</h2>
+                                @if (! empty($task['description']))
+                                    <div class="dar-prose">{!! $task['description'] !!}</div>
+                                @else
+                                    <p class="text-sm italic text-zinc-400">No description provided.</p>
+                                @endif
+                            </div>
+
+                            @if ($this->teamUser->isNotEmpty())
+                                <div class="mt-6 border-t border-zinc-100 pt-6">
+                                    <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">Team</h2>
+                                    <div class="flex flex-wrap gap-2">
+                                        @foreach ($this->teamUser as $user)
+                                            <span class="inline-flex items-center gap-2 rounded-full bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200">
+                                                <flux:avatar circle name="{{ $user->name }}" size="xs" />
+                                                {{ $user->name }}
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
+                        @endif
+                    </article>
+
+                    {{-- ── RIGHT: Sidebar ── --}}
+                    <aside class="space-y-5">
+                        {{-- Status card --}}
+                        <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-zinc-200/70">
+                            <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Details</h3>
+                            <dl class="mt-3 space-y-3 text-sm">
+                                <div class="flex items-center justify-between">
+                                    <dt class="text-zinc-500">Status</dt>
+                                    <dd>
+                                        <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 {{ $statusColor }}">
+                                            <span class="h-1.5 w-1.5 rounded-full {{ $statusDot }}"></span>
+                                            {{ $statusLabel }}
+                                        </span>
+                                    </dd>
+                                </div>
+                                @if (! empty($task['start_date']))
+                                    <div class="flex items-center justify-between">
+                                        <dt class="text-zinc-500">Start</dt>
+                                        <dd class="font-medium text-zinc-800">{{ Carbon::parse($task['start_date'])->format('d M, H:i') }}</dd>
+                                    </div>
+                                @endif
+                                @if (! empty($task['end_date']))
+                                    <div class="flex items-center justify-between">
+                                        <dt class="text-zinc-500">End</dt>
+                                        <dd class="font-medium text-zinc-800">{{ Carbon::parse($task['end_date'])->format('d M, H:i') }}</dd>
+                                    </div>
+                                @endif
+                                @if ($duration)
+                                    <div class="flex items-center justify-between">
+                                        <dt class="text-zinc-500">Duration</dt>
+                                        <dd class="font-medium text-zinc-800">{{ $duration }}</dd>
+                                    </div>
+                                @endif
+                                <div class="flex items-center justify-between">
+                                    <dt class="text-zinc-500">Comments</dt>
+                                    <dd class="font-medium text-zinc-800">{{ count($comments) }}</dd>
+                                </div>
+                            </dl>
+                        </div>
+
+                        {{-- Attachments overview --}}
+                        <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-zinc-200/70">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Attachments</h3>
+                                <span class="text-xs font-semibold text-zinc-400">{{ $this->allAttachments->count() }}</span>
+                            </div>
+
+                            @if ($this->allAttachments->isNotEmpty())
+                                <div class="mt-4 space-y-2">
+                                    @foreach ($this->allAttachments as $item)
+                                        <div wire:key="att-{{ $item['id'] }}">
+                                            @include('livewire.dar.partials.attachment-card', ['file' => $item, 'variant' => 'card'])
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <p class="mt-3 text-sm text-zinc-500">No attachments yet.</p>
+                            @endif
+                        </div>
+                    </aside>
+                </div>
+
+                {{-- ── Comments section ── --}}
+                <section class="mt-5 rounded-2xl bg-white shadow-sm ring-1 ring-zinc-200/70">
+                    <header class="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
+                        <div class="flex items-center gap-2">
+                            <flux:icon name="chat-bubble-left-right" class="h-4 w-4 text-zinc-500" />
+                            <h2 class="text-sm font-semibold text-zinc-900">Comments</h2>
+                            <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600">{{ count($comments) }}</span>
+                        </div>
+                    </header>
+
+                    {{-- Comment list --}}
+                    <div x-ref="commentList" class="divide-y divide-zinc-100">
+                        @forelse ($comments as $c)
+                            @include('livewire.dar.partials.comment-item', [
+                                'c' => $c,
+                                'cu' => $commentUsers[$c['user_id']] ?? null,
+                                'isOwn' => ($c['user_id'] ?? null) === Auth::id(),
+                                'isEditing' => $editingCommentId === ($c['id'] ?? null),
+                            ])
+                        @empty
+                            <div class="px-5 py-10 text-center">
+                                <div class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-zinc-100 text-zinc-400">
+                                    <flux:icon name="chat-bubble-left-right" class="h-6 w-6" />
+                                </div>
+                                <p class="text-sm font-medium text-zinc-700">Belum ada komentar</p>
+                                <p class="mt-1 text-xs text-zinc-500">Mulai diskusi dengan menulis komentar pertama.</p>
+                            </div>
+                        @endforelse
+
+                        {{-- Loading skeleton --}}
+                        <div wire:loading.flex wire:target="addComment" class="hidden gap-3 px-5 py-4">
+                            <div class="h-8 w-8 shrink-0 animate-pulse rounded-full bg-zinc-100"></div>
+                            <div class="flex-1 space-y-2">
+                                <div class="h-3 w-24 animate-pulse rounded bg-zinc-100"></div>
+                                <div class="h-10 w-3/4 animate-pulse rounded-xl bg-zinc-100"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- ── Compose ── --}}
+                    <div class="border-t border-zinc-100 px-5 py-4">
+                        <div
+                            x-data="{ dragging: false }"
+                            @dragover.prevent="dragging = true"
+                            @dragleave.prevent="dragging = false"
+                            @drop.prevent="dragging = false; $refs.fileInput.files = $event.dataTransfer.files; $refs.fileInput.dispatchEvent(new Event('change'))"
+                            :class="dragging ? 'ring-2 ring-zinc-400 bg-zinc-50' : 'ring-1 ring-zinc-200'"
+                            class="rounded-2xl bg-white transition focus-within:ring-2 focus-within:ring-zinc-300"
+                        >
+                            <div class="flex items-start gap-3 px-4 pt-3">
+                                <flux:avatar circle name="{{ Auth::user()->name }}" size="sm" class="shrink-0" />
                                 <textarea
-                                    wire:model="editDescription"
-                                    rows="5"
-                                    class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                    placeholder="Task description..."
+                                    wire:model="comment"
+                                    rows="2"
+                                    @keydown.meta.enter="$wire.addComment()"
+                                    @keydown.ctrl.enter="$wire.addComment()"
+                                    class="block w-full resize-none border-0 bg-transparent py-1.5 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-0"
+                                    placeholder="Tulis komentar... (⌘+Enter to send)"
                                 ></textarea>
                             </div>
 
-                            {{-- Actions --}}
-                            <div class="flex items-center justify-end gap-3 pt-2">
-                                <button
-                                    wire:click="cancelEditing"
-                                    type="button"
-                                    class="rounded-xl px-5 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    wire:click="updateTask"
-                                    wire:loading.attr="disabled"
-                                    wire:target="updateTask"
-                                    type="button"
-                                    class="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
-                                >
-                                    <span wire:loading.remove wire:target="updateTask">Save Changes</span>
-                                    <span wire:loading wire:target="updateTask" class="animate-pulse">Saving...</span>
-                                </button>
-                            </div>
-                        </div>
-
-                    @else
-                        {{-- ── View Mode ── --}}
-                        <div class="text-center">
-                            <div class="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-slate-100 text-slate-700">
-                                <svg viewBox="0 0 24 24" class="h-8 w-8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                    <path d="M4.5 6.5l1.2 1.2 2.3-2.7" />
-                                    <path d="M4.5 12.5l1.2 1.2 2.3-2.7" />
-                                    <path d="M4.5 18.5l1.2 1.2 2.3-2.7" />
-                                    <path d="M9 6h11" />
-                                    <path d="M9 12h11" />
-                                    <path d="M9 18h11" />
-                                </svg>
-                            </div>
-
-                            <p class="text-xs font-semibold uppercase tracking-widest text-slate-500">Task</p>
-                            <h1
-                                wire:loading.class="opacity-50"
-                                wire:target="markAsDone"
-                                class="mt-2 text-3xl font-semibold leading-tight tracking-tight text-slate-900 sm:text-4xl"
-                            >
-                                {{ $task['activity'] }}
-                            </h1>
-
-                            <div class="mt-4 flex flex-wrap items-center justify-center gap-2 text-sm text-slate-500">
-                                <span class="inline-flex items-center gap-2">
-                                    <flux:avatar circle name="{{ $this->user->name ?? 'Unknown' }}" size="xs" />
-                                    <span class="font-semibold text-slate-700">{{ $this->user->name ?? 'Unknown' }}</span>
-                                </span>
-                                <span>•</span>
-                                <span>{{ Carbon::parse($task['start_date'] ?? now())->format('M d') }}</span>
-                                <span>•</span>
-                                <span>Notified {{ count($task['team_user'] ?? []) }} people</span>
-                            </div>
-
-                            <div class="mt-5 flex flex-wrap items-center justify-center gap-2">
-                                <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ring-1 {{ $statusColor }}">
-                                    {{ $statusLabel }}
-                                </span>
-                                @if(!empty($task['end_date']))
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
-                                        <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                            <path d="M7 3v3" />
-                                            <path d="M17 3v3" />
-                                            <path d="M3.5 9h17" />
-                                            <path d="M5.5 6h13A2 2 0 0 1 20.5 8v12A2 2 0 0 1 18.5 22h-13A2 2 0 0 1 3.5 20V8A2 2 0 0 1 5.5 6Z" />
-                                        </svg>
-                                        Due {{ Carbon::parse($task['end_date'])->format('d M') }}
-                                    </span>
-                                @endif
-                            </div>
-                        </div>
-
-                        <div class="mt-10 space-y-5 text-lg leading-relaxed text-slate-800">
-                            <p>{{ $task['description'] ?? 'No description provided.' }}</p>
-                        </div>
-
-                        <div class="mt-10 flex flex-wrap items-center justify-center gap-2">
-                            @foreach($this->teamUser as $user)
-                                <span class="inline-flex items-center gap-2 rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
-                                    <flux:avatar circle name="{{ $user->name }}" size="xs" />
-                                    {{ $user->name }}
-                                </span>
-                            @endforeach
-                        </div>
-                    @endif
-
-                </article>
-
-                {{-- Comments Section --}}
-                <section class="mt-8 rounded-3xl bg-white shadow-sm ring-1 ring-slate-200/70">
-                    <header class="flex items-center justify-between border-b border-slate-200/70 px-6 py-4">
-                        <h2 class="text-sm font-semibold text-slate-900">Comments</h2>
-                        <span class="text-xs font-semibold text-slate-500">{{ count($comments) }}</span>
-                    </header>
-
-                    <div class="divide-y divide-slate-200/70">
-                        @forelse($comments as $c)
-                            @php $cu = $commentUsers[$c['user_id']] ?? null; @endphp
-
-                            <article class="px-6 py-5" wire:key="comment-{{ $c['id'] }}">
-                                <div class="flex items-start gap-4">
-                                    <flux:avatar circle name="{{ $cu['name'] ?? 'Unknown' }}" size="sm" class="shrink-0" />
-
-                                    <div class="min-w-0 flex-1">
-                                        <div class="flex flex-wrap items-center gap-2 text-sm">
-                                            <span class="font-semibold text-slate-900">{{ $cu['name'] ?? 'Unknown' }}</span>
-                                            @if(!empty($cu['role_name']))
-                                                <span class="text-slate-500">{{ $cu['role_name'] }}</span>
+                            {{-- File previews --}}
+                            @if (! empty($newFiles))
+                                <div class="mx-4 mt-2 flex flex-wrap gap-2 rounded-xl bg-zinc-50 p-2">
+                                    @foreach ($newFiles as $i => $upload)
+                                        @php
+                                            $fname = $upload->getClientOriginalName();
+                                            $isImg = isImageFile($fname, $upload->getMimeType());
+                                            $meta = fileExtMeta($fname);
+                                        @endphp
+                                        <div wire:key="newfile-{{ $i }}" class="relative flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 pr-7 text-xs">
+                                            @if ($isImg)
+                                                <img src="{{ $upload->temporaryUrl() }}" alt="" class="h-7 w-7 rounded object-cover" />
+                                            @else
+                                                <span class="grid h-7 w-7 place-items-center rounded text-[9px] font-bold {{ $meta['bg'] }} {{ $meta['text'] }}">
+                                                    {{ $meta['label'] }}
+                                                </span>
                                             @endif
-                                            <span class="text-slate-400">•</span>
-                                            <span class="text-slate-500">{{ Carbon::parse($c['created_at'] ?? now())->format('M d') }}</span>
-                                        </div>
-
-                                        @if($editingCommentId === $c['id'])
-                                            {{-- Comment edit form --}}
-                                            <div class="mt-3 space-y-2">
-                                                <textarea
-                                                    wire:model="editingCommentBody"
-                                                    rows="3"
-                                                    class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200"
-                                                ></textarea>
-                                                @error('editingCommentBody')
-                                                    <p class="text-xs text-red-600">{{ $message }}</p>
-                                                @enderror
-                                                <div class="flex items-center gap-2">
-                                                    <button
-                                                        wire:click="updateComment"
-                                                        wire:loading.attr="disabled"
-                                                        wire:target="updateComment"
-                                                        type="button"
-                                                        class="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
-                                                    >
-                                                        <span wire:loading.remove wire:target="updateComment">Save</span>
-                                                        <span wire:loading wire:target="updateComment" class="animate-pulse">Saving...</span>
-                                                    </button>
-                                                    <button
-                                                        wire:click="cancelEditingComment"
-                                                        type="button"
-                                                        class="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
-                                                    >
-                                                        Cancel
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        @else
-                                            <p class="mt-3 text-sm leading-relaxed text-slate-700">
-                                                {{ $c['body'] ?? '' }}
-                                            </p>
-                                        @endif
-                                    </div>
-
-                                    {{-- Comment actions dropdown --}}
-                                    @if($editingCommentId !== $c['id'])
-                                        <div x-data="{ open: false }" class="relative shrink-0">
-                                            <button type="button" @click="open = !open" class="grid h-9 w-9 place-items-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700" aria-label="Comment actions">
-                                                <svg viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor" aria-hidden="true">
-                                                    <circle cx="5" cy="12" r="1.6" />
-                                                    <circle cx="12" cy="12" r="1.6" />
-                                                    <circle cx="19" cy="12" r="1.6" />
-                                                </svg>
+                                            <span class="max-w-35 truncate font-medium text-zinc-700">{{ $fname }}</span>
+                                            <span class="text-zinc-400">{{ formatFileSize($upload->getSize()) }}</span>
+                                            <button
+                                                type="button"
+                                                wire:click="removeNewFile({{ $i }})"
+                                                class="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-red-600"
+                                                aria-label="Remove"
+                                            >
+                                                <flux:icon name="x-mark" class="h-3 w-3" />
                                             </button>
-                                            <div x-cloak x-show="open" @click.away="open = false" x-transition.origin.top.right class="absolute right-0 z-20 mt-2 w-36 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-slate-200/70">
-                                                @if($c['user_id'] === Auth::id())
-                                                    <button
-                                                        wire:click="startEditingComment({{ $c['id'] }}, '{{ addslashes($c['body'] ?? '') }}')"
-                                                        @click="open = false"
-                                                        type="button"
-                                                        class="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                                                    >
-                                                        Edit
-                                                    </button>
-                                                    <button
-                                                        wire:click="deleteComment({{ $c['id'] }})"
-                                                        wire:loading.attr="disabled"
-                                                        wire:target="deleteComment({{ $c['id'] }})"
-                                                        @click="open = false"
-                                                        type="button"
-                                                        class="w-full px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
-                                                    >
-                                                        <span wire:loading.remove wire:target="deleteComment({{ $c['id'] }})">Delete</span>
-                                                        <span wire:loading wire:target="deleteComment({{ $c['id'] }})" class="animate-pulse">Deleting...</span>
-                                                    </button>
-                                                @else
-                                                    <div class="px-3 py-2 text-xs text-slate-400">No actions</div>
-                                                @endif
-                                            </div>
                                         </div>
-                                    @endif
+                                    @endforeach
                                 </div>
-                            </article>
-                        @empty
-                            <div class="px-6 py-6 text-sm text-slate-600">Belum ada komentar.</div>
-                        @endforelse
-                    </div>
+                            @endif
+                            @error('newFiles.*') <p class="mx-4 mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                            @error('comment') <p class="mx-4 mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
 
-                    {{-- Add comment --}}
-                    <div class="border-t border-slate-200/70 px-6 py-5">
-                        <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Add a comment</label>
-                        <div class="mt-2 rounded-2xl ring-1 ring-slate-200/70 focus-within:ring-slate-300 bg-white">
-                            <textarea
-                                wire:model="comment"
-                                rows="3"
-                                class="w-full resize-none rounded-2xl border-0 bg-transparent px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
-                                placeholder="Tulis komentar..."
-                            ></textarea>
-                            <div class="flex items-center justify-end gap-2 px-4 pb-3">
-                                <button
-                                    wire:click="addComment"
-                                    wire:loading.attr="disabled"
-                                    wire:target="addComment"
-                                    type="button"
-                                    class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
-                                >
-                                    <span wire:loading.remove wire:target="addComment">Post</span>
-                                    <span wire:loading wire:target="addComment" class="animate-pulse">Posting...</span>
-                                </button>
+                            {{-- Action bar --}}
+                            <div class="flex items-center justify-between gap-2 border-t border-zinc-100 px-3 py-2">
+                                <label class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-zinc-600 hover:bg-zinc-50">
+                                    <flux:icon name="paper-clip" class="h-4 w-4" />
+                                    <span>Attach</span>
+                                    <input
+                                        x-ref="fileInput"
+                                        type="file"
+                                        wire:model="newFiles"
+                                        multiple
+                                        class="hidden"
+                                    />
+                                </label>
+
+                                <div class="flex items-center gap-2">
+                                    <span wire:loading wire:target="newFiles" class="text-xs text-zinc-500">Uploading...</span>
+                                    <button
+                                        wire:click="addComment"
+                                        wire:loading.attr="disabled"
+                                        wire:target="addComment,newFiles"
+                                        type="button"
+                                        class="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-zinc-800 disabled:opacity-60"
+                                    >
+                                        <span wire:loading.remove wire:target="addComment">Send</span>
+                                        <span wire:loading wire:target="addComment" class="animate-pulse">Sending...</span>
+                                        <flux:icon name="paper-airplane" class="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
                             </div>
                         </div>
+
+                        <p class="mt-2 text-[11px] text-zinc-400">
+                            Drag &amp; drop file ke area di atas, atau klik <span class="font-medium">Attach</span>. Max 10MB per file.
+                        </p>
                     </div>
                 </section>
             @endif
+        </div>
 
+        {{-- ── Image lightbox ── --}}
+        <div
+            x-data="{ open: false, url: '', name: '' }"
+            x-on:open-lightbox.window="open = true; url = $event.detail.url; name = $event.detail.name"
+            x-on:keydown.escape.window="open = false"
+            x-show="open"
+            x-cloak
+            x-transition.opacity
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            @click.self="open = false"
+        >
+            <button
+                @click="open = false"
+                class="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white backdrop-blur hover:bg-white/20"
+                aria-label="Close"
+            >
+                <flux:icon name="x-mark" class="h-5 w-5" />
+            </button>
+            <div class="max-h-full max-w-5xl">
+                <img :src="url" :alt="name" class="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl" />
+                <p class="mt-3 text-center text-sm text-white/80" x-text="name"></p>
+            </div>
         </div>
     </div>
+
+    <script src="https://cdn.ckeditor.com/ckeditor5/35.1.0/classic/ckeditor.js"></script>
+    <script>
+        function teamPicker() {
+            return {
+                open: false,
+                query: '',
+                matches(name) {
+                    if (!this.query) return true;
+                    return name.includes(this.query.toLowerCase());
+                },
+            };
+        }
+
+        function darShow() {
+            return {
+                scrollToLatestComment() {
+                    this.$nextTick(() => {
+                        const list = this.$refs.commentList;
+                        if (!list) return;
+                        const items = list.querySelectorAll('article');
+                        const last = items[items.length - 1];
+                        if (last) {
+                            last.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            last.classList.add('ring-2', 'ring-zinc-300');
+                            setTimeout(() => last.classList.remove('ring-2', 'ring-zinc-300'), 1500);
+                        }
+                    });
+                },
+            };
+        }
+
+        function editorComponent(model) {
+            return {
+                editor: null,
+                value: model,
+                init() {
+                    if (this.editor) return;
+
+                    ClassicEditor
+                        .create(this.$refs.editor)
+                        .then(editor => {
+                            this.editor = editor;
+                            editor.setData(this.value || '');
+                            editor.model.document.on('change:data', () => {
+                                this.value = editor.getData();
+                            });
+                            this.$watch('value', (val) => {
+                                if (editor.getData() !== val) {
+                                    editor.setData(val || '');
+                                }
+                            });
+                        })
+                        .catch(error => console.error(error));
+                },
+            };
+        }
+    </script>
 </div>

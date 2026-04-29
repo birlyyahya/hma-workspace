@@ -31,9 +31,9 @@ new class extends Component {
 
         try {
               if(Auth::user()->role_id < 3){
-                $response = Http::get(env('API_IZIN').'/global/dar/list?limit=1000000')->json();
+                $response = Http::timeout(120)->retry(3, 200)->get(env('API_IZIN').'/global/dar/list?limit=1000000')->json();
             }else {
-                $response = Http::get(env('API_IZIN').'/global/dar/list?limit=1000000&team_user='.Auth::id())->json();
+                $response = Http::timeout(120)->retry(3, 200)->get(env('API_IZIN').'/global/dar/list?limit=1000000&team_user='.Auth::id())->json();
             }
             $this->buildTimeline($response['data'] ?? []);
         } catch (\Throwable $e) {
@@ -63,28 +63,60 @@ new class extends Component {
             })
             ->values();
 
-        $clamped = $relevant->map(function ($item) use ($dayStart, $dayEnd) {
-            $start = Carbon::parse($item['start_date'])->max($dayStart);
-            $end = Carbon::parse($item['end_date'])->min($dayEnd);
+        $processed = $relevant->map(function ($item) use ($dayStart, $dayEnd) {
+            $rawStart = Carbon::parse($item['start_date']);
+            $rawEnd = Carbon::parse($item['end_date']);
+
+            if ($rawEnd->lt($dayStart)) {
+                $timing = 'past';
+            } elseif ($rawStart->gt($dayEnd)) {
+                $timing = 'future';
+            } else {
+                $timing = 'today';
+            }
+
+            if ($timing === 'today') {
+                $displayStart = $rawStart->lt($dayStart) ? $dayStart->copy() : $rawStart->copy();
+                $displayEnd = $rawEnd->gt($dayEnd) ? $dayEnd->copy() : $rawEnd->copy();
+            } else {
+                $displayStart = $rawStart->copy();
+                $displayEnd = $rawEnd->copy();
+            }
+
+            if ($displayEnd->lessThanOrEqualTo($displayStart)) {
+                $displayEnd = $displayStart->copy()->addMinutes(30);
+            }
 
             return [
                 'item' => $item,
-                'start' => $start,
-                'end' => $end->greaterThan($start) ? $end : $start->copy()->addMinutes(30),
+                'start' => $displayStart,
+                'end' => $displayEnd,
+                'timing' => $timing,
             ];
         });
 
-        [$rangeStart, $rangeEnd] = $this->computeRange($clamped);
+        [$rangeStart, $rangeEnd] = $this->computeRange($processed);
         $this->rangeStartHour = $rangeStart;
         $this->rangeEndHour = $rangeEnd;
         $this->hours = $this->buildHours($rangeStart, $rangeEnd);
 
-        $this->events = $clamped->values()->map(function ($entry, $index) use ($rangeStart) {
+        $this->events = $processed->values()->map(function ($entry, $index) use ($rangeStart) {
             $start = $entry['start'];
             $end = $entry['end'];
+            $timing = $entry['timing'];
 
             $startHour = $start->hour + ($start->minute / 60);
             $endHour = $end->hour + ($end->minute / 60);
+
+            if (! $start->isSameDay($end)) {
+                $endHour = 24;
+            }
+
+            $color = match ($timing) {
+                'past' => 'red',
+                'future' => 'sky',
+                default => self::COLORS[$index % count(self::COLORS)],
+            };
 
             return [
                 'title' => $entry['item']['activity'] ?? 'Untitled',
@@ -95,27 +127,32 @@ new class extends Component {
                 'offset' => max(0, $startHour - $rangeStart),
                 'span' => max(0.25, $endHour - $startHour),
                 'row' => $index + 1,
-                'color' => self::COLORS[$index % count(self::COLORS)],
+                'color' => $color,
+                'timing' => $timing,
                 'user' => $entry['item']['user'] ?? null,
             ];
         })->toArray();
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, array{start: Carbon, end: Carbon}>  $clamped
+     * @param  \Illuminate\Support\Collection<int, array{start: Carbon, end: Carbon}>  $processed
      * @return array{0: int, 1: int}
      */
-    private function computeRange($clamped): array
+    private function computeRange($processed): array
     {
-        if ($clamped->isEmpty()) {
+        if ($processed->isEmpty()) {
             return [self::DEFAULT_START, self::DEFAULT_END];
         }
 
-        $minHour = (int) $clamped->map(fn ($e) => $e['start']->hour)->min();
-        $maxHour = (int) $clamped->map(fn ($e) => $e['end']->copy()->addMinutes($e['end']->minute > 0 ? 60 : 0)->hour)->max();
+        $minHour = (int) $processed->map(fn ($e) => $e['start']->hour)->min();
 
-        $maxHour = $clamped->map(fn ($e) => $e['end']->minute > 0 ? $e['end']->hour + 1 : $e['end']->hour)->max();
-        $maxHour = (int) $maxHour;
+        $maxHour = (int) $processed->map(function ($e) {
+            if (! $e['start']->isSameDay($e['end'])) {
+                return 24;
+            }
+
+            return $e['end']->minute > 0 ? $e['end']->hour + 1 : $e['end']->hour;
+        })->max();
 
         $start = min(self::DEFAULT_START, $minHour);
         $end = max(self::DEFAULT_END, $maxHour);
@@ -171,7 +208,7 @@ new class extends Component {
                     <flux:icon name="clock" class="size-5" />
                 </span>
                 <div>
-                    <h2 class="text-sm font-semibold tracking-tight text-slate-900">Task Timeline</h2>
+                    <h2 class="text-sm font-semibold tracking-tight text-slate-900">Timeline Tugas</h2>
                     <p class="text-xs text-slate-500">Agenda hari ini · {{ $date }}</p>
                 </div>
             </div>
@@ -239,6 +276,8 @@ new class extends Component {
                                 'indigo' => 'bg-indigo-50 text-indigo-800 ring-indigo-200 before:bg-indigo-500',
                                 'orange' => 'bg-orange-50 text-orange-800 ring-orange-200 before:bg-orange-500',
                                 'emerald' => 'bg-emerald-50 text-emerald-800 ring-emerald-200 before:bg-emerald-500',
+                                'red' => 'bg-red-50 text-red-800 ring-red-200 before:bg-red-500',
+                                'sky' => 'bg-sky-50 text-sky-800 ring-sky-200 before:bg-sky-500',
                             ];
                         @endphp
 

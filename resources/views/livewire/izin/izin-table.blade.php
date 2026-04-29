@@ -70,8 +70,8 @@ new class extends Component {
     public function fetchData(): void
     {
         try {
-            $response = Http::timeout(5)
-                ->retry(2, 200)
+            $response = Http::timeout(120)
+                ->retry(3)
                 ->get(config('services.api_izin').'/global/izin/list', $this->buildQuery());
 
             if (! $response->successful()) {
@@ -115,7 +115,7 @@ new class extends Component {
             return $this->streamPdf(Cache::get($cacheKey), "izin_{$id}.pdf");
         }
 
-        $response = Http::get(config('services.api_izin').'/global/izin/detail/'.$id)->json();
+        $response = Http::timeout(120)->retry(3, 200)->get(config('services.api_izin').'/global/izin/detail/'.$id)->json();
 
         if (($response['success'] ?? false) !== true) {
             Toaster::error('Gagal generate PDF. Data izin tidak ditemukan.');
@@ -180,7 +180,7 @@ new class extends Component {
         }
 
         try {
-            $imageContent = Http::timeout(5)->get($url)->body();
+            $imageContent = Http::timeout(120)->retry(3, 200)->get($url)->body();
 
             if (! $imageContent) {
                 return null;

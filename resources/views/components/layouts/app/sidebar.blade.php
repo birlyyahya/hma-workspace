@@ -23,10 +23,10 @@
                 Events
             </flux:sidebar.item>
             <flux:sidebar.item icon="banknotes" :href="route('cashadvance')" :current="request()->routeIs('cashadvance')" wire:navigate>
-                Cash Advance (CA)
+                Cash Advance
             </flux:sidebar.item>
-            <flux:sidebar.item icon="bookmark-square" :href="route('dar')" :current="request()->routeIs('dar')" wire:navigate>
-                Daily Activity Report (DAR)
+            <flux:sidebar.item icon="bookmark-square" :href="route('dar')" :current="request()->routeIs('dar') || request()->routeIs('dar.dar-show')" wire:navigate>
+                DAR
             </flux:sidebar.item>
             <flux:sidebar.item icon="archive-box" :href="route('inventaris')" :current="request()->routeIs('inventaris')" wire:navigate>
                 Inventaris

@@ -26,7 +26,7 @@ Route::middleware('auth')->group(function () {
 
     // DAR
     Route::view('dar', 'daily-report')->name('dar');
-    Volt::route('dar/tasks/{id}', 'dar.dar-show')->name('dar.tasks.show');
+    Volt::route('dar/tasks/{id}', 'dar.dar-show')->name('dar.dar-show');
 
     // Izin
     Route::view('izin', 'izin')->name('izin');

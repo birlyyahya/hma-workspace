@@ -6,13 +6,12 @@ use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
+use Masmerise\Toaster\Toaster;
 
 new class extends Component {
 
     public $date;
     public $id; // project id
-    public $tasks = [];
-    public $taskStatus;
 
     public $timelines = [];
     public $activities = [];
@@ -26,133 +25,45 @@ new class extends Component {
     public ?int $editingTimelineId = null;
     public ?int $deletingTimelineId = null;
 
-    public string $form_name = '';
+    public string $form_title = '';
     public string $form_start_date = '';
     public string $form_end_date = '';
 
     #[On('timelineLoad')]
     public function mount(){
-        $this->tasks = Http::get(env('API_IZIN'). '/global/dar/list?user_id='.Auth::user()->id.'&project_id='.$this->id)->json();
-
         // Dummy timelines
-        $this->timelines = [
-            [
-                'id' => 1,
-                'name' => 'Planning',
-                'start_date' => '2025-01-10',
-                'end_date' => '2025-03-20',
-            ],
-            [
-                'id' => 2,
-                'name' => 'Design',
-                'start_date' => '2025-02-01',
-                'end_date' => '2025-05-10',
-            ],
-            [
-                'id' => 3,
-                'name' => 'Development',
-                'start_date' => '2025-03-15',
-                'end_date' => '2025-12-01',
-            ],
-            [
-                'id' => 4,
-                'name' => 'Warranty & Support',
-                'start_date' => '2025-03-15',
-                'end_date' => '2027-12-01',
-            ],
-        ];
+        $response = Http::get(config('services.api_project').'timelines/search?user_id='.Auth::user()->id.'&project_id='.$this->id)->json();
 
-        // Dummy activities
-        $this->activities = [
-            [
-                'id' => 1,
-                'activity' => 'Kickoff Meeting',
-                'description' => 'Pertemuan awal dengan stakeholder untuk menyusun ruang lingkup proyek.',
-                'date' => '2025-01-12',
-                'start_date' => '2025-01-12 09:00:00',
-                'end_date' => '2025-01-12 11:00:00',
-                'status' => 'completed',
-                'project_id' => 1,
-                'timeline_id' => 1,
-            ],
-            [
-                'id' => 2,
-                'activity' => 'Requirement Gathering',
-                'description' => 'Pengumpulan kebutuhan fungsional dan non-fungsional.',
-                'date' => '2025-01-20',
-                'start_date' => '2025-01-20 10:00:00',
-                'end_date' => '2025-01-22 17:00:00',
-                'status' => 'completed',
-                'project_id' => 1,
-                'timeline_id' => 1,
-            ],
-            [
-                'id' => 3,
-                'activity' => 'Wireframe Review',
-                'description' => 'Review wireframe halaman utama dan dashboard.',
-                'date' => '2025-02-05',
-                'start_date' => '2025-02-05 13:00:00',
-                'end_date' => '2025-02-05 15:30:00',
-                'status' => 'completed',
-                'project_id' => 1,
-                'timeline_id' => 2,
-            ],
-            [
-                'id' => 4,
-                'activity' => 'UI Mockup',
-                'description' => 'Pembuatan mockup high-fidelity untuk seluruh modul.',
-                'date' => '2025-02-18',
-                'start_date' => '2025-02-18 09:00:00',
-                'end_date' => '2025-02-25 17:00:00',
-                'status' => 'in-progress',
-                'project_id' => 1,
-                'timeline_id' => 2,
-            ],
-            [
-                'id' => 5,
-                'activity' => 'Setup Repository',
-                'description' => 'Inisialisasi repository, CI/CD, dan environment dev.',
-                'date' => '2025-03-16',
-                'start_date' => '2025-03-16 08:30:00',
-                'end_date' => '2025-03-16 12:00:00',
-                'status' => 'completed',
-                'project_id' => 1,
-                'timeline_id' => 3,
-            ],
-            [
-                'id' => 6,
-                'activity' => 'Sprint 1 Development',
-                'description' => 'Modul autentikasi dan manajemen user.',
-                'date' => '2025-03-20',
-                'start_date' => '2025-03-20 09:00:00',
-                'end_date' => '2025-04-03 17:00:00',
-                'status' => 'in-progress',
-                'project_id' => 1,
-                'timeline_id' => 3,
-            ],
-            [
-                'id' => 7,
-                'activity' => 'Sprint 2 Development',
-                'description' => 'Modul project & timeline.',
-                'date' => '2025-04-10',
-                'start_date' => '2025-04-10 09:00:00',
-                'end_date' => '2025-04-24 17:00:00',
-                'status' => 'pending',
-                'project_id' => 1,
-                'timeline_id' => 3,
-            ],
-            [
-                'id' => 8,
-                'activity' => 'QA Testing',
-                'description' => 'Pengujian internal sebelum UAT.',
-                'date' => '2025-05-08',
-                'start_date' => '2025-05-08 09:00:00',
-                'end_date' => '2025-05-09 17:00:00',
-                'status' => 'pending',
-                'project_id' => 1,
-                'timeline_id' => 2,
-            ],
-        ];
+        if($response['status'] !== 200) {
+            Toaster::error('Failed to load timelines. Please refresh the page.');
+
+            \Log::error('Timeline loading failed', [
+                'response_status' => $response['status'],
+                'response_message' => $response['message'] ?? 'No message',
+                'response_errors' => $response['errors'],
+            ]);
+            return;
+        }
+
+        $this->timelines = $response['data'] ?? [];
+
+
+
+        $response_dar = Http::get(config('services.api_izin'). '/global/dar/list?team_user='.Auth::user()->id.'&project_id='.$this->id)->json();
+
+        if(!$response_dar['success']) {
+            Toaster::error('Failed to load activities. Please refresh the page.');
+
+            \Log::error('Activities loading failed', [
+                'response_status' => $response_dar['success'],
+                'response_message' => $response_dar['message'] ?? 'No message',
+                'response_errors' => $response_dar['errors'],
+            ]);
+            return;
+        }
+
+        $this->activities = $response_dar['data'] ?? [];
+
 
         $start = collect($this->timelines)->min('start_date');
         $end = collect($this->timelines)->max('end_date');
@@ -225,7 +136,7 @@ new class extends Component {
     {
         $this->resetValidation();
         $this->editingTimelineId = null;
-        $this->form_name = '';
+        $this->form_title = '';
         $this->form_start_date = Carbon::now()->format('Y-m-d');
         $this->form_end_date = Carbon::now()->addMonth()->format('Y-m-d');
         $this->showTimelineModal = true;
@@ -240,7 +151,7 @@ new class extends Component {
         }
 
         $this->editingTimelineId = $id;
-        $this->form_name = $tl['name'];
+        $this->form_title = $tl['title'];
         $this->form_start_date = $tl['start_date'];
         $this->form_end_date = $tl['end_date'];
         $this->showTimelineModal = true;
@@ -250,32 +161,51 @@ new class extends Component {
     public function saveTimeline(): void
     {
         $this->validate([
-            'form_name' => ['required', 'string', 'min:2', 'max:80'],
+            'form_title' => ['required', 'string', 'min:2', 'max:80'],
             'form_start_date' => ['required', 'date'],
             'form_end_date' => ['required', 'date', 'after_or_equal:form_start_date'],
         ], [], [
-            'form_name' => 'nama timeline',
+            'form_title' => 'nama timeline',
             'form_start_date' => 'tanggal mulai',
             'form_end_date' => 'tanggal akhir',
         ]);
 
         if ($this->editingTimelineId) {
+
             $this->timelines = collect($this->timelines)->map(function ($tl) {
                 if ($tl['id'] === $this->editingTimelineId) {
-                    $tl['name'] = $this->form_name;
+                    $tl['title'] = $this->form_title;
                     $tl['start_date'] = $this->form_start_date;
                     $tl['end_date'] = $this->form_end_date;
                 }
                 return $tl;
             })->all();
         } else {
-            $nextId = (int) (collect($this->timelines)->max('id') ?? 0) + 1;
+            $response = Http::post(config('services.api_project').'timelines', [
+                'user_id' => Auth::user()->id,
+                'project_id' => $this->id,
+                'title' => $this->form_title,
+                'start_date' => $this->form_start_date,
+                'end_date' => $this->form_end_date,
+            ]);
+
+            if ($response['status'] !== 201) {
+                Toaster::error('Failed to create timeline. Please try again.');
+                \Log::error('Timeline creation failed', [
+                    'response_status' => $response['status'],
+                    'response_message' => $response['message'] ?? 'No message',
+                    'response_errors' => $response['errors'],
+                ]);
+                return;
+            }
             $this->timelines[] = [
-                'id' => $nextId,
-                'name' => $this->form_name,
+                'id' => $response['data']['id'],
+                'title' => $this->form_title,
                 'start_date' => $this->form_start_date,
                 'end_date' => $this->form_end_date,
             ];
+
+            Toaster::success('Timeline created successfully!');
         }
 
         $this->recomputeMonths();
@@ -286,7 +216,7 @@ new class extends Component {
     {
         $this->showTimelineModal = false;
         $this->editingTimelineId = null;
-        $this->form_name = '';
+        $this->form_title = '';
         $this->form_start_date = '';
         $this->form_end_date = '';
     }
@@ -303,13 +233,28 @@ new class extends Component {
             return;
         }
 
+        $response = Http::delete(config('services.api_project').'timelines/'.$this->deletingTimelineId);
+
+        if($response['status'] !== 200) {
+            Toaster::error('Failed to delete timeline. Please try again.');
+
+            \Log::error('Timeline deletion failed', [
+                'response_status' => $response['status'],
+                'response_message' => $response['message'] ?? 'No message',
+                'response_errors' => $response['errors'],
+            ]);
+            return;
+        }
+
         $this->timelines = collect($this->timelines)
-            ->reject(fn ($tl) => $tl['id'] === $this->deletingTimelineId)
-            ->values()
-            ->all();
+        ->reject(fn ($tl) => $tl['id'] === $this->deletingTimelineId)
+        ->values()
+        ->all();
 
         $this->deletingTimelineId = null;
         $this->showDeleteModal = false;
+
+        Toaster::success('Timeline deleted successfully!');
         $this->recomputeMonths();
     }
 
@@ -422,7 +367,7 @@ new class extends Component {
                 <div wire:key="tl-chip-{{ $tl['id'] }}"
                      class="group inline-flex items-center gap-2 pl-3 pr-1 py-1 rounded-full bg-gray-50 border text-xs text-gray-700 hover:border-gray-300 transition">
                     <flux:icon name="flag" class="size-3 text-gray-400" />
-                    <span class="font-medium">{{ $tl['name'] }}</span>
+                    <span class="font-medium">{{ $tl['title'] }}</span>
                     <span class="text-gray-400">
                         {{ Carbon::parse($tl['start_date'])->locale('id')->translatedFormat('d M') }}
                         –
@@ -454,7 +399,7 @@ new class extends Component {
             <ol class="relative border-l border-gray-200 ml-3 space-y-6">
                 @foreach($monthActivities as $activity)
                 @php
-                $tl = collect($timelines)->firstWhere('id', $activity['timeline_id']);
+                $tl = collect($timelines)->firstWhere('id', $activity['project_category_id']);
                 $status = $statusMap[$activity['status']] ?? $statusMap['pending'];
                 @endphp
                 <li wire:key="act-{{ $activity['id'] }}" class="ml-6">
@@ -467,7 +412,7 @@ new class extends Component {
                             </time>
                             @if($tl)
                             <span class="text-xs px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600">
-                                {{ $tl['name'] }}
+                                {{ $tl['title'] }}
                             </span>
                             @endif
                         </div>
@@ -529,8 +474,8 @@ new class extends Component {
             <form wire:submit="saveTimeline" class="space-y-4">
                 <flux:field>
                     <flux:label>Nama Timeline</flux:label>
-                    <flux:input wire:model="form_name" placeholder="cth: Planning, Design, Development" autofocus />
-                    <flux:error name="form_name" />
+                    <flux:input wire:model="form_title" placeholder="cth: Planning, Design, Development" autofocus />
+                    <flux:error name="form_title" />
                 </flux:field>
 
                 <div class="grid grid-cols-2 gap-3">
@@ -564,7 +509,7 @@ new class extends Component {
         @php
         $deletingTl = collect($timelines)->firstWhere('id', $deletingTimelineId);
         $linkedActivities = $deletingTimelineId
-            ? collect($activities)->where('timeline_id', $deletingTimelineId)->count()
+            ? collect($activities)->where('project_category_id', $deletingTimelineId)->count()
             : 0;
         @endphp
 
@@ -577,7 +522,7 @@ new class extends Component {
                     <flux:heading size="md">Hapus Timeline?</flux:heading>
                     <flux:text class="mt-1 text-sm text-gray-500">
                         Timeline
-                        <span class="font-semibold text-gray-700">"{{ $deletingTl['name'] ?? '' }}"</span>
+                        <span class="font-semibold text-gray-700">"{{ $deletingTl['title'] ?? '' }}"</span>
                         akan dihapus.
                         @if($linkedActivities > 0)
                         Ada <span class="font-semibold text-red-600">{{ $linkedActivities }} aktivitas</span> yang
@@ -624,7 +569,7 @@ new class extends Component {
                             <flux:icon name="flag" class="w-4 h-4 text-zinc-500" />
                         </div>
                         <div class="min-w-0">
-                            <p class="text-sm font-semibold text-gray-900 truncate">{{ $tl['name'] }}</p>
+                            <p class="text-sm font-semibold text-gray-900 truncate">{{ $tl['title'] }}</p>
                             <p class="text-xs text-gray-500">
                                 {{ Carbon::parse($tl['start_date'])->locale('id')->translatedFormat('d M Y') }}
                                 –

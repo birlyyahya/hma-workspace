@@ -15,7 +15,7 @@ new #[Lazy] class extends Component {
     protected function fetchProject(): void
     {
         try {
-            $response = Http::get(
+            $response = Http::timeout(120)->retry(3, 200)->get(
                 rtrim((string) config('services.api_project'), '/').'/projects/'.$this->id
             )->json();
 
@@ -90,7 +90,7 @@ new #[Lazy] class extends Component {
             }"
         >
             {{-- ============ STICKY HEADER ============ --}}
-            <div class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-zinc-200">
+            <div class="md:sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-zinc-200">
                 <div class="px-4 sm:px-6 pt-4 pb-0">
                     {{-- Breadcrumb --}}
                     <nav class="flex items-center gap-1.5 text-xs text-zinc-500 mb-3">

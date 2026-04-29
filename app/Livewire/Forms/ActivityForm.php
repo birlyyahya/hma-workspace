@@ -26,7 +26,7 @@ class ActivityForm extends Form
 
     public $project_id;
 
-    public $spectech_id;
+    public $timelines_id;
 
     public $isproject = false;
 
@@ -44,7 +44,7 @@ class ActivityForm extends Form
 
         if ($this->isproject) {
             $rules['project_id'] = ['required', 'integer'];
-            $rules['spectech_id'] = ['required', 'integer'];
+            $rules['timelines_id'] = ['required', 'integer'];
         }
 
         return $rules;
@@ -62,7 +62,7 @@ class ActivityForm extends Form
 
         $this->status = 1;
         $this->project_id = null;
-        $this->spectech_id = null;
+        $this->timelines_id = null;
         $this->team_user = [];
     }
 
@@ -89,7 +89,7 @@ class ActivityForm extends Form
             'team_user' => $teamUser,
             'status' => $this->status,
             'project_id' => $this->project_id,
-            'project_category_id' => $this->spectech_id,
+            'timelines_id' => $this->timelines_id,
         ]);
 
         return $response;

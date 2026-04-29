@@ -18,7 +18,7 @@ new class extends Component {
     public array $projectData = [];
     public array $users = [];
     public $projectSelected = null;
-    public array $spectech = [];
+    public array $timelines = [];
     public string $search = '';
 
     public bool $loading = true;
@@ -45,8 +45,8 @@ new class extends Component {
 
     public function updatedProjectSelected(): void
     {
-        $project = collect($this->projectData['data'] ?? [])->firstWhere('id', $this->projectSelected);
-        $this->spectech = $project['specktech'] ?? [];
+        collect($this->projectData['data'] ?? [])->firstWhere('id', $this->projectSelected);
+        $this->timelines = Http::get(config('services.api_project').'timelines/search?project_id='.$this->projectSelected.'&user_id='.Auth::id())->json()['data'] ?? [];
         $this->form->project_id = $this->projectSelected;
     }
 
@@ -59,19 +59,18 @@ new class extends Component {
             $apiIzin = rtrim(config('services.api_izin'), '/');
 
             if(Auth::user()->role_id < 3){
-                $response = Http::get(
+                $response = Http::timeout(120)->retry(3, 200)->get(
                     $apiIzin.'/global/dar/list?limit=50000&search='.$this->search
                 )->json();
             } else {
-            $response = Http::get(
+            $response = Http::timeout(120)->retry(3, 200)->get(
                 $apiIzin.'/global/dar/list?team_user='.Auth::id().'&limit=50000&search='.$this->search
             )->json();
             }
-
             $this->tasks = $response['data'] ?? [];
         } catch (\Throwable $e) {
             $this->tasks = [];
-            Toaster::error('Server PM Error, silahkan coba lagi atau menghubungi tim IT');
+            Toaster::error('Server DAR Error, silahkan coba lagi atau menghubungi tim IT');
             Log::error('DAR list API failed', ['message' => $e->getMessage()]);
         } finally {
             $this->loading = false;
@@ -123,7 +122,7 @@ new class extends Component {
 
         $this->resetForm();
         $this->projectSelected = null;
-        $this->spectech = [];
+        $this->timelines = [];
 
         Flux::modals()->close('create-task');
 
@@ -214,13 +213,13 @@ new class extends Component {
             <div class="flex items-center gap-3">
                 <flux:modal.trigger name="create-task">
                     <flux:button icon="plus-circle" iconClasses="size-6" variant="outline">
-                        Tambah task
+                        Tambah Tugas
                     </flux:button>
                 </flux:modal.trigger>
 
                 <div class="flex flex-1 items-center gap-4">
                     <div class="h-px flex-1 bg-slate-200/70"></div>
-                    <h2 class="text-lg font-semibold tracking-tight text-slate-800">Tasks</h2>
+                    <h2 class="text-lg font-semibold tracking-tight text-slate-800">Tugas</h2>
                     <div class="h-px flex-1 bg-slate-200/70"></div>
                 </div>
 
@@ -239,7 +238,7 @@ new class extends Component {
                 @php
                 $status = $task['status'] ?? 'Draft';
                 $taskId = $task['id'] ?? null;
-                $taskUrl = $taskId ? route('dar.tasks.show', $taskId) : '#';
+                $taskUrl = $taskId ? route('dar.dar-show', $taskId) : '#';
                 $statusColor = match ($status) {
                 1 => 'bg-slate-50 text-slate-700 ring-slate-200', // pending
                 2 => 'bg-amber-50 text-amber-800 ring-amber-200', // hold
@@ -264,8 +263,8 @@ new class extends Component {
                                 <a href="{{ $taskUrl }}" class="text-base font-semibold leading-snug text-slate-900">
                                     {{ ucwords($task['activity']) ?? 'Untitled task' }}
                                 </a>
-                                <a href="{{ $taskUrl }}" class="mt-1 text-sm leading-relaxed text-slate-600 line-clamp-3">
-                                    {{ $task['description'] ?? 'No description provided.' }}
+                                <a href="{{ $taskUrl }}" class="mt-1 text-sm leading-relaxed text-slate-600 line-clamp-1">
+                                    {!! $task['description'] ?? 'No description provided.' !!}
                                 </a>
                             </div>
 
@@ -344,7 +343,7 @@ new class extends Component {
                 </article>
                 @empty
                 <div class="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600">
-                    Belum ada task. Klik <span class="font-semibold">Tambah task</span> untuk membuat yang baru.
+                    Belum ada tugas. Klik <span class="font-semibold">Tambah Tugas</span> untuk membuat yang baru.
                 </div>
                 @endforelse
             </div>
@@ -403,9 +402,9 @@ new class extends Component {
                     </svg>
                 </div>
                 <div class="min-w-0 flex-1">
-                    <flux:heading size="lg">Hapus task ini?</flux:heading>
+                    <flux:heading size="lg">Hapus tugas ini?</flux:heading>
                     <flux:text class="mt-1 text-sm text-slate-600">
-                        Task <span class="font-semibold text-slate-900">"{{ $pendingDeleteName ?: 'Untitled task' }}"</span>
+                        Tugas <span class="font-semibold text-slate-900">"{{ $pendingDeleteName ?: 'Untitled task' }}"</span>
                         akan dihapus secara permanen beserta seluruh aktivitas terkait. Tindakan ini tidak dapat dibatalkan.
                     </flux:text>
                 </div>
@@ -419,7 +418,7 @@ new class extends Component {
                     wire:loading.attr="disabled"
                     wire:target="deleteTask"
                 >
-                    <span wire:loading.remove wire:target="deleteTask">Hapus task</span>
+                    <span wire:loading.remove wire:target="deleteTask">Hapus tugas</span>
                     <span wire:loading wire:target="deleteTask">Menghapus...</span>
                 </flux:button>
             </div>
@@ -429,7 +428,7 @@ new class extends Component {
     <flux:modal x-data="{ isProject: false }" name="create-task" class="min-w-2xl overflow-visible">
         <form wire:submit='createActivity' class="space-y-6">
             <div>
-                <flux:heading size="lg">Create Activity</flux:heading>
+                <flux:heading size="lg">Buat Tugas</flux:heading>
             </div>
             <flux:input wire:model='form.activity' placeholder="Nama Tugas" />
             @error('form.activity')
@@ -451,15 +450,22 @@ new class extends Component {
             <flux:error message="{{ $message }}" />
             @enderror
             <div x-show="isProject" x-transition>
-                <flux:select wire:model='form.spectech_id' placeholder="Choose Spectech...">
-                    @foreach ($this->spectech ?? [] as $item)
-                    <flux:select.option value="{{ $item['id'] }}">{{ $item['name'] }}</flux:select.option>
+                @if(!empty($this->timelines))
+                <flux:select wire:model='form.timelines_id' placeholder="Choose timelines...">
+                    @foreach ($this->timelines ?? [] as $item)
+                    <flux:select.option value="{{ $item['id'] }}">{{ $item['title'] }}</flux:select.option>
                     @endforeach
-                    <flux:select.option value="0">Non Spectech / All Spectech</flux:select.option>
-                    <flux:select.option value="-1">Timeline Project</flux:select.option>
                 </flux:select>
+                @else
+                 <div wire:loading wire:target="updatedProjectSelected, projectSelected" class="text-sm text-slate-500">
+                    Loading timeline...
+                </div>
+                <div wire:loading.remove wire:target="updatedProjectSelected, projectSelected" class="rounded bg-yellow-50 p-4 text-sm text-yellow-700 ring-1 ring-yellow-200">
+                    Tidak ada timeline tersedia untuk project ini. Silakan buat timeline terlebih dahulu di menu project.
+                </div>
+                @endif
             </div>
-            @error('form.spectech_id')
+            @error('form.timelines_id')
             <flux:error message="{{ $message }}" />
             @enderror
             <div class="grid grid-cols-2 gap-4">
@@ -490,7 +496,7 @@ new class extends Component {
             <flux:error message="{{ $message }}" />
             @enderror
             <div class="flex justify-end">
-                <flux:button type="submit" variant="primary">Create Task</flux:button>
+                <flux:button type="submit" variant="primary">Buat tugas</flux:button>
             </div>
 
         </form>

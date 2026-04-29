@@ -339,7 +339,7 @@ new class extends Component {
         {{-- ============ RIGHT: SUMMARY ============ --}}
         <div class="space-y-4">
             {{-- Progress widget --}}
-            <div class="bg-white rounded-xl p-6 border border-zinc-200 space-y-5 sticky top-4">
+            <div class="bg-white rounded-xl p-6 border border-zinc-200 space-y-5 md:sticky md:top-47 top-4">
                 <div class="flex items-center justify-between gap-3">
                     <flux:heading size="md" class="font-semibold text-zinc-900">
                         Progress Pekerjaan

@@ -59,7 +59,7 @@ new class extends Component {
 
     protected function refreshFolderCounts(): void
     {
-        $response = Http::get($this->endpoint('admin-docs/search'), [
+        $response = Http::timeout(120)->retry(3, 200)->get($this->endpoint('admin-docs/search'), [
             'project_id' => $this->id,
             'limit'      => 10000,
             'sortBy'     => 'created_at',
@@ -80,7 +80,7 @@ new class extends Component {
 
     protected function fetchFiles(int $limit): array
     {
-        $response = Http::get($this->endpoint('admin-docs/search'), [
+        $response = Http::timeout(120)->retry(3, 200)->get($this->endpoint('admin-docs/search'), [
             'project_id'     => $this->id,
             'limit'          => $limit,
             'extension_type' => $this->type,
@@ -216,7 +216,7 @@ new class extends Component {
 
     public function getCategoryProperty(): array
     {
-        $response = Http::get($this->endpoint('admin-doc-categories'), ['limit' => 1000])->json();
+        $response = Http::timeout(120)->retry(3, 200)->get($this->endpoint('admin-doc-categories'), ['limit' => 1000])->json();
         return $response['data'] ?? [];
     }
 

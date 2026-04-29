@@ -16,9 +16,9 @@ new class extends Component {
     public function mount(): void
     {
           if(Auth::user()->role_id < 3){
-              $response = Http::get(env('API_IZIN').'/global/dar/list?limit=1000000')->json();
+              $response = Http::timeout(120)->retry(3, 200)->get(env('API_IZIN').'/global/dar/list?limit=1000000')->json();
           }else {
-              $response = Http::get(env('API_IZIN').'/global/dar/list?limit=1000000&team_user='.Auth::id())->json();
+              $response = Http::timeout(120)->retry(3, 200)->get(env('API_IZIN').'/global/dar/list?limit=1000000&team_user='.Auth::id())->json();
           }
 
         $today = now()->startOfDay();
@@ -165,6 +165,7 @@ new class extends Component {
 
         $this->mount();
 
+        $this->dispatch('updatedTimeline');
         $this->dispatch('updatedCardTaskDar');
     }
 }; ?>
@@ -186,7 +187,7 @@ new class extends Component {
                                 </svg>
                             </span>
                             <div>
-                                <h2 class="text-sm font-semibold tracking-tight text-slate-900">Messages</h2>
+                                <h2 class="text-sm font-semibold tracking-tight text-slate-900">Message Board</h2>
                                 <p class="text-xs text-slate-500">Message board terbaru</p>
                             </div>
                         </div>
@@ -227,8 +228,8 @@ new class extends Component {
                                             <span class="font-medium {{ $msg->unread > 0 ? 'text-blue-500' : 'text-slate-500' }}">replies</span>
                                         </span>
                                     </div>
-                                    <p class="mt-0.5 text-xs leading-relaxed text-slate-600 line-clamp-2">
-                                        {{ $msg->description }}
+                                    <p class="mt-0.5 text-xs leading-relaxed text-slate-600 line-clamp-1">
+                                        {!! $msg->description !!}
                                     </p>
                                     @if(!empty($msg->created_at))
                                         <p class="mt-1 text-[11px] text-slate-400">
@@ -393,9 +394,6 @@ new class extends Component {
                                             <div class="min-w-0 flex-1">
                                                 <p class="truncate text-sm font-semibold text-slate-900 group-hover:text-slate-950">
                                                     {{ $schedule->title }}
-                                                </p>
-                                                <p class="mt-0.5 text-xs leading-relaxed text-slate-600">
-                                                    {{ $schedule->description }}
                                                 </p>
                                             </div>
                                         </div>

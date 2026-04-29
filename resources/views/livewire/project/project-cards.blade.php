@@ -18,7 +18,7 @@ new class extends Component
 
     public function fetchProjects(): void
     {
-        $response = Http::get(config('services.api_project') . 'projects/search', [
+        $response = Http::timeout(120)->retry(3, 200)->get(config('services.api_project') . 'projects/search', [
             'limit' => $this->limit,
             'page'  => $this->currentPage,
             'name'  => $this->search,
