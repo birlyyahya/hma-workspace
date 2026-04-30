@@ -47,19 +47,17 @@
                         @if (Auth::user()->level >= 60)
                             <a href="{{ route('izin.laporan-pengajuan') }}" class="w-full sm:w-auto">
                                 <flux:button
-                                    icon="document-chart-bar"
-                                    variant="outline"
-                                    class="cursor-pointer w-full sm:w-auto border-white/30! text-white! hover:bg-white/10!"
-                                >
-                                    Laporan Pengajuan
-                                </flux:button>
+                                icon="document-text"
+                                variant="primary"
+                                class="cursor-pointer w-full sm:w-auto bg-white! text-red-700! hover:bg-white/90!"
+                            >
+                                Laporan Pengajuan
+                            </flux:button>
                             </a>
                         @endif
                     </div>
                 </div>
             </div>
-
-
             <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
                 <livewire:izin.widget.report-izin lazy />
                 <livewire:izin.widget.report-izin-category lazy />
