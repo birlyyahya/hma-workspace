@@ -33,8 +33,13 @@ class extends Component {
     public string $editStartDate = '';
     public string $editEndDate = '';
     public array $editTeamUser = [];
+    public bool $editIsProject = false;
+    public ?int $editProjectId = null;
+    public ?int $editProjectCategoryId = null;
 
     public array $availableUsers = [];
+    public array $projectData = [];
+    public array $editTimelines = [];
 
     // Edit comment
     public ?int $editingCommentId = null;
@@ -48,7 +53,49 @@ class extends Component {
             ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
             ->toArray();
 
+        try {
+            $apiProject = rtrim(config('services.api_project'), '/');
+            $response = Http::get($apiProject . '/projects/search?project_leader_id=' . Auth::id())->json();
+            $this->projectData = $response['data'] ?? [];
+        } catch (\Throwable $e) {
+            $this->projectData = [];
+            Log::warning('Failed to load project list for DAR edit', ['message' => $e->getMessage()]);
+        }
+
         $this->loadTask();
+    }
+
+    protected function loadTimelines(?int $projectId): void
+    {
+        if (! $projectId) {
+            $this->editTimelines = [];
+
+            return;
+        }
+
+        try {
+            $apiProject = rtrim(config('services.api_project'), '/');
+            $response = Http::get($apiProject . '/timelines/search?project_id=' . $projectId . '&user_id=' . Auth::id())->json();
+            $this->editTimelines = $response['data'] ?? [];
+        } catch (\Throwable $e) {
+            $this->editTimelines = [];
+            Log::warning('Failed to load timelines', ['message' => $e->getMessage()]);
+        }
+    }
+
+    public function updatedEditProjectId($value): void
+    {
+        $this->editProjectCategoryId = null;
+        $this->loadTimelines($value ? (int) $value : null);
+    }
+
+    public function updatedEditIsProject($value): void
+    {
+        if (! $value) {
+            $this->editProjectId = null;
+            $this->editProjectCategoryId = null;
+            $this->editTimelines = [];
+        }
     }
 
     protected function loadTask(): void
@@ -105,6 +152,13 @@ class extends Component {
             ->map(fn ($id) => (int) $id)
             ->values()
             ->toArray();
+
+        $this->editProjectId = ! empty($this->task['project_id']) ? (int) $this->task['project_id'] : null;
+        $this->editProjectCategoryId = ! empty($this->task['project_category_id']) ? (int) $this->task['project_category_id'] : null;
+        $this->editIsProject = (bool) $this->editProjectId;
+
+        $this->loadTimelines($this->editProjectId);
+
         $this->editing = true;
     }
 
@@ -124,19 +178,28 @@ class extends Component {
 
     public function updateTask(): void
     {
-        $this->validate([
+        $rules = [
             'editActivity' => ['required', 'min:3'],
             'editStatus' => ['required', 'integer'],
             'editStartDate' => ['required'],
             'editEndDate' => ['required'],
             'editTeamUser' => ['nullable', 'array'],
             'editTeamUser.*' => ['integer'],
-        ]);
+        ];
+
+        if ($this->editIsProject) {
+            $rules['editProjectId'] = ['required', 'integer'];
+            $rules['editProjectCategoryId'] = ['required', 'integer'];
+        }
+
+        $this->validate($rules);
 
         $response = null;
 
         try {
             $teamUser = collect($this->editTeamUser)->map(fn ($id) => (int) $id)->values()->toArray();
+            $projectId = $this->editIsProject && $this->editProjectId ? (int) $this->editProjectId : null;
+            $categoryId = $this->editIsProject && $this->editProjectCategoryId ? (int) $this->editProjectCategoryId : null;
 
             $response = Http::post(config('services.api_izin') . "/global/dar/update/{$this->id}", [
                 '_method' => 'PUT',
@@ -148,6 +211,9 @@ class extends Component {
                 'end_date' => $this->editEndDate,
                 'team' => $teamUser,
                 'team_user' => $teamUser,
+                'project_id' => $projectId,
+                'timelines_id' => $categoryId,
+                'project_category_id' => $categoryId,
             ]);
 
             if ($response['success']) {
@@ -159,6 +225,8 @@ class extends Component {
                     'start_date' => $this->editStartDate,
                     'end_date' => $this->editEndDate,
                     'team_user' => collect($teamUser)->map(fn ($id) => ['user_id' => $id])->toArray(),
+                    'project_id' => $projectId,
+                    'project_category_id' => $categoryId,
                 ];
                 $this->editing = false;
                 Toaster::success('Task updated successfully!');
@@ -565,6 +633,57 @@ class extends Component {
                                     </div>
                                 </div>
 
+                                {{-- Project category --}}
+                                <div class="rounded-xl border border-zinc-200 bg-zinc-50/60 p-4">
+                                    <label class="flex cursor-pointer items-start gap-3">
+                                        <input
+                                            wire:model.live="editIsProject"
+                                            type="checkbox"
+                                            class="mt-0.5 h-4 w-4 cursor-pointer rounded border-zinc-300 text-zinc-900 focus:ring-zinc-400"
+                                        />
+                                        <span class="flex-1">
+                                            <span class="block text-sm font-semibold text-zinc-900">Kegiatan Project</span>
+                                            <span class="block text-xs text-zinc-500">Centang jika tugas ini terkait dengan project tertentu.</span>
+                                        </span>
+                                    </label>
+
+                                    @if ($editIsProject)
+                                        <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            <div>
+                                                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Project</label>
+                                                <select wire:model.live="editProjectId"
+                                                    class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-800 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200">
+                                                    <option value="">— Pilih project —</option>
+                                                    @foreach ($projectData as $proj)
+                                                        <option value="{{ $proj['id'] }}">{{ $proj['name'] }}</option>
+                                                    @endforeach
+                                                </select>
+                                                @error('editProjectId')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                                            </div>
+                                            <div>
+                                                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Timeline / Category</label>
+                                                @if ($editProjectId && empty($editTimelines))
+                                                    <div wire:loading wire:target="editProjectId,updatedEditProjectId" class="rounded-xl bg-zinc-100 px-3 py-2.5 text-xs text-zinc-500">
+                                                        Memuat timeline...
+                                                    </div>
+                                                    <div wire:loading.remove wire:target="editProjectId,updatedEditProjectId" class="rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-700 ring-1 ring-amber-200">
+                                                        Tidak ada timeline untuk project ini.
+                                                    </div>
+                                                @else
+                                                    <select wire:model="editProjectCategoryId" @disabled(! $editProjectId)
+                                                        class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-800 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200 disabled:cursor-not-allowed disabled:opacity-50">
+                                                        <option value="">— Pilih timeline —</option>
+                                                        @foreach ($editTimelines as $tl)
+                                                            <option value="{{ $tl['id'] }}">{{ $tl['title'] ?? $tl['name'] ?? '#' . $tl['id'] }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                @endif
+                                                @error('editProjectCategoryId')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                                            </div>
+                                        </div>
+                                    @endif
+                                </div>
+
                                 {{-- Team picker --}}
                                 @php
                                     $userMap = collect($availableUsers)->keyBy('id');
@@ -674,13 +793,28 @@ class extends Component {
                         @else
                             {{-- View mode --}}
                             <div>
-                                <div class="flex items-center gap-2">
+                                <div class="flex flex-wrap items-center gap-2">
                                     <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 {{ $statusColor }}">
                                         <span class="h-1.5 w-1.5 rounded-full {{ $statusDot }}"></span>
                                         {{ $statusLabel }}
                                     </span>
                                     <span class="text-xs text-zinc-400">·</span>
                                     <span class="text-xs font-medium text-zinc-500">Task #{{ $task['id'] ?? $id }}</span>
+                                    @if (! empty($task['project_id']))
+                                        @php
+                                            $projName = collect($projectData)->firstWhere('id', $task['project_id'])['name'] ?? null;
+                                        @endphp
+                                        <span class="text-xs text-zinc-400">·</span>
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
+                                            <flux:icon name="briefcase" class="h-3 w-3" />
+                                            {{ $projName ?? 'Project #' . $task['project_id'] }}
+                                        </span>
+                                    @else
+                                        <span class="text-xs text-zinc-400">·</span>
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200">
+                                            Non-project
+                                        </span>
+                                    @endif
                                 </div>
 
                                 <h1 class="mt-3 text-2xl font-semibold tracking-tight text-zinc-900 sm:text-3xl">
