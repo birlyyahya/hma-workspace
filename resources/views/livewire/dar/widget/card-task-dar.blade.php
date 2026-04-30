@@ -39,8 +39,6 @@ new class extends Component {
 
         $this->fetchTasks();
         $this->resetForm();
-
-        $this->dispatch('initSelect2');
     }
 
     public function updatedProjectSelected(): void
@@ -92,6 +90,20 @@ new class extends Component {
             ->all();
     }
 
+    public function toggleTeamUser(int $userId): void
+    {
+        $current = collect($this->form->team_user ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if (in_array($userId, $current, true)) {
+            $this->form->team_user = array_values(array_filter($current, fn ($id) => $id !== $userId));
+        } else {
+            $current[] = $userId;
+            $this->form->team_user = $current;
+        }
+    }
+
     public function createActivity(): void
     {
         try {
@@ -126,7 +138,6 @@ new class extends Component {
 
         Flux::modals()->close('create-task');
 
-        $this->dispatch('resetSelect2');
         $this->dispatch('updatedCardTaskDar');
         $this->dispatch('updatedTimeline');
 
@@ -412,12 +423,7 @@ new class extends Component {
 
             <div class="flex justify-end gap-2">
                 <flux:button variant="ghost" wire:click="cancelDeleteTask">Batal</flux:button>
-                <flux:button
-                    variant="danger"
-                    wire:click="deleteTask"
-                    wire:loading.attr="disabled"
-                    wire:target="deleteTask"
-                >
+                <flux:button variant="danger" wire:click="deleteTask" wire:loading.attr="disabled" wire:target="deleteTask">
                     <span wire:loading.remove wire:target="deleteTask">Hapus tugas</span>
                     <span wire:loading wire:target="deleteTask">Menghapus...</span>
                 </flux:button>
@@ -425,120 +431,190 @@ new class extends Component {
         </div>
     </flux:modal>
 
-    <flux:modal x-data="{ isProject: false }" name="create-task" class="min-w-2xl overflow-visible">
-        <form wire:submit='createActivity' class="space-y-6">
-            <div>
-                <flux:heading size="lg">Buat Tugas</flux:heading>
-            </div>
-            <flux:input wire:model='form.activity' placeholder="Nama Tugas" />
-            @error('form.activity')
-            <flux:error message="{{ $message }}" />
-            @enderror
-            <flux:textarea wire:model='form.description' placeholder="Jelaskan lebih detail..."></flux:textarea>
-            @error('form.description')
-            <flux:error message="{{ $message }}" />
-            @enderror
-            <flux:checkbox wire:model='form.isproject' x-model="isProject" label="Kegiatan Project?" />
-            <div x-show="isProject" x-transition>
-                <flux:select wire:model.live='projectSelected' placeholder="Choose project...">
-                    @foreach ($this->projectData() as $item)
-                    <flux:select.option value="{{ $item['id'] }}">{{ $item['name'] }}</flux:select.option>
-                    @endforeach
-                </flux:select>
-            </div>
-            @error('form.project_id')
-            <flux:error message="{{ $message }}" />
-            @enderror
-            <div x-show="isProject" x-transition>
-                @if(!empty($this->timelines))
-                <flux:select wire:model='form.timelines_id' placeholder="Choose timelines...">
-                    @foreach ($this->timelines ?? [] as $item)
-                    <flux:select.option value="{{ $item['id'] }}">{{ $item['title'] }}</flux:select.option>
-                    @endforeach
-                </flux:select>
-                @else
-                 <div wire:loading wire:target="updatedProjectSelected, projectSelected" class="text-sm text-slate-500">
-                    Loading timeline...
-                </div>
-                <div wire:loading.remove wire:target="updatedProjectSelected, projectSelected" class="rounded bg-yellow-50 p-4 text-sm text-yellow-700 ring-1 ring-yellow-200">
-                    Tidak ada timeline tersedia untuk project ini. Silakan buat timeline terlebih dahulu di menu project.
-                </div>
-                @endif
-            </div>
-            @error('form.timelines_id')
-            <flux:error message="{{ $message }}" />
-            @enderror
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <flux:input wire:model='form.start_date' label="Tanggal Mulai" type="datetime-local" />
+    <flux:modal x-data="{ isProject: @entangle('form.isproject').live }" name="create-task" class="min-w-screen overflow-auto md:min-w-3xl lg:min-w-5xl xl:min-w-6xl">
+        <form wire:submit="createActivity" class="space-y-5">
+            {{-- ── Header ── --}}
+            <div class="flex items-start gap-3 border-b border-zinc-100 pb-4">
+                <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-zinc-100 text-zinc-700">
+                    <flux:icon name="clipboard-document-list" class="h-5 w-5" />
                 </div>
                 <div>
-                    <flux:input wire:model='form.end_date' label="Tanggal Berakhir" type="datetime-local" />
+                    <flux:heading size="lg" class="mb-0!">Buat Tugas Baru</flux:heading>
+                    <p class="mt-0.5 text-sm text-zinc-500">Lengkapi detail tugas, jadwal, dan anggota tim.</p>
                 </div>
-            </div>
-            <div wire:ignore>
-                <select id="teamUser" multiple="multiple" class="select2 form-select" placeholder="Pilih team untuk tugas ini">
-                    @foreach ($this->users as $item)
-                    <option value="{{ $item['id'] }}">{{ $item['name'] }}</option>
-                    @endforeach
-                </select>
-            </div>
-            @error('form.team_user')
-            <flux:error message="{{ $message }}" />
-            @enderror
-            <flux:select wire:model='form.status' placeholder="Choose status...">
-                <flux:select.option value="1">Draft</flux:select.option>
-                <flux:select.option value="2">Hold</flux:select.option>
-                <flux:select.option value="3">In Progress</flux:select.option>
-                <flux:select.option value="4">Completed</flux:select.option>
-            </flux:select>
-            @error('form.status')
-            <flux:error message="{{ $message }}" />
-            @enderror
-            <div class="flex justify-end">
-                <flux:button type="submit" variant="primary">Buat tugas</flux:button>
             </div>
 
+            {{-- ── Body grid: 2 kolom di desktop, stacked di mobile ── --}}
+            <div class="grid grid-cols-1 gap-x-8 gap-y-5 lg:grid-cols-2">
+
+                {{-- ── Section: Detail (kolom kiri, span 2 di desktop) ── --}}
+                <div class="space-y-3 lg:col-span-2">
+                    <p class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Detail Tugas</p>
+
+                    <div>
+                        <flux:input wire:model="form.activity" placeholder="Nama tugas" />
+                        @error('form.activity')
+                        <flux:error message="{{ $message }}" /> @enderror
+                    </div>
+
+                    <div>
+                        <flux:textarea wire:model="form.description" rows="3" placeholder="Jelaskan lebih detail apa yang akan dikerjakan..." />
+                        @error('form.description')
+                        <flux:error message="{{ $message }}" /> @enderror
+                    </div>
+                </div>
+
+                {{-- ── Section: Kategori ── --}}
+                <div class="space-y-3">
+                    <p class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Kategori</p>
+
+                    <div class="rounded-xl border bg-zinc-50/60 p-4 transition" :class="isProject ? 'border-zinc-300' : 'border-zinc-200'">
+                        <label class="flex cursor-pointer items-start gap-3">
+                            <input wire:model.live="form.isproject" x-model="isProject" type="checkbox" class="mt-0.5 h-4 w-4 cursor-pointer rounded border-zinc-300 text-zinc-900 focus:ring-zinc-400" />
+                            <span class="flex-1">
+                                <span class="block text-sm font-semibold text-zinc-900">Kegiatan Project</span>
+                                <span class="block text-xs text-zinc-500">Centang jika tugas ini terkait dengan project tertentu.</span>
+                            </span>
+                        </label>
+
+                        {{-- Project & timeline selectors — hanya muncul kalau checkbox dicentang --}}
+                        <template x-if="isProject">
+                            <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div>
+                                    <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Project</label>
+                                    <flux:select wire:model.live="projectSelected" placeholder="Pilih project...">
+                                        @foreach ($this->projectData() as $item)
+                                        <flux:select.option value="{{ $item['id'] }}">{{ $item['name'] }}</flux:select.option>
+                                        @endforeach
+                                    </flux:select>
+                                    @error('form.project_id')
+                                    <flux:error message="{{ $message }}" /> @enderror
+                                </div>
+
+                                <div>
+                                    <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Timeline</label>
+                                    @if (! empty($this->timelines))
+                                    <flux:select wire:model="form.timelines_id" placeholder="Pilih timeline...">
+                                        @foreach ($this->timelines as $item)
+                                        <flux:select.option value="{{ $item['id'] }}">{{ $item['title'] }}</flux:select.option>
+                                        @endforeach
+                                    </flux:select>
+                                    @elseif ($projectSelected)
+                                    <div wire:loading wire:target="updatedProjectSelected, projectSelected" class="rounded-xl bg-zinc-100 px-3 py-2.5 text-xs text-zinc-500">
+                                        Memuat timeline...
+                                    </div>
+                                    <div wire:loading.remove wire:target="updatedProjectSelected, projectSelected" class="rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-700 ring-1 ring-amber-200">
+                                        Tidak ada timeline. Buat dulu di menu project.
+                                    </div>
+                                    @else
+                                    <div class="rounded-xl bg-zinc-100 px-3 py-2.5 text-xs text-zinc-500">
+                                        Pilih project dulu.
+                                    </div>
+                                    @endif
+                                    @error('form.timelines_id')
+                                    <flux:error message="{{ $message }}" /> @enderror
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                {{-- ── Section: Jadwal ── --}}
+                <div class="space-y-3">
+                    <p class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Jadwal</p>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <flux:input wire:model="form.start_date" label="Mulai" type="datetime-local" />
+                        <flux:input wire:model="form.end_date" label="Berakhir" type="datetime-local" />
+                    </div>
+                    @error('form.start_date')
+                    <flux:error message="{{ $message }}" /> @enderror
+                    @error('form.end_date')
+                    <flux:error message="{{ $message }}" /> @enderror
+                </div>
+
+
+                {{-- ── Section: Tim & Status ── --}}
+                <div class="space-y-3 lg:col-span-2">
+                    <div class="grid grid-cols-2 gap-4 items-start">
+                        <div x-data="{ open: false, query: '', matches(name) { return !this.query || name.toLowerCase().includes(this.query.toLowerCase()); } }" @click.away="open = false" @keydown.escape.window="open = false" class="relative">
+                            @php
+                            $selectedTeam = collect($this->form->team_user ?? [])->map(fn ($id) => (int) $id)->all();
+                            $userById = collect($this->users)->keyBy('id');
+                            @endphp
+
+                            <div class="mb-1.5 flex items-center justify-between">
+                                <p class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Tim</p>
+                                <span class="text-[11px] text-zinc-400">{{ count($selectedTeam) }} dipilih</span>
+                            </div>
+
+                            {{-- Chip area --}}
+                            <div @click="open = true; $nextTick(() => $refs.teamSearch.focus())" class="flex min-h-11.5 cursor-text flex-wrap items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-2 py-1.5 transition focus-within:border-zinc-400 focus-within:ring-2 focus-within:ring-zinc-200">
+                                @foreach ($selectedTeam as $uid)
+                                @php $u = $userById[$uid] ?? null; @endphp
+                                @if ($u)
+                                <span wire:key="create-team-chip-{{ $uid }}" class="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-700 ring-1 ring-zinc-200">
+                                    <flux:avatar circle name="{{ $u['name'] }}" size="xs" />
+                                    {{ $u['name'] }}
+                                    <button type="button" @click.stop="$wire.toggleTeamUser({{ $uid }})" class="grid h-4 w-4 place-items-center rounded-full text-zinc-400 hover:bg-white hover:text-red-600" aria-label="Hapus">
+                                        <flux:icon name="x-mark" class="h-3 w-3" />
+                                    </button>
+                                </span>
+                                @endif
+                                @endforeach
+
+                                <input x-ref="teamSearch" x-model="query" @focus="open = true" @keydown.enter.prevent type="text" placeholder="@if (empty($selectedTeam)) Pilih anggota tim... @else Tambah anggota lain... @endif" class="min-w-30 flex-1 border-0 bg-transparent px-2 py-1 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-0" />
+                            </div>
+
+                            {{-- Dropdown --}}
+                            <div x-show="open" x-cloak x-transition.origin.top class="absolute left-0 right-0 z-30 mt-1 max-h-64 overflow-y-auto rounded-xl bg-white p-1 shadow-lg ring-1 ring-zinc-200/70">
+                                @forelse ($this->users as $u)
+                                @php $isSelected = in_array((int) $u['id'], $selectedTeam, true); @endphp
+                                <button wire:key="create-team-opt-{{ $u['id'] }}" type="button" x-show="matches('{{ addslashes($u['name']) }}')" @click="$wire.toggleTeamUser({{ $u['id'] }}); query = ''; $refs.teamSearch.focus()" class="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-zinc-50 {{ $isSelected ? 'bg-zinc-50' : '' }}">
+                                    <span class="inline-flex min-w-0 items-center gap-2">
+                                        <flux:avatar circle name="{{ $u['name'] }}" size="xs" />
+                                        <span class="truncate text-zinc-800">{{ $u['name'] }}</span>
+                                    </span>
+                                    @if ($isSelected)
+                                    <flux:icon name="check" class="h-4 w-4 shrink-0 text-emerald-600" />
+                                    @endif
+                                </button>
+                                @empty
+                                <div class="px-3 py-2 text-xs text-zinc-500">Tidak ada user.</div>
+                                @endforelse
+                            </div>
+
+                            @error('form.team_user')
+                            <flux:error message="{{ $message }}" /> @enderror
+                        </div>
+
+                        {{-- Status awal --}}
+                        <div>
+                            <p class="text-[11px] mb-1.5  font-semibold uppercase tracking-widest text-zinc-500">Status</p>
+                            <flux:select wire:model="form.status" placeholder="Pilih status...">
+                                <flux:select.option value="1">Draft</flux:select.option>
+                                <flux:select.option value="2">Hold</flux:select.option>
+                                <flux:select.option value="3">In Progress</flux:select.option>
+                                <flux:select.option value="4">Completed</flux:select.option>
+                            </flux:select>
+                            @error('form.status')
+                            <flux:error message="{{ $message }}" /> @enderror
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            {{-- ── /Body grid ── --}}
+
+            {{-- ── Footer ── --}}
+            <div class="flex items-center justify-end gap-2 border-t border-zinc-100 pt-4">
+                <flux:modal.close>
+                    <flux:button variant="ghost" type="button">Batal</flux:button>
+                </flux:modal.close>
+                <flux:button type="submit" variant="primary" icon="check" wire:loading.attr="disabled" wire:target="createActivity">
+                    <span wire:loading.remove wire:target="createActivity">Buat tugas</span>
+                    <span wire:loading wire:target="createActivity">Menyimpan...</span>
+                </flux:button>
+            </div>
         </form>
     </flux:modal>
 </div>
-
-{{-- script --}}
-@script
-<script>
-    const initTeamUserSelect2 = () => {
-        const el = $('#teamUser');
-        if (!el.length) return;
-
-        if (el.hasClass('select2-hidden-accessible')) {
-            el.select2('destroy');
-        }
-
-        el.select2({
-            dropdownParent: $('dialog[data-modal="create-task"]'),
-            width: '100%',
-            placeholder: 'Pilih team untuk tugas ini',
-            allowClear: true,
-        });
-
-        el.off('change.teamUser').on('change.teamUser', function () {
-            const values = ($(this).val() || []).map(v => parseInt(v, 10)).filter(v => !isNaN(v));
-            $wire.set('form.team_user', values);
-        });
-    };
-
-    const resetTeamUserSelect2 = () => {
-        const el = $('#teamUser');
-        if (!el.length) return;
-        el.val(null).trigger('change');
-    };
-
-    Livewire.on('initSelect2', () => {
-        setTimeout(initTeamUserSelect2, 0);
-    });
-
-    Livewire.on('resetSelect2', () => {
-        setTimeout(resetTeamUserSelect2, 0);
-    });
-</script>
-@endscript
