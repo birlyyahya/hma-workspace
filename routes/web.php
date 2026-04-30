@@ -33,6 +33,8 @@ Route::middleware('auth')->group(function () {
     Volt::route('izin/{id}/detail', 'izin.izin-show')->name('izin.show');
     Volt::route('izin/{id}/pdf', 'izin.izin-show-pdf')->name('izin.pdf');
     Volt::route('izin/laporan-pengajuan', 'izin.laporan-pengajuan-izin')->name('izin.laporan-pengajuan');
+    Volt::route('izin/spd/{id}/preview', 'izin.spd-show')->name('izin.spd-preview');
+
 
     // Inventaris
     Route::view('inventaris', 'inventaris')->name('inventaris');
@@ -67,4 +69,4 @@ Route::middleware('auth')->group(function () {
     Route::view('/test', 'testclean')->name('settings');
 });
 
-require __DIR__.'/settings.php';
+require __DIR__ . '/settings.php';

@@ -65,6 +65,8 @@
             <livewire:izin.izin-search-list />
 
             <livewire:izin.izin-table lazy />
+
+            <livewire:izin.spd-list lazy />
         </div>
 
         <livewire:izin.add-izin-modal />
