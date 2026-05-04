@@ -6,11 +6,32 @@ use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
+use Masmerise\Toaster\Toaster;
 
 new #[Lazy] class extends Component {
     public $id;
     public $project;
     public $document;
+
+    public function deleteProject(): void
+    {
+        try {
+            $response = Http::delete(
+                rtrim((string) config('services.api_project'), '/').'/projects/'.$this->id
+            );
+
+            if ($response->successful()) {
+                Toaster::success('Proyek berhasil dihapus');
+                $this->redirect(route('projects'), navigate: true);
+                return;
+            }
+
+            Toaster::error($response->json('message') ?? 'Gagal menghapus proyek');
+        } catch (\Throwable $e) {
+            Toaster::error('Gagal menghapus proyek');
+            Log::error('Failed to delete project', ['id' => $this->id, 'error' => $e->getMessage()]);
+        }
+    }
 
     protected function fetchProject(): void
     {
@@ -173,6 +194,34 @@ new #[Lazy] class extends Component {
                                     @endif
                                 </flux:avatar.group>
                             @endif
+
+                            <flux:button
+                                size="sm"
+                                variant="outline"
+                                icon="pencil-square"
+                                :href="route('projects.edit', $this->id)"
+                                wire:navigate
+                            >
+                                <span class="hidden sm:inline">Edit</span>
+                            </flux:button>
+
+                            <flux:dropdown align="end">
+                                <flux:button size="sm" variant="ghost" icon="ellipsis-vertical" />
+                                <flux:menu>
+                                    <flux:menu.item icon="pencil-square" :href="route('projects.edit', $this->id)" wire:navigate>
+                                        Edit Proyek
+                                    </flux:menu.item>
+                                    <flux:menu.separator />
+                                    <flux:menu.item
+                                        icon="trash"
+                                        variant="danger"
+                                        wire:click="deleteProject"
+                                        wire:confirm="Yakin ingin menghapus proyek ini? Tindakan ini tidak bisa dibatalkan."
+                                    >
+                                        Hapus Proyek
+                                    </flux:menu.item>
+                                </flux:menu>
+                            </flux:dropdown>
                         </div>
                     </div>
 
@@ -209,7 +258,10 @@ new #[Lazy] class extends Component {
                         :progress="$this->project['progress']" />
                 </div>
                 <div x-show="active === 'timeline'" wire:key="timeline-{{ $this->id }}" x-transition.opacity.duration.150ms>
-                    <livewire:project.components.project-timeline-tabs lazy :id="$this->id"  :user_id="$this->project['project_leader_id']"  />
+                    <div class="space-y-6">
+                        <livewire:project.components.project-timeline-gantt lazy :id="$this->id" :user_id="$this->project['project_leader_id']"  />
+                        <livewire:project.components.project-timeline-tabs lazy :id="$this->id"  :user_id="$this->project['project_leader_id']"  />
+                    </div>
                 </div>
 
                 <div x-show="active === 'team'" wire:key="team-{{ $this->id }}" x-transition.opacity.duration.150ms>

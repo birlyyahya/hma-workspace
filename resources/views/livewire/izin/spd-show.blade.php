@@ -48,12 +48,14 @@ class extends Component {
         }
 
         $user = User::find($this->spd['user_id'] ?? null);
+        $role = $user->role;
         $attachmentImage = $this->fetchAttachmentImage($this->spd['attachment_url'] ?? null);
 
 
         $pdf = Pdf::loadView('pdf.spd-pdf', [
             'spd' => $this->spd,
             'user' => $user,
+            'role' => $role,
             'attachmentImage' => $attachmentImage,
         ])->setPaper('A4', 'portrait');
 
@@ -345,6 +347,7 @@ class extends Component {
         @else
         @php
         $task = $spd['task'] ?? '-';
+        $username = User::find($this->spd['user_id']);
         $department = $spd['department'] ?? '-';
         $destination = $spd['destination'] ?? 'Terlampir';
         $address = $spd['address'] ?? 'Terlampir';
@@ -444,6 +447,16 @@ class extends Component {
                 </div>
 
                 <table class="detail">
+                    <tr>
+                        <td class="label">Nama</td>
+                        <td class="colon">:</td>
+                        <td>{{ $username->name }}</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Jabatan</td>
+                        <td class="colon">:</td>
+                        <td>{{ $username->role->name }}</td>
+                    </tr>
                     <tr>
                         <td class="label">Melaksanakan tugas</td>
                         <td class="colon">:</td>

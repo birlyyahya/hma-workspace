@@ -317,12 +317,14 @@ new class extends Component {
         }
 
         $user = User::find($row['user_id'] ?? null);
+        $role = $user->role;
+        $attachmentImage = $this->fetchAttachmentImage($this->spd['attachment_url'] ?? null);
 
-        $attachmentImage = $this->fetchAttachmentImage($row['attachment_url'] ?? null);
 
         $pdf = Pdf::loadView('pdf.spd-pdf', [
             'spd' => $row,
             'user' => $user,
+            'role' => $role,
             'attachmentImage' => $attachmentImage,
         ])->setPaper('A4', 'portrait');
 
@@ -494,8 +496,8 @@ new class extends Component {
                             <span class="text-xs italic text-zinc-400">Pegawai tidak ditemukan</span>
                             @endif
                         </td>
-                        <td class="px-5 py-3.5">
-                            <p class="font-semibold text-zinc-900">{{ $spd['task'] }}</p>
+                        <td class="px-5 py-3.5 max-w-[400px]">
+                            <p class="font-semibold text-zinc-900 line-clamp-1">{{ $spd['task'] }}</p>
                             <p class="mt-0.5 text-xs text-zinc-500">{{ $spd['department'] }}</p>
                         </td>
                         <td class="px-5 py-3.5">

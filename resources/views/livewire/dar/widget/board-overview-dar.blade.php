@@ -142,7 +142,7 @@ new class extends Component {
                 ->each->markAsRead();
         }
 
-        $this->redirectRoute('dar.tasks.show', ['id' => $activityId], navigate: true);
+        $this->redirectRoute('dar.dar-show', ['id' => $activityId], navigate: true);
     }
 
     public function toggleTodo($id)

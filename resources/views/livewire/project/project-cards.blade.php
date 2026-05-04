@@ -2,6 +2,8 @@
 
 use Livewire\Volt\Component;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Masmerise\Toaster\Toaster;
 
 new class extends Component
 {
@@ -40,6 +42,34 @@ new class extends Component
         $this->fetchProjects();
     }
 
+    public function deleteProject(int $id): void
+    {
+        try {
+            $response = Http::delete(config('services.api_project') . 'projects/' . $id);
+
+            if ($response->successful()) {
+                $this->projects = array_values(array_filter(
+                    $this->projects,
+                    fn ($p) => (int) ($p['id'] ?? 0) !== $id
+                ));
+
+                Toaster::success('Proyek berhasil dihapus');
+
+                if (count($this->projects) === 0 && $this->currentPage > 1) {
+                    $this->currentPage--;
+                }
+
+                $this->fetchProjects();
+                return;
+            }
+
+            Toaster::error($response->json('message') ?? 'Gagal menghapus proyek');
+        } catch (\Throwable $e) {
+            Toaster::error('Gagal menghapus proyek');
+            Log::error('Failed to delete project', ['id' => $id, 'error' => $e->getMessage()]);
+        }
+    }
+
     public function placeholder(): object
     {
         return view('components.placeholder.ph_project');
@@ -72,7 +102,7 @@ new class extends Component
                 @endif
             </flux:description>
         </div>
-        <flux:button icon="plus-circle" :href="route('projects.create')" wire:navigate variant="primary" class="w-full sm:w-auto shrink-0">
+        <flux:button icon="plus-circle" href="{{ route('projects.create') }}" wire:navigate variant="primary" class="w-full sm:w-auto shrink-0">
             Tambah Proyek
         </flux:button>
     </div>
@@ -113,6 +143,30 @@ new class extends Component
 
             <div wire:key="project-{{ $item['id'] }}"
                  class="group relative flex flex-col bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 overflow-hidden">
+
+                {{-- Action menu (top-right, above overlay) --}}
+                <div class="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                    <flux:dropdown align="end">
+                        <flux:button size="xs" variant="filled" icon="ellipsis-horizontal" class="bg-white/90 dark:bg-zinc-800/90 backdrop-blur shadow-sm" />
+                        <flux:menu>
+                            <flux:menu.item icon="eye" :href="route('projects.show', $item['id'])" wire:navigate>
+                                Detail
+                            </flux:menu.item>
+                            <flux:menu.item icon="pencil-square" :href="route('projects.edit', $item['id'])" wire:navigate>
+                                Edit
+                            </flux:menu.item>
+                            <flux:menu.separator />
+                            <flux:menu.item
+                                icon="trash"
+                                variant="danger"
+                                wire:click="deleteProject({{ $item['id'] }})"
+                                wire:confirm="Yakin ingin menghapus proyek &quot;{{ addslashes($item['name'] ?? '') }}&quot;? Tindakan ini tidak bisa dibatalkan."
+                            >
+                                Hapus Proyek
+                            </flux:menu.item>
+                        </flux:menu>
+                    </flux:dropdown>
+                </div>
 
                 {{-- Status accent bar --}}
                 <div class="h-1.5 w-full bg-gradient-to-r {{ $status['accent'] }}"></div>

@@ -89,7 +89,7 @@ class ActivityForm extends Form
             'team_user' => $teamUser,
             'status' => $this->status,
             'project_id' => $this->project_id,
-            'timelines_id' => $this->timelines_id,
+            'project_category_id' => $this->timelines_id,
         ]);
 
         return $response;

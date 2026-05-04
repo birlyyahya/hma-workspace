@@ -1,6 +1,8 @@
 @php
 use Carbon\Carbon;
 
+$username = data_get($user, 'name', '-');
+$role = data_get($role, 'name', '-');
 $task = data_get($spd, 'task', '-');
 $department = data_get($spd, 'department', '-');
 $destination = data_get($spd, 'destination', 'Terlampir');
@@ -175,17 +177,18 @@ $ttdIrwanPath = public_path('img/ttd/ttd-irwan.png');
         /* Issue */
         .issue {
             margin-top: 22px;
-            width: 100%;
+            width: 50%;
             border-collapse: collapse;
+            text-align: left;
         }
 
         .issue td {
             padding: 2px 0;
             vertical-align: top;
+            text-align: left;
         }
 
         .issue .label {
-            width: 28%;
         }
 
         /* Signatures */
@@ -310,6 +313,16 @@ $ttdIrwanPath = public_path('img/ttd/ttd-irwan.png');
 
         <table class="detail">
             <tr>
+                <td class="label">Nama</td>
+                <td class="colon">:</td>
+                <td>{{ $username }}</td>
+            </tr>
+            <tr>
+                <td class="label">Jabatan</td>
+                <td class="colon">:</td>
+                <td>{{ $role }}</td>
+            </tr>
+            <tr>
                 <td class="label">Melaksanakan tugas</td>
                 <td class="colon">:</td>
                 <td>{{ $task }}</td>
@@ -348,13 +361,13 @@ $ttdIrwanPath = public_path('img/ttd/ttd-irwan.png');
 
         <table class="issue">
             <tr>
-                <td class="label">Dikeluarkan di</td>
-                <td class="colon">:</td>
+                <td class="label" style="width: 50%;">Dikeluarkan di</td>
+                <td class="colon" style="width: 12px;">:</td>
                 <td>Jakarta</td>
             </tr>
             <tr>
-                <td class="label">Tanggal</td>
-                <td class="colon">:</td>
+                <td class="label" style="width: 50%;">Tanggal</td>
+                <td class="colon" style="width: 12px;">:</td>
                 <td>{{ $tanggalDibuat }}</td>
             </tr>
         </table>

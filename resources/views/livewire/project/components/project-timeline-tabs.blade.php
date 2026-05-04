@@ -241,6 +241,7 @@ new class extends Component {
         }
 
         $this->recomputeMonths();
+        $this->dispatch('timelinesUpdated');
         $this->closeTimelineModal();
     }
 
@@ -288,6 +289,7 @@ new class extends Component {
 
         Toaster::success('Timeline deleted successfully!');
         $this->recomputeMonths();
+        $this->dispatch('timelinesUpdated');
     }
 
     public function openManageTimeline(): void

@@ -21,6 +21,9 @@ new class extends Component
     public string $project_leader_id = '';
     public string $company_id       = '';
 
+    public array $support_teams = [];
+    public string $newSupportTeam = '';
+
     // Display labels for selected items (shown in the trigger field)
     public string $company_label = '';
     public string $leader_label  = '';
@@ -29,12 +32,12 @@ new class extends Component
 
     public function mount(): void
     {
-        $this->dispatch('initSelects');
+        $this->dispatch('initSelects2');
     }
 
     public function getCompaniesProperty(): array
     {
-        $response = Http::get(config('services.api_project') . 'companies')->json();
+        $response = Http::get(config('services.api_project') . 'companies?limit=999999999')->json();
 
         return $response['data'] ?? [];
     }
@@ -57,10 +60,35 @@ new class extends Component
             'status'            => ['required', 'string', 'in:WAITING,ON PROGRESS,DONE,CANCELLED,MAINTENANCE'],
             'start_date'        => ['required', 'date'],
             'end_date'          => ['required', 'date', 'after_or_equal:start_date'],
-            'maintenance_date'  => ['nullable', 'date', 'after_or_equal:end_date'],
+            'maintenance_date'  => ['required', 'date', 'after_or_equal:end_date'],
             'project_leader_id' => ['required', 'integer'],
             'company_id'        => ['required', 'integer'],
+            'support_teams'     => ['array', 'required'],
+            'support_teams.*'   => ['string', 'min:2'],
         ];
+    }
+
+    public function addSupportTeam(): void
+    {
+        $name = trim($this->newSupportTeam);
+
+        if ($name === '') {
+            return;
+        }
+
+        if (in_array($name, $this->support_teams, true)) {
+            Toaster::error('Tim pendukung sudah ditambahkan');
+            return;
+        }
+
+        $this->support_teams[] = $name;
+        $this->newSupportTeam = '';
+    }
+
+    public function removeSupportTeam(int $index): void
+    {
+        unset($this->support_teams[$index]);
+        $this->support_teams = array_values($this->support_teams);
     }
 
     protected function messages(): array
@@ -80,47 +108,54 @@ new class extends Component
             'end_date.required'               => 'Tanggal selesai wajib diisi.',
             'end_date.after_or_equal'         => 'Tanggal selesai harus setelah atau sama dengan tanggal mulai.',
             'maintenance_date.after_or_equal' => 'Tanggal maintenance harus setelah atau sama dengan tanggal selesai.',
+            'maintenance_date.required'       => 'Tanggal maintenance wajib diisi.',
             'project_leader_id.required'      => 'Project Leader wajib dipilih.',
             'project_leader_id.integer'       => 'Project Leader tidak valid.',
             'company_id.required'             => 'Perusahaan wajib dipilih.',
             'company_id.integer'              => 'Perusahaan tidak valid.',
+            'support_teams.required'           => 'Timduk wajib diisi.',
         ];
     }
 
     public function store(): void
     {
         $this->submitting = true;
-        $this->validate();
 
-        $response = Http::post(config('services.api_project') . 'projects', [
-            'name'              => $this->name,
-            'code'              => $this->code,
-            'contract_number'   => $this->contract_number,
-            'contract_date'     => $this->contract_date,
-            'client'            => $this->client,
-            'ppk'               => $this->ppk,
-            'value'             => (int) $this->value,
-            'status'            => $this->status,
-            'start_date'        => $this->start_date,
-            'end_date'          => $this->end_date,
-            'maintenance_date'  => $this->maintenance_date ?: null,
-            'project_leader_id' => (int) $this->project_leader_id,
-            'company_id'        => (int) $this->company_id,
-        ]);
+        try {
+            $this->validate();
 
-        $this->submitting = false;
+            $response = Http::post(config('services.api_project').'projects', [
+                'name'              => $this->name,
+                'code'              => $this->code,
+                'contract_number'   => $this->contract_number,
+                'contract_date'     => $this->contract_date,
+                'client'            => $this->client,
+                'ppk'               => $this->ppk,
+                'value'             => (int) $this->value,
+                'status'            => $this->status,
+                'start_date'        => $this->start_date,
+                'end_date'          => $this->end_date,
+                'maintenance_date'  => $this->maintenance_date ?: null,
+                'project_leader_id' => (int) $this->project_leader_id,
+                'company_id'        => (int) $this->company_id,
+                'support_teams'     => $this->support_teams,
+            ]);
 
-        if ($response->successful()) {
-            $id = $response->json('data.id') ?? $response->json('data.0.id');
-            Toaster::success('Proyek berhasil dibuat!');
+            if ($response->json()['status'] === 201) {
+                $id = $response->json('data.id') ?? $response->json('data.0.id');
+                Toaster::success('Proyek berhasil dibuat!');
 
-            if ($id) {
-                $this->redirect(route('projects.show', $id), navigate: true);
-            } else {
-                $this->redirect(route('projects'), navigate: true);
+                if ($id) {
+                    $this->redirect(route('projects.show', $id), navigate: true);
+                } else {
+                    $this->redirect(route('projects'), navigate: true);
+                }
+                return;
             }
-        } else {
+
             Toaster::error($response->json('message') ?? 'Gagal membuat proyek. Coba lagi.');
+        } finally {
+            $this->submitting = false;
         }
     }
 }
@@ -263,7 +298,6 @@ new class extends Component
                 <flux:field>
                     <flux:label>Tanggal Maintenance</flux:label>
                     <flux:input wire:model="maintenance_date" type="date" :min="$end_date ?: null"/>
-                    <flux:description>Opsional</flux:description>
                     <flux:error name="maintenance_date"/>
                 </flux:field>
             </div>
@@ -320,6 +354,56 @@ new class extends Component
                     @enderror
                 </div>
 
+            </div>
+        </div>
+
+        {{-- Section 5: Tim Pendukung (PPK) --}}
+        <div class="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-zinc-100 flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                    <flux:icon name="briefcase" class="w-4 h-4 text-amber-600"/>
+                </div>
+                <div>
+                    <p class="text-sm font-semibold text-zinc-800">Tim Pendukung (PPK)</p>
+                    <p class="text-xs text-zinc-500">Daftar nama tim pendukung — opsional, bisa ditambah nanti</p>
+                </div>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <flux:input
+                        wire:model="newSupportTeam"
+                        wire:keydown.enter.prevent="addSupportTeam"
+                        placeholder="Contoh: Nanang Suherman, S.T.MM"
+                        icon="user"
+                        class="flex-1"
+                    />
+                    <flux:button type="button" wire:click="addSupportTeam" variant="filled" icon="plus">
+                        Tambah
+                    </flux:button>
+                </div>
+
+                @if (count($support_teams) > 0)
+                    <div class="flex flex-wrap gap-2">
+                        @foreach ($support_teams as $i => $team)
+                            <span wire:key="support-team-{{ $i }}"
+                                  class="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1 rounded-full bg-amber-50 text-amber-800 text-sm border border-amber-200">
+                                <flux:icon name="user" class="w-3.5 h-3.5" />
+                                {{ $team }}
+                                <button type="button"
+                                        wire:click="removeSupportTeam({{ $i }})"
+                                        class="ml-0.5 inline-flex items-center justify-center w-5 h-5 rounded-full hover:bg-amber-200 text-amber-700 transition">
+                                    <flux:icon name="x-mark" class="w-3 h-3" />
+                                </button>
+                            </span>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="text-center py-6 px-4 rounded-lg border border-dashed border-zinc-300 bg-zinc-50/50">
+                        <flux:icon name="user-group" class="w-6 h-6 mx-auto text-zinc-400 mb-1.5" />
+                        <p class="text-xs text-zinc-500">Belum ada tim pendukung ditambahkan</p>
+                    </div>
+                @endif
+                <flux:error name="support_teams" />
             </div>
         </div>
 
@@ -393,7 +477,17 @@ new class extends Component
 
 @script
 <script>
-    const initSelects = () => {
+    Livewire.on('initSelects', () => {
+        setTimeout(initSelects2, 0);
+    });
+
+    document.addEventListener('livewire:navigated', () => {
+        setTimeout(initSelects2, 0);
+    });
+    document.addEventListener('livewire:init', () => {
+        setTimeout(initSelects2, 0);
+    });
+    const initSelects2 = () => {
         $('#select-company').select2({
             placeholder: 'Cari perusahaan...',
             allowClear: true,
@@ -410,13 +504,5 @@ new class extends Component
             @this.set('project_leader_id', $(this).val() ?? '');
         });
     };
-
-    Livewire.on('initSelects', () => {
-        setTimeout(initSelects, 0);
-    });
-
-    document.addEventListener('livewire:navigated', () => {
-        setTimeout(initSelects, 0);
-    });
 </script>
 @endscript
