@@ -24,7 +24,7 @@ new class extends Component {
 
     public function mount(): void
     {
-        $cached = Cache::get('izin_widget_'.Auth::user()->username);
+        $cached = Cache::get('izin_widget_group_global');
         $this->setData($cached['group'] ?? []);
     }
 

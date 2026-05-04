@@ -2,6 +2,7 @@
 
 use Carbon\Carbon;
 use Flux\Flux;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Livewire\Volt\Component;
@@ -92,6 +93,7 @@ new class extends Component {
 
         Toaster::success('Izin berhasil diajukan!');
         $this->dispatch('izinAdded');
+        Cache::forget('izin_widget_group_global');
         $this->reset(['alasan', 'deskripsi']);
         Flux::modal('form-izin-modal')->close();
     }

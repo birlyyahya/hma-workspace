@@ -1,10 +1,12 @@
 <?php
 
 use App\Models\User;
+use App\Services\NotificationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 use Masmerise\Toaster\Toaster;
@@ -47,6 +49,7 @@ class extends Component {
 
         $user = User::find($this->spd['user_id'] ?? null);
         $attachmentImage = $this->fetchAttachmentImage($this->spd['attachment_url'] ?? null);
+
 
         $pdf = Pdf::loadView('pdf.spd-pdf', [
             'spd' => $this->spd,
@@ -96,6 +99,13 @@ class extends Component {
 
             return null;
         }
+    }
+    public function sendText()
+    {
+        $user = User::find($this->spd['user_id']);
+        $message = 'Test Notification';
+        // kirim ke service
+        NotificationService::send($user, $message, $this->spd);
     }
 }; ?>
 
@@ -318,7 +328,8 @@ class extends Component {
 
     </style>
 
-    <div class="min-h-screen bg-zinc-100 py-8 px-4">
+    <div class="min-h-screen py-8 px-4">
+        <flux:button wire:click='sendText'>Send</flux:button>
         @if (!$spd)
         <div class="mx-auto max-w-2xl rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-zinc-200">
             <div class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-zinc-100 text-zinc-400">
@@ -374,7 +385,7 @@ class extends Component {
         @endphp
 
         {{-- Toolbar (sticky, hidden when printing) --}}
-        <div class="no-print mx-auto mb-5 flex max-w-[210mm] flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white px-5 py-3 shadow-sm">
+        <div class="no-print mx-auto mb-5 flex  flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white px-5 py-3 shadow-sm">
             <div class="flex items-center gap-3">
                 <a href="{{ route('izin') }}" class="inline-flex items-center gap-1.5 rounded-full bg-zinc-50 px-3 py-1.5 text-sm font-medium text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-100">
                     <flux:icon name="arrow-left" class="h-4 w-4" />
@@ -402,7 +413,7 @@ class extends Component {
             </div>
         </div>
 
-        <div class="print-area">
+        <div class="print-area max-w-[210mm] mx-auto">
             {{-- ── Page 1: SPD ── --}}
             <div class="a4-paper">
                 <table class="doc-header">

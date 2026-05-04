@@ -208,9 +208,8 @@ new #[Lazy] class extends Component {
                         :id="$this->project['id']"
                         :progress="$this->project['progress']" />
                 </div>
-
                 <div x-show="active === 'timeline'" wire:key="timeline-{{ $this->id }}" x-transition.opacity.duration.150ms>
-                    <livewire:project.components.project-timeline-tabs lazy :id="$this->id" />
+                    <livewire:project.components.project-timeline-tabs lazy :id="$this->id"  :user_id="$this->project['project_leader_id']"  />
                 </div>
 
                 <div x-show="active === 'team'" wire:key="team-{{ $this->id }}" x-transition.opacity.duration.150ms>

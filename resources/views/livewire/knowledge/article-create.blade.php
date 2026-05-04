@@ -1,115 +1,190 @@
 <?php
 
+use App\Models\SupportArticle;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
+use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
+use Masmerise\Toaster\Toaster;
 
-new class extends Component {
-     use WithFileUploads;
+new
+#[Layout('components.layouts.app')]
+class extends Component {
+    use WithFileUploads;
 
-    public $content;
-    public $title;
-    public $file;
-    public $category;
+    public ?SupportArticle $article = null;
 
-    public function contentChanged($editorId, $content)
+    public string $title = '';
+    public string $excerpt = '';
+    public string $content = '';
+    public string $category = '';
+    public bool $isPublished = false;
+
+    public $image = null;
+    public ?string $existingImage = null;
+
+    public function mount(?string $slug = null): void
     {
-        // $editorId is the id use when you initiated the livewire component
-        // $content is the raw text editor content
+        if (! Gate::allows('create', SupportArticle::class)) {
+            abort(403);
+        }
 
-        // save to the local variable...
-        $this->content = $content;
+        if ($slug) {
+            $this->article = SupportArticle::where('slug', $slug)->firstOrFail();
+
+            if (Gate::denies('update', $this->article)) {
+                abort(403);
+            }
+
+            $this->title = $this->article->title;
+            $this->excerpt = $this->article->excerpt ?? '';
+            $this->content = $this->article->content;
+            $this->category = $this->article->category ?? '';
+            $this->isPublished = (bool) $this->article->is_published;
+            $this->existingImage = $this->article->featured_image;
+        }
+    }
+
+    public function save(bool $publish = false): void
+    {
+        $data = $this->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'excerpt' => ['nullable', 'string', 'max:500'],
+            'content' => ['required', 'string'],
+            'category' => ['nullable', 'string', 'max:100'],
+            'image' => ['nullable', 'image', 'max:5120'],
+        ]);
+
+        $payload = [
+            'title' => $data['title'],
+            'excerpt' => $data['excerpt'] ?? null,
+            'content' => $data['content'],
+            'category' => $data['category'] ?: null,
+            'is_published' => $publish || $this->isPublished,
+        ];
+
+        if ($this->image) {
+            if ($this->existingImage) {
+                Storage::disk('public')->delete($this->existingImage);
+            }
+            $payload['featured_image'] = $this->image->store('knowledge/article', 'public');
+        }
+
+        if ($this->article) {
+            $this->article->update($payload);
+            Toaster::success('Artikel diperbarui');
+        } else {
+            $payload['user_id'] = Auth::id();
+            $payload['created_by'] = Auth::id();
+            $this->article = SupportArticle::create($payload);
+            Toaster::success('Artikel disimpan');
+        }
+
+        $this->redirect(route('knowledge.articles-show', $this->article->slug), navigate: true);
+    }
+
+    public function publish(): void
+    {
+        $this->save(publish: true);
     }
 }; ?>
 
 <div>
     <div class="relative w-full py-6 px-2">
         <flux:breadcrumbs>
-            <flux:breadcrumbs.item class="font-normal !text-gray-300" href="#">Knowledge</flux:breadcrumbs.item>
-            <flux:breadcrumbs.item class="!text-gray-400 font-normal" href="#">Article</flux:breadcrumbs.item>
-            <flux:breadcrumbs.item class="font-normal">Create new Article</flux:breadcrumbs.item>
+            <flux:breadcrumbs.item :href="route('knowledge')" wire:navigate>Knowledge</flux:breadcrumbs.item>
+            <flux:breadcrumbs.item :href="route('knowledge.articles')" wire:navigate>Articles</flux:breadcrumbs.item>
+            <flux:breadcrumbs.item>{{ $article ? 'Edit' : 'Create new' }}</flux:breadcrumbs.item>
         </flux:breadcrumbs>
     </div>
 
-    <div class="grid grid-cols-2 gap-4">
-        <div class="p-6 rounded-xl space-y-6 bg-white">
-            <flux:heading size="lg" level="1" class="mb-6">{{ __('Create new Article') }}</flux:heading>
-
-            <div class="space-y-3">
-                <flux:input label="Title" wire:model.live="title"></flux:input>
-                <flux:text class="text-xs">Title will be used as slug</flux:text>
-            </div>
-
-            <div wire:ignore>
-                <select id="category" multiple="multiple" class="select2 form-select" placeholder="select a team">
-                    <option value="tips">Tips</option>
-                    <option value="tutorial">Tutorial</option>
-                    <option value="insight">Insight</option>
-                    <option value="workflow">Workflow</option>
-                    <option value="approval">Approval</option>
-                    <option value="efesiensi">Efesiensi</option>
-                </select>
-            </div>
-
-            <div class="space-y-3">
-                <flux:heading>Featrued Image</flux:heading>
-                <div class="flex items-center justify-center w-1/2">
-
-                    <label for="dropzone-file" class="
-                flex flex-col items-center justify-center
-                w-full h-64 bg-white border rounded-lg cursor-pointer overflow-hidden
-                {{ $file ? '' : 'border-dashed border-red-700 hover:bg-red-50' }}
-            ">
-                        @if($file)
-                        <img class="w-full h-full object-cover" src="{{ $file->temporaryUrl() }}" alt="">
-                        @else
-                        <div class="flex flex-col items-center justify-center text-body">
-                            <flux:icon.photo class="w-10 h-10 mb-4 text-red-700" />
-                            <p class="text-xs text-gray-400">
-                                Image Only (MAX. 800x400px)
-                            </p>
-                        </div>
-                        @endif
-
-                        <input id="dropzone-file" wire:model="file" type="file" class="hidden" />
-
-                    </label>
-
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {{-- FORM --}}
+        <div class="p-6 rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 space-y-5">
+            <div class="flex items-start gap-3">
+                <div class="shrink-0 w-10 h-10 rounded-xl bg-linear-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                    <flux:icon name="pencil-square" class="w-5 h-5 text-white" />
+                </div>
+                <div>
+                    <flux:heading size="lg">{{ $article ? 'Edit Artikel' : 'Tulis Artikel Baru' }}</flux:heading>
+                    <flux:text size="sm" class="text-zinc-500">Slug akan dibuat otomatis dari judul</flux:text>
                 </div>
             </div>
-            <flux:button type="submit" color="primary">Create</flux:button>
+
+            <flux:input wire:model.live.debounce.500ms="title" label="Judul" placeholder="Tulis judul yang menarik..." />
+
+            <flux:input wire:model="category" label="Kategori (opsional)" placeholder="Tips, Tutorial, Workflow, ..." />
+
+            <flux:textarea wire:model="excerpt" label="Ringkasan (opsional)" rows="2" placeholder="Ringkasan singkat untuk preview kartu..." />
+
+            <flux:textarea wire:model.live.debounce.500ms="content" label="Konten" rows="14" placeholder="Tulis isi artikel di sini..." />
+
+            <div>
+                <flux:text class="text-sm font-medium mb-2 block">Featured Image (max 5MB)</flux:text>
+                <label for="dropzone-file"
+                    class="flex items-center justify-center w-full h-48 rounded-xl border-2 border-dashed cursor-pointer overflow-hidden
+                    {{ $image || $existingImage ? 'border-zinc-200' : 'border-zinc-300 hover:bg-zinc-50' }} dark:border-zinc-700">
+                    @if ($image)
+                        <img src="{{ $image->temporaryUrl() }}" class="w-full h-full object-cover" />
+                    @elseif ($existingImage)
+                        <img src="{{ Storage::url($existingImage) }}" class="w-full h-full object-cover" />
+                    @else
+                        <div class="flex flex-col items-center text-zinc-400">
+                            <flux:icon.photo class="w-8 h-8 mb-2" />
+                            <p class="text-xs">Klik untuk pilih gambar</p>
+                        </div>
+                    @endif
+                    <input id="dropzone-file" wire:model="image" type="file" accept="image/*" class="hidden" />
+                </label>
+                @error('image') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                <flux:switch wire:model="isPublished" label="Publish setelah simpan" />
+
+                <div class="flex gap-2">
+                    <flux:button variant="ghost" :href="route('knowledge.articles')" wire:navigate>Batal</flux:button>
+                    <flux:button wire:click="save" variant="filled" icon="document"
+                        wire:loading.attr="disabled" wire:target="save,publish,image">
+                        <span wire:loading.remove wire:target="save,publish">Simpan Draft</span>
+                        <span wire:loading wire:target="save,publish">Menyimpan...</span>
+                    </flux:button>
+                    <flux:button wire:click="publish" variant="primary" icon="paper-airplane"
+                        wire:loading.attr="disabled" wire:target="save,publish,image">
+                        Publish
+                    </flux:button>
+                </div>
+            </div>
         </div>
 
-        <div class="space-y-4 p-6 bg-white rounded-lg">
-            <flux:heading size="lg" level="1" class="mb-6">Preview</flux:heading>
+        {{-- PREVIEW --}}
+        <div class="p-6 rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 space-y-4">
+            <div class="flex items-center gap-2 text-xs text-zinc-400 uppercase tracking-wide">
+                <flux:icon name="eye" class="w-4 h-4" /> Live Preview
+            </div>
 
-            <flux:heading size="xl" level="1" class="mb-6">{{ $title ?? '' }}</flux:heading>
-            @if($content)
-            {{-- {{ dd($content) }} --}}
-            {{ $content }}
-            <br>
-            <br>
-            <br>
-            {!! $content !!}
+            @if ($image || $existingImage)
+                <img src="{{ $image ? $image->temporaryUrl() : Storage::url($existingImage) }}"
+                    class="w-full h-48 object-cover rounded-xl" />
             @endif
 
+            @if ($category)
+                <flux:badge color="blue" size="sm">{{ $category }}</flux:badge>
+            @endif
+
+            <flux:heading size="xl" level="1">{{ $title ?: 'Judul artikel akan muncul di sini' }}</flux:heading>
+
+            @if ($excerpt)
+                <p class="text-sm text-zinc-500 italic">{{ $excerpt }}</p>
+            @endif
+
+            <flux:separator variant="subtle" />
+
+            <div class="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
+                {{ $content ?: 'Konten preview akan muncul di sini saat Anda mengetik...' }}
+            </div>
         </div>
-
     </div>
-    <div x-data="setupEditor(
-    $wire.entangle('{{ $content }}').defer
-  )" x-init="() => init($refs.editor)" wire:ignore>
-        <div x-ref="editor"></div>
-    </div>
-
 </div>
-@script
-<script>
-    const el = $('#category');
-    el.select2({
-        width: '100%'
-        , placeholder: "Select a category"
-        , tags: true
-    });
-
-</script>
-@endscript

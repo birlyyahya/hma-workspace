@@ -320,6 +320,7 @@ class extends Component {
                 }
 
                 $newComment = $payload['data'] ?? [];
+
                 $this->comments[] = [
                     'id' => $newComment['id'] ?? null,
                     'activity_id' => $this->id,
@@ -328,7 +329,6 @@ class extends Component {
                     'created_at' => $newComment['created_at'] ?? now()->toDateTimeString(),
                     'files' => $newComment['files'] ?? [],
                 ];
-
                 $taskOwnerId = (int) ($this->task['user_id'] ?? 0);
                 $teamUserIds = collect($this->task['team_user'] ?? [])
                     ->pluck('user_id')
@@ -362,13 +362,11 @@ class extends Component {
                 $this->newFiles = [];
                 $this->dispatch('comment-added');
                 Toaster::success('Comment added successfully!');
-
                 return;
             }
-
-            Toaster::error(getErrorMessages($payload['errors'] ?? []));
-        } catch (Exception $e) {
-            Toaster::error('An error occurred while creating the comment.');
+            Toaster::error(getErrorMessages($response['message'] ?? []));
+            } catch (Exception $e) {
+            Toaster::error('Ada serror pada server!');
             Log::error('Failed to add comment', [
                 'body' => $response['message'] ?? 'No message',
                 'error' => $response['errors'] ?? 'No error',
@@ -845,7 +843,7 @@ class extends Component {
                                 </div>
                             </div>
 
-                            <div class="mt-6 border-t border-zinc-100 pt-6">
+                            <div class="mt-6 py-20 border-t border-zinc-100 pt-6">
                                 <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">Description</h2>
                                 @if (! empty($task['description']))
                                     <div class="dar-prose">{!! $task['description'] !!}</div>
@@ -918,9 +916,9 @@ class extends Component {
                             </div>
 
                             @if ($this->allAttachments->isNotEmpty())
-                                <div class="mt-4 space-y-2">
-                                    @foreach ($this->allAttachments as $item)
-                                        <div wire:key="att-{{ $item['id'] }}">
+                                <div class="mt-4 space-y-2 max-h-40 overflow-auto">
+                                    @foreach ($this->allAttachments as $index => $item)
+                                        <div wire:key="att-{{ $item['id'] ?? $item['url'] ?? $item['filename'] ?? $index }}">
                                             @include('livewire.dar.partials.attachment-card', ['file' => $item, 'variant' => 'card'])
                                         </div>
                                     @endforeach
@@ -949,7 +947,7 @@ class extends Component {
                                 'c' => $c,
                                 'cu' => $commentUsers[$c['user_id']] ?? null,
                                 'isOwn' => ($c['user_id'] ?? null) === Auth::id(),
-                                'isEditing' => $editingCommentId === ($c['id'] ?? null),
+                                'isEditing' => $editingCommentId !== null && isset($c['id']) && $editingCommentId === $c['id'],
                             ])
                         @empty
                             <div class="px-5 py-10 text-center">

@@ -13,49 +13,7 @@
 
 
                 <!-- Announcement -->
-                <div class="relative overflow-hidden rounded-xl p-5 shadow-sm bg-white border border-red-100">
-
-                    <div class="flex items-center justify-between gap-10">
-
-                        <div class="flex items-start gap-3">
-
-                            <!-- Icon -->
-                            <div class="bg-red-500 p-2 rounded-lg flex h-fit items-center justify-center">
-                                <flux:icon.fire class="w-5 h-5 text-white" />
-                            </div>
-
-                            <!-- Content -->
-                            <div>
-
-                                <!-- Title + Badge -->
-                                <div class="flex items-center gap-2 mb-1">
-                                    <flux:heading size="base" class="font-semibold text-gray-900">
-                                        Eid al-Fitr Holiday Notice
-                                    </flux:heading>
-
-                                    <flux:badge color="red" class="text-xs">
-                                        Important
-                                    </flux:badge>
-                                </div>
-
-                                <!-- Description -->
-                                <p class="text-sm text-gray-600">
-                                    The office will be closed from <span class="font-medium text-gray-800">March 25–27, 2026</span> in observance of Eid al-Fitr.
-                                    Normal operations will resume on <span class="font-medium text-gray-800">March 28, 2026</span>.
-                                </p>
-
-                            </div>
-
-                        </div>
-
-                        <!-- Button -->
-                        <flux:button icon="arrow-right" size="sm" href="#" variant="outline">
-                            View
-                        </flux:button>
-
-                    </div>
-
-                </div>
+                <livewire:widget.dashboard.announcement />
 
 
                <livewire:widget.dashboard.task-in-progress>

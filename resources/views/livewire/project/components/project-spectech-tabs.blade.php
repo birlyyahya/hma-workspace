@@ -19,7 +19,7 @@ new class extends Component {
     public array $spectech = [];
     public bool $loadingSpectech = false;
     public $id;
-    public int $ppn = 11;
+    public int $ppn = 0;
 
     public ?int $deletingId = null;
     public ?string $deletingName = null;

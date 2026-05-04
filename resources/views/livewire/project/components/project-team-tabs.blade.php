@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use Flux\Flux;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -16,6 +17,11 @@ new class extends Component {
 
     public string $userSearch = '';
     public ?string $nameTimduk = null;
+
+    public ?int $deletingInternalId = null;
+    public ?string $deletingInternalName = null;
+
+    public ?string $deletingTimdukName = null;
 
     public function mount(): void
     {
@@ -91,7 +97,9 @@ new class extends Component {
 
                 if ($user && ! $this->internal->contains('id', $user->id)) {
                     $this->internal->push($user);
-                    collect($this->internals)->push($response->json('data'));
+                    $this->internals = collect($this->internals)
+                        ->push($response->json('data'))
+                        ->all();
 
                     $this->dispatch('projectLoad');
                     Toaster::success('Anggota berhasil ditambahkan');
@@ -106,13 +114,35 @@ new class extends Component {
         }
     }
 
-    public function removeInternal(int $id): void
+    public function confirmDeleteInternal(int $id): void
     {
+        $user = collect($this->internal)->firstWhere('id', $id);
+
+        if (! $user) {
+            Toaster::error('Anggota tidak ditemukan');
+            return;
+        }
+
+        $this->deletingInternalId = $id;
+        $this->deletingInternalName = $user['name'] ?? $user->name ?? '';
+        Flux::modal('delete-internal-modal')->show();
+    }
+
+    public function removeInternal(): void
+    {
+        if ($this->deletingInternalId === null) {
+            return;
+        }
+
+        $id = $this->deletingInternalId;
+
         $teamId = collect($this->internals)
             ->firstWhere('user_id', $id)['id'] ?? null;
 
         if (! $teamId) {
             Toaster::error('Anggota tidak ditemukan');
+            $this->reset('deletingInternalId', 'deletingInternalName');
+            Flux::modal('delete-internal-modal')->close();
             return;
         }
 
@@ -124,16 +154,23 @@ new class extends Component {
                     ->reject(fn ($user) => $user->id === $id)
                     ->values();
 
+                $this->internals = collect($this->internals)
+                    ->reject(fn ($item) => (int) ($item['user_id'] ?? 0) === $id)
+                    ->values()
+                    ->all();
+
                 $this->dispatch('projectLoad');
                 Toaster::success('Anggota berhasil dihapus');
-                return;
+            } else {
+                Toaster::error('Gagal menghapus anggota');
             }
-
-            Toaster::error('Gagal menghapus anggota');
         } catch (\Throwable $th) {
             Toaster::error('Gagal menghapus anggota');
             Log::error('Failed to remove internal', ['error' => $th->getMessage()]);
         }
+
+        $this->reset('deletingInternalId', 'deletingInternalName');
+        Flux::modal('delete-internal-modal')->close();
     }
 
     public function addTimduk(): void
@@ -168,8 +205,24 @@ new class extends Component {
         }
     }
 
-    public function removeTimduk(string $name): void
+    public function confirmDeleteTimduk(string $name): void
     {
+        if (! collect($this->timduk)->contains($name)) {
+            Toaster::error('Tim pendukung tidak ditemukan');
+            return;
+        }
+
+        $this->deletingTimdukName = $name;
+        Flux::modal('delete-timduk-modal')->show();
+    }
+
+    public function removeTimduk(): void
+    {
+        if ($this->deletingTimdukName === null) {
+            return;
+        }
+
+        $name = $this->deletingTimdukName;
         $previous = $this->timduk;
 
         try {
@@ -185,16 +238,18 @@ new class extends Component {
             if ($response->json('status') === 200) {
                 $this->dispatch('projectLoad');
                 Toaster::success('Tim pendukung berhasil dihapus');
-                return;
+            } else {
+                $this->timduk = $previous;
+                Toaster::error('Gagal menghapus tim pendukung');
             }
-
-            $this->timduk = $previous;
-            Toaster::error('Gagal menghapus tim pendukung');
         } catch (\Throwable $th) {
             $this->timduk = $previous;
             Toaster::error('Gagal menghapus tim pendukung');
             Log::error('Failed to remove timduk', ['error' => $th->getMessage()]);
         }
+
+        $this->reset('deletingTimdukName');
+        Flux::modal('delete-timduk-modal')->close();
     }
 }; ?>
 
@@ -267,8 +322,7 @@ new class extends Component {
                                             <flux:menu.item
                                                 icon="trash"
                                                 variant="danger"
-                                                wire:click="removeInternal({{ $tim['id'] }})"
-                                                wire:confirm="Hapus anggota ini dari project?"
+                                                wire:click="confirmDeleteInternal({{ $tim['id'] }})"
                                             >
                                                 Hapus Anggota
                                             </flux:menu.item>
@@ -381,8 +435,7 @@ new class extends Component {
                                             <flux:menu.item
                                                 icon="trash"
                                                 variant="danger"
-                                                wire:click="removeTimduk('{{ addslashes($tim) }}')"
-                                                wire:confirm="Hapus tim pendukung ini?"
+                                                wire:click="confirmDeleteTimduk('{{ addslashes($tim) }}')"
                                             >
                                                 Hapus Tim
                                             </flux:menu.item>
@@ -573,8 +626,7 @@ new class extends Component {
                                     size="xs"
                                     variant="ghost"
                                     icon="trash"
-                                    wire:click="removeInternal({{ $tim['id'] }})"
-                                    wire:confirm="Hapus anggota ini?"
+                                    wire:click="confirmDeleteInternal({{ $tim['id'] }})"
                                 />
                             </div>
                         @endforeach
@@ -647,8 +699,7 @@ new class extends Component {
                                 size="xs"
                                 variant="ghost"
                                 icon="trash"
-                                wire:click="removeTimduk('{{ addslashes($tim) }}')"
-                                wire:confirm="Hapus tim pendukung ini?"
+                                wire:click="confirmDeleteTimduk('{{ addslashes($tim) }}')"
                             />
                         </div>
                     @empty
@@ -657,6 +708,64 @@ new class extends Component {
                         </div>
                     @endforelse
                 </div>
+            </div>
+        </div>
+    </flux:modal>
+
+    {{-- MODAL: CONFIRM DELETE INTERNAL --}}
+    <flux:modal name="delete-internal-modal" class="md:w-110">
+        <div class="space-y-5">
+            <div class="flex items-start gap-4">
+                <div class="shrink-0 w-11 h-11 rounded-full bg-red-50 dark:bg-red-500/10 flex items-center justify-center ring-4 ring-red-50/50 dark:ring-red-500/5">
+                    <flux:icon.exclamation-triangle class="w-5 h-5 text-red-600 dark:text-red-400" />
+                </div>
+                <div class="space-y-1 flex-1 min-w-0">
+                    <flux:heading size="lg">Hapus Anggota Internal?</flux:heading>
+                    <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">
+                        Anggota <span class="font-medium text-zinc-800 dark:text-zinc-200">"{{ $deletingInternalName }}"</span>
+                        akan dikeluarkan dari project ini. Tindakan ini tidak dapat dibatalkan.
+                    </flux:text>
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                <flux:modal.close>
+                    <flux:button variant="ghost" class="flex-1">Batal</flux:button>
+                </flux:modal.close>
+                <flux:button wire:click="removeInternal" variant="danger" icon="trash" class="flex-1"
+                    wire:loading.attr="disabled" wire:target="removeInternal">
+                    <span wire:loading.remove wire:target="removeInternal">Hapus</span>
+                    <span wire:loading wire:target="removeInternal">Menghapus...</span>
+                </flux:button>
+            </div>
+        </div>
+    </flux:modal>
+
+    {{-- MODAL: CONFIRM DELETE TIMDUK --}}
+    <flux:modal name="delete-timduk-modal" class="md:w-110">
+        <div class="space-y-5">
+            <div class="flex items-start gap-4">
+                <div class="shrink-0 w-11 h-11 rounded-full bg-red-50 dark:bg-red-500/10 flex items-center justify-center ring-4 ring-red-50/50 dark:ring-red-500/5">
+                    <flux:icon.exclamation-triangle class="w-5 h-5 text-red-600 dark:text-red-400" />
+                </div>
+                <div class="space-y-1 flex-1 min-w-0">
+                    <flux:heading size="lg">Hapus Tim Pendukung?</flux:heading>
+                    <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">
+                        Tim <span class="font-medium text-zinc-800 dark:text-zinc-200">"{{ $deletingTimdukName }}"</span>
+                        akan dihapus dari daftar tim pendukung project. Tindakan ini tidak dapat dibatalkan.
+                    </flux:text>
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                <flux:modal.close>
+                    <flux:button variant="ghost" class="flex-1">Batal</flux:button>
+                </flux:modal.close>
+                <flux:button wire:click="removeTimduk" variant="danger" icon="trash" class="flex-1"
+                    wire:loading.attr="disabled" wire:target="removeTimduk">
+                    <span wire:loading.remove wire:target="removeTimduk">Hapus</span>
+                    <span wire:loading wire:target="removeTimduk">Menghapus...</span>
+                </flux:button>
             </div>
         </div>
     </flux:modal>

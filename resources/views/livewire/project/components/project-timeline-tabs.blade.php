@@ -12,6 +12,7 @@ new class extends Component {
 
     public $date;
     public $id; // project id
+    public $user_id;
 
     public $timelines = [];
     public $activities = [];
@@ -32,7 +33,7 @@ new class extends Component {
     #[On('timelineLoad')]
     public function mount(){
         // Dummy timelines
-        $response = Http::get(config('services.api_project').'timelines/search?user_id='.Auth::user()->id.'&project_id='.$this->id)->json();
+        $response = Http::get(config('services.api_project').'timelines/search?user_id='.$this->user_id.'&project_id='.$this->id)->json();
 
         if($response['status'] !== 200) {
             Toaster::error('Failed to load timelines. Please refresh the page.');
@@ -47,9 +48,7 @@ new class extends Component {
 
         $this->timelines = $response['data'] ?? [];
 
-
-
-        $response_dar = Http::get(config('services.api_izin'). '/global/dar/list?team_user='.Auth::user()->id.'&project_id='.$this->id)->json();
+        $response_dar = Http::get(config('services.api_izin'). '/global/dar/list?team_user='.$this->user_id.'&project_id='.$this->id)->json();
 
         if(!$response_dar['success']) {
             Toaster::error('Failed to load activities. Please refresh the page.');
@@ -101,9 +100,17 @@ new class extends Component {
             return [];
         }
 
+        $monthStart = Carbon::parse($this->selectedMonth.'-01')->startOfMonth();
+        $monthEnd = (clone $monthStart)->endOfMonth();
+
         return collect($this->activities)
-            ->filter(fn ($a) => Carbon::parse($a['date'])->format('Y-m') === $this->selectedMonth)
-            ->sortBy('date')
+            ->filter(function ($a) use ($monthStart, $monthEnd) {
+                $s = Carbon::parse($a['start_date']);
+                $e = Carbon::parse($a['end_date']);
+
+                return $s <= $monthEnd && $e >= $monthStart;
+            })
+            ->sortBy('start_date')
             ->values()
             ->all();
     }
@@ -172,6 +179,28 @@ new class extends Component {
 
         if ($this->editingTimelineId) {
 
+            $response = Http::patch(
+                config('services.api_project') . 'timelines/' . $this->editingTimelineId,
+                [
+                    'user_id' => Auth::user()->id,
+                    'project_id' => $this->id,
+                    'title' => $this->form_title,
+                    'start_date' => $this->form_start_date,
+                    'end_date' => $this->form_end_date,
+                ]
+            );
+
+            if ($response->failed()) {
+                Toaster::error('Failed to update timeline.');
+
+                \Log::error('Timeline update failed', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+
+                return;
+            }
+
             $this->timelines = collect($this->timelines)->map(function ($tl) {
                 if ($tl['id'] === $this->editingTimelineId) {
                     $tl['title'] = $this->form_title;
@@ -179,7 +208,10 @@ new class extends Component {
                     $tl['end_date'] = $this->form_end_date;
                 }
                 return $tl;
-            })->all();
+            })->values()->all();
+
+            Toaster::success('Timeline updated successfully!');
+
         } else {
             $response = Http::post(config('services.api_project').'timelines', [
                 'user_id' => Auth::user()->id,
@@ -323,8 +355,15 @@ new class extends Component {
                     @foreach($months as $month)
                     @php
                     $isActive = $selectedMonth === $month['value'];
+                    $monthStart = Carbon::parse($month['value'].'-01')->startOfMonth();
+                    $monthEnd = (clone $monthStart)->endOfMonth();
                     $count = collect($activities)
-                        ->filter(fn ($a) => Carbon::parse($a['date'])->format('Y-m') === $month['value'])
+                        ->filter(function ($a) use ($monthStart, $monthEnd) {
+                            $s = Carbon::parse($a['start_date']);
+                            $e = Carbon::parse($a['end_date']);
+
+                            return $s <= $monthEnd && $e >= $monthStart;
+                        })
                         ->count();
                     @endphp
                     <button
@@ -352,10 +391,10 @@ new class extends Component {
         $monthTimelines = $this->getTimelinesForMonth($selectedMonth);
         $monthActivities = $this->getActivitiesForSelectedMonth();
         $statusMap = [
-            'completed' => ['label' => 'Selesai', 'class' => 'bg-emerald-100 text-emerald-700', 'dot' => 'bg-emerald-500'],
-            'in-progress' => ['label' => 'Berjalan', 'class' => 'bg-blue-100 text-blue-700', 'dot' => 'bg-blue-500'],
-            'pending' => ['label' => 'Tertunda', 'class' => 'bg-amber-100 text-amber-700', 'dot' => 'bg-amber-500'],
-            'hold' => ['label' => 'Ditahan', 'class' => 'bg-gray-100 text-gray-700', 'dot' => 'bg-gray-400'],
+            1 => ['label' => 'Open', 'class' => 'bg-blue-100 text-blue-700', 'dot' => 'bg-blue-500'],
+            2 => ['label' => 'Pending', 'class' => 'bg-amber-100 text-amber-700', 'dot' => 'bg-amber-500'],
+            3 => ['label' => 'Cancelled', 'class' => 'bg-red-100 text-red-700', 'dot' => 'bg-red-500'],
+            4 => ['label' => 'Completed', 'class' => 'bg-emerald-100 text-emerald-700', 'dot' => 'bg-emerald-500'],
         ];
         @endphp
 
@@ -400,7 +439,7 @@ new class extends Component {
                 @foreach($monthActivities as $activity)
                 @php
                 $tl = collect($timelines)->firstWhere('id', $activity['project_category_id']);
-                $status = $statusMap[$activity['status']] ?? $statusMap['pending'];
+                $status = $statusMap[(int) ($activity['status'] ?? 0)] ?? $statusMap[1];
                 @endphp
                 <li wire:key="act-{{ $activity['id'] }}" class="ml-6">
                     <span class="absolute -left-[7px] flex items-center justify-center w-3.5 h-3.5 rounded-full ring-4 ring-white {{ $status['dot'] }}"></span>
@@ -408,7 +447,7 @@ new class extends Component {
                     <div class="flex flex-wrap items-start justify-between gap-3 mb-1">
                         <div class="flex items-center gap-2">
                             <time class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                                {{ Carbon::parse($activity['date'])->locale('id')->translatedFormat('D, d M Y') }}
+                                {{ Carbon::parse($activity['start_date'])->locale('id')->translatedFormat('D, d M Y') }}
                             </time>
                             @if($tl)
                             <span class="text-xs px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600">
@@ -425,7 +464,7 @@ new class extends Component {
                     <div class="p-4 rounded-xl border border-gray-100 bg-gray-50 hover:bg-white hover:shadow-sm transition">
                         <h3 class="text-sm font-semibold text-gray-900">{{ $activity['activity'] }}</h3>
                         @if(!empty($activity['description']))
-                        <p class="mt-1 text-xs text-gray-500 leading-relaxed">{{ $activity['description'] }}</p>
+                        <p class="mt-1 text-xs text-gray-500 leading-relaxed">{{ strip_tags($activity['description']) }}</p>
                         @endif
                         <div class="mt-2 flex items-center gap-4 text-xs text-gray-500">
                             <span class="inline-flex items-center gap-1">

@@ -35,25 +35,23 @@
 
                     <div class="flex w-full flex-col gap-2 sm:flex-row md:w-auto md:gap-3">
                         <flux:modal.trigger name="form-izin-modal">
-                            <flux:button
-                                icon="plus-circle"
-                                variant="primary"
-                                class="cursor-pointer w-full sm:w-auto bg-white! text-red-700! hover:bg-white/90!"
-                            >
+                            <flux:button icon="plus-circle" variant="primary" class="cursor-pointer w-full sm:w-auto bg-white! text-red-700! hover:bg-white/90!">
                                 Ajukan Izin
                             </flux:button>
                         </flux:modal.trigger>
 
+
                         @if (Auth::user()->level >= 60)
-                            <a href="{{ route('izin.laporan-pengajuan') }}" class="w-full sm:w-auto">
-                                <flux:button
-                                icon="document-text"
-                                variant="primary"
-                                class="cursor-pointer w-full sm:w-auto bg-white! text-red-700! hover:bg-white/90!"
-                            >
+                        <flux:modal.trigger name="spd-form-modal">
+                            <flux:button icon="plus-circle" variant="primary" class="cursor-pointer w-full sm:w-auto bg-white! text-red-700! hover:bg-white/90!">
+                                Buat SPD
+                            </flux:button>
+                        </flux:modal.trigger>
+                        <a href="{{ route('izin.laporan-pengajuan') }}" class="w-full sm:w-auto">
+                            <flux:button icon="document-text" variant="primary" class="cursor-pointer w-full sm:w-auto bg-white! text-red-700! hover:bg-white/90!">
                                 Laporan Pengajuan
                             </flux:button>
-                            </a>
+                        </a>
                         @endif
                     </div>
                 </div>
@@ -62,13 +60,47 @@
                 <livewire:izin.widget.report-izin lazy />
                 <livewire:izin.widget.report-izin-category lazy />
             </div>
-            <livewire:izin.izin-search-list />
 
-            <livewire:izin.izin-table lazy />
+            @if(Auth::user()->level <= 90) <div x-data="{ tab: 'izin' }" class="space-y-4">
+                <div class="flex justify-center">
+                    <div class="inline-flex w-full rounded-xl bg-zinc-100 p-1 shadow-sm">
 
-            <livewire:izin.spd-list lazy />
+                        <button @click="tab = 'izin'" :class="tab === 'izin'
+                ? 'bg-white text-zinc-900 shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-700'" class="px-4 w-full py-2 text-sm font-medium rounded-lg transition-all duration-200">
+                            Izin
+                        </button>
+
+                        <button @click="tab = 'spd'" :class="tab === 'spd'
+                ? 'bg-white text-zinc-900 shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-700'" class="px-4 w-full py-2 text-sm font-medium rounded-lg transition-all duration-200">
+                            SPD
+                        </button>
+
+                    </div>
+                </div>
+
+                <!-- 🔹 Tab Content -->
+                <div>
+
+                    <!-- IZIN -->
+                    <div x-show="tab === 'izin'" class="space-y-3" x-transition>
+                        <livewire:izin.izin-search-list />
+                        <livewire:izin.izin-table lazy />
+                    </div>
+
+                    <!-- SPD -->
+                    <div x-show="tab === 'spd'" x-transition>
+                        <livewire:izin.spd-list lazy />
+                    </div>
+
+                </div>
         </div>
+        @else
+        <livewire:izin.spd-list lazy />
+        @endif
+    </div>
 
-        <livewire:izin.add-izin-modal />
+    <livewire:izin.add-izin-modal />
     </div>
 </x-layouts.app>

@@ -251,9 +251,9 @@ new class extends Component {
                 $taskId = $task['id'] ?? null;
                 $taskUrl = $taskId ? route('dar.dar-show', $taskId) : '#';
                 $statusColor = match ($status) {
-                1 => 'bg-slate-50 text-slate-700 ring-slate-200', // pending
-                2 => 'bg-amber-50 text-amber-800 ring-amber-200', // hold
-                3 => 'bg-blue-50 text-blue-700 ring-blue-200', // in progress
+                1 => 'bg-blue-50 text-blue-700 ring-blue-200', // open
+                2 => 'bg-amber-50 text-amber-800 ring-amber-200', // pending
+                3 => 'bg-red-50 text-red-700 ring-red-200', // cancelled
                 4 => 'bg-emerald-50 text-emerald-800 ring-emerald-200', // completed
                 default => 'bg-slate-50 text-slate-700 ring-slate-200',
                 };
@@ -309,7 +309,7 @@ new class extends Component {
 
                         <div class="mt-4 flex flex-wrap items-center gap-2">
                             <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ring-1 {{ $statusColor }}">
-                                {{ $status === 1 ? 'Pending' : ($status === 2 ? 'Hold' : ($status === 3 ? 'In Progress' : ($status === 4 ? 'Completed' : 'Draft'))) }}
+                                {{ $status === 1 ? 'Open' : ($status === 2 ? 'Pending' : ($status === 3 ? 'Cancelled' : ($status === 4 ? 'Completed' : 'Draft'))) }}
                             </span>
 
                             @if(!empty($task['end_date']))
@@ -431,7 +431,7 @@ new class extends Component {
         </div>
     </flux:modal>
 
-    <flux:modal x-data="{ isProject: @entangle('form.isproject').live }" name="create-task" class="min-w-screen overflow-auto md:min-w-3xl lg:min-w-5xl xl:min-w-6xl">
+    <flux:modal name="create-task" class="min-w-screen overflow-auto md:min-w-3xl lg:min-w-5xl xl:min-w-6xl">
         <form wire:submit="createActivity" class="space-y-5">
             {{-- ── Header ── --}}
             <div class="flex items-start gap-3 border-b border-zinc-100 pb-4">
@@ -468,9 +468,9 @@ new class extends Component {
                 <div class="space-y-3">
                     <p class="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">Kategori</p>
 
-                    <div class="rounded-xl border bg-zinc-50/60 p-4 transition" :class="isProject ? 'border-zinc-300' : 'border-zinc-200'">
+                    <div class="rounded-xl border bg-zinc-50/60 p-4 transition {{ $form->isproject ? 'border-zinc-300' : 'border-zinc-200' }}">
                         <label class="flex cursor-pointer items-start gap-3">
-                            <input wire:model.live="form.isproject" x-model="isProject" type="checkbox" class="mt-0.5 h-4 w-4 cursor-pointer rounded border-zinc-300 text-zinc-900 focus:ring-zinc-400" />
+                            <input wire:model.live="form.isproject" type="checkbox" class="mt-0.5 h-4 w-4 cursor-pointer rounded border-zinc-300 text-zinc-900 focus:ring-zinc-400" />
                             <span class="flex-1">
                                 <span class="block text-sm font-semibold text-zinc-900">Kegiatan Project</span>
                                 <span class="block text-xs text-zinc-500">Centang jika tugas ini terkait dengan project tertentu.</span>
@@ -478,44 +478,46 @@ new class extends Component {
                         </label>
 
                         {{-- Project & timeline selectors — hanya muncul kalau checkbox dicentang --}}
-                        <template x-if="isProject">
-                            <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <div>
-                                    <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Project</label>
-                                    <flux:select wire:model.live="projectSelected" placeholder="Pilih project...">
-                                        @foreach ($this->projectData() as $item)
-                                        <flux:select.option value="{{ $item['id'] }}">{{ $item['name'] }}</flux:select.option>
-                                        @endforeach
-                                    </flux:select>
-                                    @error('form.project_id')
-                                    <flux:error message="{{ $message }}" /> @enderror
-                                </div>
-
-                                <div>
-                                    <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Timeline</label>
-                                    @if (! empty($this->timelines))
-                                    <flux:select wire:model="form.timelines_id" placeholder="Pilih timeline...">
-                                        @foreach ($this->timelines as $item)
-                                        <flux:select.option value="{{ $item['id'] }}">{{ $item['title'] }}</flux:select.option>
-                                        @endforeach
-                                    </flux:select>
-                                    @elseif ($projectSelected)
-                                    <div wire:loading wire:target="updatedProjectSelected, projectSelected" class="rounded-xl bg-zinc-100 px-3 py-2.5 text-xs text-zinc-500">
-                                        Memuat timeline...
-                                    </div>
-                                    <div wire:loading.remove wire:target="updatedProjectSelected, projectSelected" class="rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-700 ring-1 ring-amber-200">
-                                        Tidak ada timeline. Buat dulu di menu project.
-                                    </div>
-                                    @else
-                                    <div class="rounded-xl bg-zinc-100 px-3 py-2.5 text-xs text-zinc-500">
-                                        Pilih project dulu.
-                                    </div>
-                                    @endif
-                                    @error('form.timelines_id')
-                                    <flux:error message="{{ $message }}" /> @enderror
-                                </div>
+                        @if ($form->isproject)
+                        <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Project</label>
+                                <flux:select wire:model.live="projectSelected" placeholder="Pilih project...">
+                                    <flux:select.option selected>Pilih Project...</flux:select.option>
+                                    @foreach ($this->projectData() as $item)
+                                    <flux:select.option value="{{ $item['id'] }}">{{ $item['name'] }}</flux:select.option>
+                                    @endforeach
+                                </flux:select>
+                                @error('form.project_id')
+                                <flux:error message="{{ $message }}" /> @enderror
                             </div>
-                        </template>
+
+                            <div>
+                                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Timeline</label>
+                                @if (! empty($this->timelines))
+                                <flux:select wire:model.live="form.timelines_id" placeholder="Pilih timeline...">
+                                    <flux:select.option selected>Pilih Timeline...</flux:select.option>
+                                    @foreach ($this->timelines as $item)
+                                    <flux:select.option value="{{ $item['id'] }}">{{ $item['title'] }}</flux:select.option>
+                                    @endforeach
+                                </flux:select>
+                                @elseif ($projectSelected)
+                                <div wire:loading wire:target="updatedProjectSelected, projectSelected" class="rounded-xl bg-zinc-100 px-3 py-2.5 text-xs text-zinc-500">
+                                    Memuat timeline...
+                                </div>
+                                <div wire:loading.remove wire:target="updatedProjectSelected, projectSelected" class="rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-700 ring-1 ring-amber-200">
+                                    Tidak ada timeline. Buat dulu di menu project.
+                                </div>
+                                @else
+                                <div class="rounded-xl bg-zinc-100 px-3 py-2.5 text-xs text-zinc-500">
+                                    Pilih project dulu.
+                                </div>
+                                @endif
+                                @error('form.timelines_id')
+                                <flux:error message="{{ $message }}" /> @enderror
+                            </div>
+                        </div>
+                        @endif
                     </div>
                 </div>
 
@@ -591,9 +593,9 @@ new class extends Component {
                         <div>
                             <p class="text-[11px] mb-1.5  font-semibold uppercase tracking-widest text-zinc-500">Status</p>
                             <flux:select wire:model="form.status" placeholder="Pilih status...">
-                                <flux:select.option value="1">Draft</flux:select.option>
-                                <flux:select.option value="2">Hold</flux:select.option>
-                                <flux:select.option value="3">In Progress</flux:select.option>
+                                <flux:select.option value="1">Open</flux:select.option>
+                                <flux:select.option value="2">Pending</flux:select.option>
+                                <flux:select.option value="3">Cancelled</flux:select.option>
                                 <flux:select.option value="4">Completed</flux:select.option>
                             </flux:select>
                             @error('form.status')

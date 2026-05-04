@@ -10,6 +10,7 @@ use Livewire\Volt\Component;
 new class extends Component {
     public int $approvedCount = 0;
     public int $rejectedCount = 0;
+    public int $waitingCount = 0;
     public int $totalCount = 0;
 
     public function mount(): void
@@ -20,14 +21,19 @@ new class extends Component {
     #[On('izinAdded')]
     public function refreshData(): void
     {
-        Cache::forget($this->cacheKey());
+        Cache::forget($this->cacheKeyGroup());
+        Cache::forget($this->cacheKeyUser());
         $this->loadData();
     }
 
     #[Computed]
     public function pendingCount(): int
     {
-        return max(0, $this->totalCount - $this->approvedCount - $this->rejectedCount);
+        if (Auth::user()->level <= 90) {
+            return max(0, $this->totalCount - $this->approvedCount - $this->rejectedCount);
+        }else {
+            return max(0, $this->totalCount - $this->approvedCount - $this->waitingCount);
+        }
     }
 
     /**
@@ -38,69 +44,120 @@ new class extends Component {
     {
         $total = max($this->totalCount, 1);
 
-        return [
-            'approved' => round($this->approvedCount / $total * 100, 1),
-            'rejected' => round($this->rejectedCount / $total * 100, 1),
-            'pending' => round($this->pendingCount / $total * 100, 1),
-        ];
+        if (Auth::user()->level <= 90) {
+            return [
+                'approved' => round($this->approvedCount / $total * 100, 1),
+                'rejected' => round($this->rejectedCount / $total * 100, 1),
+                'pending' => round($this->pendingCount / $total * 100, 1),
+            ];
+        }else {
+            return [
+                'approved' => round($this->approvedCount / $total * 100, 1),
+                'waiting' => round($this->waitingCount / $total * 100, 1),
+                'pending' => round($this->pendingCount / $total * 100, 1),
+            ];
+
+        }
     }
 
     protected function loadData(): void
     {
-        $data = Cache::remember($this->cacheKey(), now()->addHour(), fn () => $this->fetchFromApi());
+        // cache per user (tanpa group)
+        $data = Cache::remember(
+            $this->cacheKeyUser(),
+            now()->addHour(),
+            fn () => $this->fetchUserData()
+        );
 
-        $this->dispatch('widget-pengajuan', data: $data['group'] ?? []);
+        // cache global (group)
+        $group = Cache::remember(
+            $this->cacheKeyGroup(),
+            now()->addHour(),
+            fn () => $this->fetchGroupData()
+        );
+
+        $this->dispatch('widget-pengajuan', data: $group ?? []);
 
         $this->approvedCount = (int) ($data['approved'] ?? 0);
-        $this->rejectedCount = (int) ($data['rejected'] ?? 0);
+
+        if (Auth::user()->level <= 90) {
+            $this->rejectedCount = (int) ($data['rejected'] ?? 0);
+        } else {
+            $this->waitingCount = (int) ($data['waiting'] ?? 0);
+        }
+
         $this->totalCount = (int) ($data['total'] ?? 0);
     }
 
     /**
      * @return array{approved:int,rejected:int,total:int,group:array}
      */
-    protected function fetchFromApi(): array
+    protected function fetchUserData(): array
     {
-        $empty = ['approved' => 0, 'rejected' => 0, 'total' => 0, 'group' => []];
-
         try {
-            $response = Http::timeout(120)
-                ->retry(2, 200)
-                ->get(config('services.api_izin').'/global/izin/dashboard/'.Auth::user()->username);
+            if (Auth::user()->level <= 90) {
+                $response = Http::get(config('services.api_izin').'/global/izin/dashboard/'.Auth::user()->username);
+            } else {
+                $response = Http::get(config('services.api_izin').'/global/dar/activity/list-spd');
+            }
 
             if (! $response->successful()) {
-                Log::error('Izin Dashboard API failed', [
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-
-                return $empty;
+                return ['approved' => 0, 'rejected' => 0, 'waiting' => 0, 'total' => 0];
             }
 
             $json = $response->json();
 
             if (! ($json['success'] ?? false)) {
-                return $empty;
+                return ['approved' => 0, 'rejected' => 0, 'waiting' => 0, 'total' => 0];
             }
 
-            return [
-                'approved' => $json['data']['approve_izin'] ?? 0,
-                'rejected' => $json['data']['failed_izin'] ?? 0,
-                'total' => $json['data']['all_izin'] ?? 0,
-                'group' => $json['data']['group'] ?? [],
-            ];
-        } catch (\Throwable $e) {
-            Log::error('Izin Dashboard API connection error', [
-                'message' => $e->getMessage(),
-            ]);
+            if (Auth::user()->level <= 90) {
+                return [
+                    'approved' => $json['data']['approve_izin'] ?? 0,
+                    'rejected' => $json['data']['failed_izin'] ?? 0,
+                    'total'    => $json['data']['all_izin'] ?? 0,
+                ];
+            } else {
+                $data = collect($json['data'] ?? []);
 
-            return $empty;
+                return [
+                    'approved' => $data->where('is_submitted', 1)->where('is_approved', 1)->count(),
+                    'waiting'  => $data->where('is_submitted', 1)->where('is_approved', 0)->count(),
+                    'total'    => $data->count(),
+                ];
+            }
+
+        } catch (\Throwable $e) {
+            return ['approved' => 0, 'rejected' => 0, 'waiting' => 0, 'total' => 0];
         }
     }
 
-    protected function cacheKey(): string
+    protected function fetchGroupData(): array
     {
-        return 'izin_widget_'.Auth::user()->username;
+        try {
+            $response = Http::get(config('services.api_izin').'/global/izin/dashboard/'.Auth::user()->username);
+
+            if (! $response->successful()) {
+                return [];
+            }
+
+            $json = $response->json();
+
+            return $json['data']['group'] ?? [];
+
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    protected function cacheKeyUser(): string
+    {
+        return 'izin_widget_user_' . Auth::user()->username;
+    }
+
+    protected function cacheKeyGroup(): string
+    {
+        return 'izin_widget_group_global';
     }
 }; ?>
 
@@ -113,12 +170,20 @@ new class extends Component {
                     <flux:icon name="chart-bar" class="size-5 text-red-600" />
                 </div>
                 <div class="min-w-0">
-                    <flux:heading size="lg" class="text-zinc-900 leading-tight">
+                    @if(Auth::user()->level <= 90) <flux:heading size="lg" class="text-zinc-900 leading-tight">
                         Ringkasan Izin
-                    </flux:heading>
-                    <flux:description class="text-xs text-zinc-500">
-                        Status pengajuan izin Anda
-                    </flux:description>
+                        </flux:heading>
+                        <flux:description class="text-xs text-zinc-500">
+                            Status pengajuan izin Anda
+                        </flux:description>
+                        @else
+                        <flux:heading size="lg" class="text-zinc-900 leading-tight">
+                            Ringkasan SPD
+                        </flux:heading>
+                        <flux:description class="text-xs text-zinc-500">
+                            Status pengajuan SPD Pegawai
+                        </flux:description>
+                        @endif
                 </div>
             </div>
             <flux:badge size="sm" color="zinc" variant="pill" class="shrink-0">All-time</flux:badge>
@@ -132,16 +197,19 @@ new class extends Component {
                     <span class="text-4xl sm:text-5xl font-semibold text-zinc-900 tabular-nums tracking-tight">
                         {{ $totalCount }}
                     </span>
-                    <span class="text-sm text-zinc-400">izin</span>
+                    @if(Auth::user()->level <= 90) <span class="text-sm text-zinc-400">izin</span>
+                        @else
+                        <span class="text-sm text-zinc-400">SPD</span>
+                        @endif
                 </div>
             </div>
             @if ($totalCount > 0)
-                <div class="text-right space-y-0.5">
-                    <p class="text-[11px] font-medium text-zinc-500">Tingkat Disetujui</p>
-                    <p class="text-2xl font-semibold text-emerald-600 tabular-nums">
-                        {{ $this->percentages['approved'] }}<span class="text-sm">%</span>
-                    </p>
-                </div>
+            <div class="text-right space-y-0.5">
+                <p class="text-[11px] font-medium text-zinc-500">Tingkat Disetujui</p>
+                <p class="text-2xl font-semibold text-emerald-600 tabular-nums">
+                    {{ $this->percentages['approved'] }}<span class="text-sm">%</span>
+                </p>
+            </div>
             @endif
         </div>
 
@@ -149,9 +217,13 @@ new class extends Component {
         <div class="mt-4">
             <div class="h-2.5 w-full rounded-full overflow-hidden bg-zinc-100 flex">
                 @if ($totalCount > 0)
-                    <div class="bg-emerald-500 h-full transition-all duration-500" style="width: {{ $this->percentages['approved'] }}%"></div>
-                    <div class="bg-rose-500 h-full transition-all duration-500" style="width: {{ $this->percentages['rejected'] }}%"></div>
-                    <div class="bg-amber-400 h-full transition-all duration-500" style="width: {{ $this->percentages['pending'] }}%"></div>
+                <div class="bg-emerald-500 h-full transition-all duration-500" style="width: {{ $this->percentages['approved'] }}%"></div>
+                @if(Auth::user()->level <= 90)
+                <div class="bg-rose-500 h-full transition-all duration-500" style="width: {{ $this->percentages['rejected'] }}%"></div>
+                @else
+                <div class="bg-blue-500 h-full transition-all duration-500" style="width: {{ $this->percentages['waiting'] }}%"></div>
+                @endif
+                <div class="bg-amber-400 h-full transition-all duration-500" style="width: {{ $this->percentages['pending'] }}%"></div>
                 @endif
             </div>
         </div>
@@ -159,14 +231,21 @@ new class extends Component {
         {{-- Legend / mini stats --}}
         <div class="mt-5 grid grid-cols-3 gap-3">
             @php
-                $stats = [
-                    ['label' => 'Disetujui', 'value' => $approvedCount, 'percent' => $this->percentages['approved'], 'dot' => 'bg-emerald-500', 'text' => 'text-emerald-600'],
-                    ['label' => 'Ditolak', 'value' => $rejectedCount, 'percent' => $this->percentages['rejected'], 'dot' => 'bg-rose-500', 'text' => 'text-rose-600'],
-                    ['label' => 'Pending', 'value' => $this->pendingCount, 'percent' => $this->percentages['pending'], 'dot' => 'bg-amber-400', 'text' => 'text-amber-600'],
+            if (Auth::user()->level <= 90){ $stats=[ ['label'=> 'Disetujui', 'value' => $approvedCount, 'percent' => $this->percentages['approved'], 'dot' => 'bg-emerald-500', 'text' => 'text-emerald-600'],
+                ['label' => 'Ditolak', 'value' => $rejectedCount, 'percent' => $this->percentages['rejected'], 'dot' => 'bg-rose-500', 'text' => 'text-rose-600'],
+                ['label' => 'Pending', 'value' => $this->pendingCount, 'percent' => $this->percentages['pending'], 'dot' => 'bg-amber-400', 'text' => 'text-amber-600'],
                 ];
-            @endphp
+                }else {
+                $stats = [
+                ['label' => 'Disetujui', 'value' => $approvedCount, 'percent' => $this->percentages['approved'], 'dot' => 'bg-emerald-500', 'text' => 'text-emerald-600'],
+                ['label' => 'Waiting', 'value' => $waitingCount, 'percent' => $this->percentages['waiting'], 'dot' => 'bg-blue-500', 'text' => 'text-blue-600'],
+                ['label' => 'Pending', 'value' => $this->pendingCount, 'percent' => $this->percentages['pending'], 'dot' => 'bg-amber-400', 'text' => 'text-amber-600'],
+                ];
+                }
 
-            @foreach ($stats as $stat)
+                @endphp
+
+                @foreach ($stats as $stat)
                 <div class="rounded-xl border border-zinc-200 p-3 transition hover:border-zinc-300 hover:shadow-xs">
                     <div class="flex items-center gap-1.5">
                         <span class="size-2 rounded-full {{ $stat['dot'] }}"></span>
@@ -177,7 +256,7 @@ new class extends Component {
                         <span class="text-[11px] {{ $stat['text'] }} tabular-nums font-medium">{{ $stat['percent'] }}%</span>
                     </div>
                 </div>
-            @endforeach
+                @endforeach
         </div>
     </div>
 </div>

@@ -210,7 +210,9 @@ new class extends Component {
                                 class="group flex w-full items-start gap-3 rounded-xl border bg-white p-3 text-left transition hover:bg-slate-50 {{ $msg->unread > 0 ? 'border-blue-200 bg-blue-50/40' : 'border-slate-200/70' }}"
                             >
                                 <div class="relative grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700">
-                                    {{ \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($msg->title, 0, 1)) }}
+                                    <flux:tooltip content="{{ $msg->title }}">
+                                        {{ \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($msg->title, 0, 2)) }}
+                                    </flux:tooltip>
                                     @if($msg->unread > 0)
                                         <span class="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-blue-500 ring-2 ring-white"></span>
                                     @endif
@@ -219,8 +221,6 @@ new class extends Component {
                                 <div class="flex-1 min-w-0">
                                     <div class="flex justify-between items-center gap-2">
                                         <p class="truncate text-sm font-semibold text-slate-900 group-hover:text-slate-950">
-                                            {{ $msg->title }}
-                                            <span class="font-normal text-slate-500">on</span>
                                             <span class="text-slate-700">{{ $msg->activity }}</span>
                                         </p>
                                         <span class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold {{ $msg->unread > 0 ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700' }}">

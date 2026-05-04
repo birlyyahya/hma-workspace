@@ -37,18 +37,6 @@
                                 Buat Tugas Baru
                             </flux:button>
                         </flux:modal.trigger>
-
-                        @if (Auth::user()->level >= 60)
-                            <a href="{{ route('izin.laporan-pengajuan') }}" class="w-full sm:w-auto">
-                                <flux:button
-                                    icon="document-chart-bar"
-                                    variant="outline"
-                                    class="cursor-pointer w-full sm:w-auto border-white/30! text-white! hover:bg-white/10!"
-                                >
-                                    Laporan Pengajuan
-                                </flux:button>
-                            </a>
-                        @endif
                     </div>
                 </div>
             </div>

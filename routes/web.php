@@ -35,16 +35,18 @@ Route::middleware('auth')->group(function () {
     Volt::route('izin/laporan-pengajuan', 'izin.laporan-pengajuan-izin')->name('izin.laporan-pengajuan');
     Volt::route('izin/spd/{id}/preview', 'izin.spd-show')->name('izin.spd-preview');
 
-
     // Inventaris
-    Route::view('inventaris', 'inventaris')->name('inventaris');
+    // Route::view('inventaris', 'inventaris')->name('inventaris');
+    Volt::route('inventaris', 'maintenance/comingsoon')->name('inventaris');
 
     // Cash Advance
-    Route::view('cashadvance', 'cashadvance')->name('cashadvance');
+    // Route::view('cashadvance', 'cashadvance')->name('cashadvance');
+    Volt::route('cashadvance', 'maintenance/comingsoon')->name('cashadvance');
 
     // Event
     Route::prefix('event')->group(function () {
-        Route::view('/', 'events')->name('events');
+        // Route::view('/', 'events')->name('events');
+        Volt::route('/', 'maintenance/comingsoon')->name('events');
         Route::get('/{event}', EventShow::class)->name('events.show');
         Route::view('/{event}/scan', 'events-scan')->name('event.scan');
         Route::view('/{event}/registration', 'events-registration')->name('event.registration');
@@ -52,9 +54,11 @@ Route::middleware('auth')->group(function () {
 
     // Knowledge
     Route::prefix('knowledge')->group(function () {
-        Route::redirect('/', 'knowledge/articles');
+        Volt::route('/', 'knowledge.index')->name('knowledge');
         Volt::route('/articles', 'knowledge.article')->name('knowledge.articles');
-        Volt::route('/articles-create', 'knowledge.article-create')->name('knowledge.articles-create');
+        Volt::route('/articles/create', 'knowledge.article-create')->name('knowledge.articles-create');
+        Volt::route('/articles/{slug}/edit', 'knowledge.article-create')->name('knowledge.articles-edit');
+        Volt::route('/articles/{slug}', 'knowledge.article-show')->name('knowledge.articles-show');
         Volt::route('/announcements', 'knowledge.announcements')->name('knowledge.announcements');
         Volt::route('/policies', 'knowledge.policies')->name('knowledge.policies');
         Volt::route('/documentation', 'knowledge.documentations')->name('knowledge.documentation');
@@ -69,4 +73,4 @@ Route::middleware('auth')->group(function () {
     Route::view('/test', 'testclean')->name('settings');
 });
 
-require __DIR__ . '/settings.php';
+require __DIR__.'/settings.php';
