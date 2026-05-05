@@ -331,7 +331,6 @@ class extends Component {
     </style>
 
     <div class="min-h-screen py-8 px-4">
-        <flux:button wire:click='sendText'>Send</flux:button>
         @if (!$spd)
         <div class="mx-auto max-w-2xl rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-zinc-200">
             <div class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-zinc-100 text-zinc-400">

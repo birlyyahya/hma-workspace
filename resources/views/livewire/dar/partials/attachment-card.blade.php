@@ -8,7 +8,7 @@
     $file = $file ?? [];
     $variant = $variant ?? 'card';
     $filename = $file['filename'] ?? 'untitled';
-    $url = $file['url'] ?? '#';
+    $url = config('services.api_izin').$file['path'] ?? '#';
     $size = $file['size'] ?? null;
     $mime = $file['type'] ?? null;
     $isImage = isImageFile($filename, $mime);

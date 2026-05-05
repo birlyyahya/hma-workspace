@@ -21,6 +21,7 @@ class extends Component {
     public array $task = [];
     public array $comments = [];
     public array $commentUsers = [];
+    public array $logs = [];
 
     public string $comment = '';
     public array $newFiles = [];
@@ -44,6 +45,9 @@ class extends Component {
     // Edit comment
     public ?int $editingCommentId = null;
     public string $editingCommentBody = '';
+
+    // Delete comment
+    public ?int $pendingDeleteCommentId = null;
 
     public function mount(): void
     {
@@ -113,6 +117,24 @@ class extends Component {
             ->keyBy('id')
             ->map(fn ($u) => ['name' => $u->name, 'role_name' => $u->role?->name])
             ->toArray();
+
+        $this->loadLogs();
+    }
+
+    protected function loadLogs(): void
+    {
+        try {
+            $response = Http::timeout(30)
+                ->get(config('services.api_izin') . '/global/dar/log-activity', [
+                    'activity_id' => $this->id,
+                    'perPage' => 99999,
+                ])->json();
+
+            $this->logs = $response['data'] ?? [];
+        } catch (\Throwable $e) {
+            $this->logs = [];
+            Log::warning('Failed to load DAR activity logs', ['message' => $e->getMessage()]);
+        }
     }
 
     public function getUserProperty(): ?User
@@ -229,6 +251,7 @@ class extends Component {
                     'project_category_id' => $categoryId,
                 ];
                 $this->editing = false;
+                $this->loadLogs();
                 Toaster::success('Task updated successfully!');
 
                 return;
@@ -427,15 +450,34 @@ class extends Component {
         }
     }
 
-    public function deleteComment(int $commentId): void
+    public function confirmDeleteComment(int $commentId): void
     {
+        $this->pendingDeleteCommentId = $commentId;
+        \Flux\Flux::modal('delete-comment-modal')->show();
+    }
+
+    public function cancelDeleteComment(): void
+    {
+        $this->pendingDeleteCommentId = null;
+        \Flux\Flux::modal('delete-comment-modal')->close();
+    }
+
+    public function deleteComment(): void
+    {
+        if (! $this->pendingDeleteCommentId) {
+            return;
+        }
+
+        $commentId = $this->pendingDeleteCommentId;
         $response = null;
 
         try {
             $response = Http::delete(config('services.api_izin') . "/global/dar/activity/delete-comment/{$commentId}");
 
             if ($response['success']) {
-                $this->comments = array_values(array_filter($this->comments, fn ($c) => $c['id'] !== $commentId));
+                $this->comments = array_values(array_filter($this->comments, fn ($c) => ($c['id'] ?? null) !== $commentId));
+                $this->pendingDeleteCommentId = null;
+                \Flux\Flux::modal('delete-comment-modal')->close();
                 Toaster::success('Comment deleted successfully!');
 
                 return;
@@ -519,9 +561,12 @@ class extends Component {
                                     <flux:icon name="x-mark" class="h-4 w-4" /> Cancel Edit
                                 </button>
                             @else
-                                <button wire:click="startEditing" @click="open = false" type="button"
-                                    class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50">
-                                    <flux:icon name="pencil-square" class="h-4 w-4" /> Edit task
+                                <button wire:click="startEditing" @click="open = false"
+                                    wire:loading.attr="disabled" wire:target="startEditing" type="button"
+                                    class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-50">
+                                    <flux:icon name="pencil-square" class="h-4 w-4" />
+                                    <span wire:loading.remove wire:target="startEditing">Edit task</span>
+                                    <span wire:loading wire:target="startEditing" class="animate-pulse">Loading...</span>
                                 </button>
                                 <button wire:click="markAsDone" @click="open = false" wire:loading.attr="disabled"
                                     wire:target="markAsDone" type="button"
@@ -562,10 +607,10 @@ class extends Component {
                         default => 'bg-zinc-400',
                     };
                     $statusLabel = match ($status) {
-                        1 => 'Pending',
-                        2 => 'On Hold',
-                        3 => 'In Progress',
-                        4 => 'Completed',
+                        1 => 'OPEN',
+                        2 => 'PENDING',
+                        3 => 'CANCELLED',
+                        4 => 'CLOSED',
                         default => 'Draft',
                     };
 
@@ -930,31 +975,142 @@ class extends Component {
                     </aside>
                 </div>
 
-                {{-- ── Comments section ── --}}
+                {{-- ── Comments + Activity Logs section ── --}}
                 <section class="mt-5 rounded-2xl bg-white shadow-sm ring-1 ring-zinc-200/70">
                     <header class="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
                         <div class="flex items-center gap-2">
                             <flux:icon name="chat-bubble-left-right" class="h-4 w-4 text-zinc-500" />
-                            <h2 class="text-sm font-semibold text-zinc-900">Comments</h2>
-                            <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600">{{ count($comments) }}</span>
+                            <h2 class="text-sm font-semibold text-zinc-900">Activity</h2>
+                            @php $visibleLogCount = collect($logs)->reject(fn ($l) => ($l['action'] ?? '') === 'created')->count(); @endphp
+                            <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600">{{ count($comments) + $visibleLogCount }}</span>
                         </div>
                     </header>
 
-                    {{-- Comment list --}}
+                    @php
+                        $fieldLabels = [
+                            'activity' => 'Judul',
+                            'description' => 'Deskripsi',
+                            'status' => 'Status',
+                            'start_date' => 'Tanggal Mulai',
+                            'end_date' => 'Tanggal Selesai',
+                            'team_user' => 'Anggota Tim',
+                            'team' => 'Anggota Tim',
+                            'project_id' => 'Project',
+                            'project_category_id' => 'Timeline',
+                            'timelines_id' => 'Timeline',
+                        ];
+
+                        $statusMap = [1 => 'Pending', 2 => 'On Hold', 3 => 'In Progress', 4 => 'Completed'];
+
+                        $formatLogValue = function ($field, $val) use ($statusMap) {
+                            if ($val === null || $val === '' || $val === []) {
+                                return '—';
+                            }
+                            if ($field === 'status') {
+                                return $statusMap[(int) $val] ?? (string) $val;
+                            }
+                            if (in_array($field, ['start_date', 'end_date'], true)) {
+                                try {
+                                    return Carbon::parse($val)->format('d M Y · H:i');
+                                } catch (\Throwable) {
+                                    return (string) $val;
+                                }
+                            }
+                            if (is_array($val)) {
+                                return implode(', ', array_map(fn ($v) => is_array($v) ? json_encode($v) : (string) $v, $val));
+                            }
+                            $str = strip_tags((string) $val);
+                            return mb_strlen($str) > 80 ? mb_substr($str, 0, 80) . '…' : $str;
+                        };
+
+                        // Build merged chronological timeline
+                        $timeline = collect()
+                            ->merge(collect($comments)->map(fn ($c) => [
+                                'kind' => 'comment',
+                                'data' => $c,
+                                'at' => $c['created_at'] ?? null,
+                            ]))
+                            ->merge(collect($logs)
+                                ->reject(fn ($l) => ($l['action'] ?? '') === 'created')
+                                ->map(fn ($l) => [
+                                    'kind' => 'log',
+                                    'data' => $l,
+                                    'at' => $l['created_at'] ?? null,
+                                ]))
+                            ->sortBy(fn ($i) => $i['at'] ? Carbon::parse($i['at'])->timestamp : 0)
+                            ->values();
+                    @endphp
+
+                    {{-- Activity timeline (comments + logs) --}}
                     <div x-ref="commentList" class="divide-y divide-zinc-100">
-                        @forelse ($comments as $c)
-                            @include('livewire.dar.partials.comment-item', [
-                                'c' => $c,
-                                'cu' => $commentUsers[$c['user_id']] ?? null,
-                                'isOwn' => ($c['user_id'] ?? null) === Auth::id(),
-                                'isEditing' => $editingCommentId !== null && isset($c['id']) && $editingCommentId === $c['id'],
-                            ])
+                        @forelse ($timeline as $item)
+                            @if ($item['kind'] === 'comment')
+                                @php $c = $item['data']; @endphp
+                                @include('livewire.dar.partials.comment-item', [
+                                    'c' => $c,
+                                    'cu' => $commentUsers[$c['user_id']] ?? null,
+                                    'isOwn' => ($c['user_id'] ?? null) === Auth::id(),
+                                    'isEditing' => $editingCommentId !== null && isset($c['id']) && $editingCommentId === $c['id'],
+                                ])
+                            @else
+                                @php
+                                    $log = $item['data'];
+                                    $logAt = ! empty($log['created_at']) ? Carbon::parse($log['created_at']) : null;
+                                    $changes = $log['changes'] ?? [];
+                                    $action = $log['action'] ?? 'updated';
+                                    $label = $log['label'] ?? match ($action) {
+                                        'created' => 'Task dibuat',
+                                        'deleted' => 'Task dihapus',
+                                        default => 'Data diubah',
+                                    };
+                                    $iconName = match ($action) {
+                                        'created' => 'sparkles',
+                                        'deleted' => 'trash',
+                                        default => 'pencil-square',
+                                    };
+                                @endphp
+
+                                <div wire:key="log-{{ $log['id'] ?? uniqid() }}" class="px-5 py-3">
+                                    {{-- Centered separator-style header --}}
+                                    <div class="flex items-center gap-3 text-xs text-zinc-500">
+                                        <span class="h-px flex-1 bg-zinc-200/70"></span>
+                                        <span class="inline-flex items-center gap-1.5">
+                                            <flux:icon name="{{ $iconName }}" class="h-3.5 w-3.5 text-zinc-400" />
+                                            <span class="font-medium text-zinc-600">{{ $label }}</span>
+                                            @if ($logAt)
+                                                <span class="text-zinc-400">·</span>
+                                                <span class="text-zinc-400" title="{{ $logAt->format('d M Y, H:i') }}">{{ $logAt->diffForHumans() }}</span>
+                                            @endif
+                                        </span>
+                                        <span class="h-px flex-1 bg-zinc-200/70"></span>
+                                    </div>
+
+                                    {{-- Diff details (centered, inline list) --}}
+                                    @if (! empty($changes) && is_array($changes))
+                                        <div class="mt-2 flex flex-col items-center gap-1 text-[11px] text-zinc-500">
+                                            @foreach ($changes as $field => $diff)
+                                                @php
+                                                    $fieldLabel = $fieldLabels[$field] ?? \Illuminate\Support\Str::headline($field);
+                                                    $oldVal = $formatLogValue($field, $diff['old'] ?? null);
+                                                    $newVal = $formatLogValue($field, $diff['new'] ?? null);
+                                                @endphp
+                                                <div class="inline-flex max-w-full flex-wrap items-center justify-center gap-1.5">
+                                                    <span class="font-semibold text-zinc-700">{{ $fieldLabel }}</span>
+                                                    <span class="rounded bg-red-50 px-1.5 py-0.5 text-red-600 line-through decoration-red-300">{{ $oldVal }}</span>
+                                                    <flux:icon name="arrow-right" class="h-3 w-3 text-zinc-400" />
+                                                    <span class="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700">{{ $newVal }}</span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
+                            @endif
                         @empty
                             <div class="px-5 py-10 text-center">
                                 <div class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-zinc-100 text-zinc-400">
                                     <flux:icon name="chat-bubble-left-right" class="h-6 w-6" />
                                 </div>
-                                <p class="text-sm font-medium text-zinc-700">Belum ada komentar</p>
+                                <p class="text-sm font-medium text-zinc-700">Belum ada aktivitas</p>
                                 <p class="mt-1 text-xs text-zinc-500">Mulai diskusi dengan menulis komentar pertama.</p>
                             </div>
                         @endforelse
@@ -1063,6 +1219,50 @@ class extends Component {
                 </section>
             @endif
         </div>
+
+        {{-- ── Full-page loading overlay (saat startEditing) ── --}}
+        <div
+            wire:loading.flex
+            wire:target="startEditing"
+            class="fixed inset-0 z-50 hidden items-center justify-center bg-zinc-900/40 backdrop-blur-sm"
+        >
+            <div class="flex items-center gap-3 rounded-2xl bg-white px-5 py-3 shadow-lg ring-1 ring-zinc-200">
+                <svg class="h-5 w-5 animate-spin text-zinc-700" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v3a5 5 0 0 0-5 5H4z"></path>
+                </svg>
+                <span class="text-sm font-medium text-zinc-700">Memuat editor task...</span>
+            </div>
+        </div>
+
+        {{-- ── Delete comment confirmation modal ── --}}
+        <flux:modal name="delete-comment-modal" class="min-w-md" :dismissible="false">
+            <div class="space-y-5">
+                <div class="flex items-start gap-4">
+                    <div class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-red-100 text-red-600">
+                        <flux:icon name="trash" class="h-5 w-5" />
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <flux:heading size="lg">Hapus komentar ini?</flux:heading>
+                        <flux:text class="mt-1 text-sm text-zinc-600">
+                            Komentar dan seluruh lampiran terkait akan dihapus secara permanen. Tindakan ini tidak dapat dibatalkan.
+                        </flux:text>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <flux:button variant="ghost" wire:click="cancelDeleteComment">Batal</flux:button>
+                    <flux:button
+                        variant="danger"
+                        wire:click="deleteComment"
+                        wire:loading.attr="disabled"
+                        wire:target="deleteComment"
+                    >
+                        <span wire:loading.remove wire:target="deleteComment">Hapus komentar</span>
+                        <span wire:loading wire:target="deleteComment">Menghapus...</span>
+                    </flux:button>
+                </div>
+            </div>
+        </flux:modal>
 
         {{-- ── Image lightbox ── --}}
         <div

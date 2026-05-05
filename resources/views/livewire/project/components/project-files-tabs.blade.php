@@ -39,6 +39,11 @@ new class extends Component {
 
     public FilesForm $form;
 
+    public function placeholder()
+    {
+        return view('components.placeholder.ph_project_files_tabs');
+    }
+
     protected function endpoint(string $path): string
     {
         return rtrim((string) config('services.api_project'), '/').'/'.ltrim($path, '/');

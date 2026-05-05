@@ -17,6 +17,7 @@ new class extends Component {
     public array $tasks = [];
     public array $projectData = [];
     public array $users = [];
+    public array $commentUsers = [];
     public $projectSelected = null;
     public array $timelines = [];
     public string $search = '';
@@ -66,8 +67,21 @@ new class extends Component {
             )->json();
             }
             $this->tasks = $response['data'] ?? [];
+
+            $commenterIds = collect($this->tasks)
+                ->flatMap(fn ($task) => collect($task['comments'] ?? [])->pluck('user_id'))
+                ->filter()
+                ->unique()
+                ->values();
+
+            $this->commentUsers = User::whereIn('id', $commenterIds)
+                ->get(['id', 'name'])
+                ->keyBy('id')
+                ->map(fn ($user) => ['id' => $user->id, 'name' => $user->name])
+                ->toArray();
         } catch (\Throwable $e) {
             $this->tasks = [];
+            $this->commentUsers = [];
             Toaster::error('Server DAR Error, silahkan coba lagi atau menghubungi tim IT');
             Log::error('DAR list API failed', ['message' => $e->getMessage()]);
         } finally {
@@ -247,41 +261,61 @@ new class extends Component {
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" wire:loading.remove wire:target="fetchTasks">
                 @forelse(collect($tasks)->sortBy('status') as $task)
                 @php
-                $status = $task['status'] ?? 'Draft';
+                $status = $task['status'] ?? 0;
                 $taskId = $task['id'] ?? null;
                 $taskUrl = $taskId ? route('dar.dar-show', $taskId) : '#';
-                $statusColor = match ($status) {
-                1 => 'bg-blue-50 text-blue-700 ring-blue-200', // open
-                2 => 'bg-amber-50 text-amber-800 ring-amber-200', // pending
-                3 => 'bg-red-50 text-red-700 ring-red-200', // cancelled
-                4 => 'bg-emerald-50 text-emerald-800 ring-emerald-200', // completed
-                default => 'bg-slate-50 text-slate-700 ring-slate-200',
+
+                $statusMeta = match ($status) {
+                    1 => ['label' => 'Open',      'dot' => 'bg-blue-500',    'text' => 'text-blue-700',    'accent' => 'from-blue-400/80 to-blue-500'],
+                    2 => ['label' => 'Pending',   'dot' => 'bg-amber-500',   'text' => 'text-amber-700',   'accent' => 'from-amber-400/80 to-amber-500'],
+                    3 => ['label' => 'Cancelled', 'dot' => 'bg-rose-500',    'text' => 'text-rose-700',    'accent' => 'from-rose-400/80 to-rose-500'],
+                    4 => ['label' => 'Closed', 'dot' => 'bg-emerald-500', 'text' => 'text-emerald-700', 'accent' => 'from-emerald-400/80 to-emerald-500'],
+                    default => ['label' => 'Draft', 'dot' => 'bg-slate-400', 'text' => 'text-slate-600',   'accent' => 'from-slate-300 to-slate-400'],
                 };
 
                 $assignees = $this->teamUser(collect($task['team_user'])->pluck('user_id')) ?? [];
-
                 if (empty($assignees)) {
-                $assignees = [Auth::user()->name];
+                    $assignees = [Auth::user()->name];
                 }
+
+                $lastComment = collect($task['comments'] ?? [])
+                    ->sortByDesc(fn ($c) => $c['created_at'] ?? '')
+                    ->first();
+                $lastCommentUser = $lastComment ? ($this->commentUsers[$lastComment['user_id']] ?? null) : null;
+                $lastCommentName = $lastCommentUser['name'] ?? 'Pengguna';
+                $lastCommentBody = $lastComment ? trim(strip_tags($lastComment['body'] ?? '')) : '';
+
+                $endDate = !empty($task['end_date']) ? \Carbon\Carbon::parse($task['end_date']) : null;
+                $isOverdue = $endDate && $status !== 4 && $endDate->isPast();
                 @endphp
 
-                <article x-data="{ menuOpen: false }" class="group relative  rounded-2xl hover:z-50 bg-white ring-1 ring-slate-200/70 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                    <a href="{{ $taskUrl }}" wire:navigate class="absolute inset-0 z-0 rounded-2xl" aria-label="Open task"></a>
+                <article x-data="{ menuOpen: false }" class="group relative overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/70 shadow-sm transition hover:z-50 hover:-translate-y-0.5 hover:shadow-lg hover:ring-slate-300/70">
+                    <a href="{{ $taskUrl }}" wire:navigate class="absolute inset-0 z-0" aria-label="Open task"></a>
+
+                    {{-- Top status accent --}}
+                    <div class="h-1 w-full bg-linear-to-r {{ $statusMeta['accent'] }}"></div>
 
                     <div class="p-5">
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0 relative z-10">
-                                <a href="{{ $taskUrl }}" class="text-base font-semibold leading-snug text-slate-900">
-                                    {{ ucwords($task['activity']) ?? 'Untitled task' }}
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide {{ $statusMeta['text'] }}">
+                                        <span class="h-1.5 w-1.5 rounded-full {{ $statusMeta['dot'] }}"></span>
+                                        {{ $statusMeta['label'] }}
+                                    </span>
+                                </div>
+
+                                <a href="{{ $taskUrl }}" wire:navigate class="mt-1.5 block text-base font-semibold leading-snug text-slate-900 line-clamp-1 group-hover:text-slate-950">
+                                    {{ ucwords($task['activity'] ?? 'Untitled task') }}
                                 </a>
-                                <a href="{{ $taskUrl }}" class="mt-1 text-sm leading-relaxed text-slate-600 line-clamp-1">
-                                    {!! $task['description'] ?? 'No description provided.' !!}
+                                <a href="{{ $taskUrl }}" wire:navigate class="mt-1 block text-sm leading-relaxed text-slate-500 line-clamp-1 truncate">
+                                    {{ strip_tags($task['description'])  ?? 'Tidak ada deskripsi.' }}
                                 </a>
                             </div>
 
                             {{-- Ellipsis menu --}}
                             <div class="relative shrink-0 z-20" @keydown.escape.window="menuOpen = false">
-                                <button type="button" @click="menuOpen = !menuOpen" class="grid h-9 w-9 place-items-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700" aria-label="Task menu">
+                                <button type="button" @click="menuOpen = !menuOpen" class="grid h-8 w-8 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label="Task menu">
                                     <svg viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor" aria-hidden="true">
                                         <circle cx="5" cy="12" r="1.6" />
                                         <circle cx="12" cy="12" r="1.6" />
@@ -290,15 +324,9 @@ new class extends Component {
                                 </button>
 
                                 <div x-cloak x-show="menuOpen" @click.away="menuOpen = false" x-transition.origin.top.right class="absolute right-0 z-20 mt-2 w-44 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-slate-200/70">
-                                    <a href="{{ $taskUrl }}" class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">
-                                        Open
-                                    </a>
-                                    <button type="button" class="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">
-                                        Edit
-                                    </button>
-                                    <button type="button" class="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">
-                                        Mark as done
-                                    </button>
+                                    <a href="{{ $taskUrl }}" class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">Open</a>
+                                    <button type="button" class="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">Edit</button>
+                                    <button type="button" class="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">Mark as done</button>
                                     <div class="h-px bg-slate-200/70"></div>
                                     <button type="button" @click="menuOpen = false" wire:click="confirmDeleteTask({{ $taskId }}, @js(ucwords($task['activity'] ?? 'Untitled task')))" class="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">
                                         Delete
@@ -307,48 +335,71 @@ new class extends Component {
                             </div>
                         </div>
 
-                        <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ring-1 {{ $statusColor }}">
-                                {{ $status === 1 ? 'Open' : ($status === 2 ? 'Pending' : ($status === 3 ? 'Cancelled' : ($status === 4 ? 'Completed' : 'Draft'))) }}
+                        {{-- Meta row --}}
+                        <div class="relative z-10 mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-500">
+                            @if($endDate)
+                            <span class="inline-flex items-center gap-1.5 {{ $isOverdue ? 'text-rose-600 font-semibold' : '' }}">
+                                <flux:icon name="calendar" class="h-3.5 w-3.5" />
+                                {{ $endDate->format('d M Y') }}
+                                @if($isOverdue)
+                                    <span class="rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-600 ring-1 ring-rose-200">Overdue</span>
+                                @endif
+                            </span>
+                            @endif
+
+                            <span class="inline-flex items-center gap-1.5">
+                                <flux:icon name="chat-bubble-left-right" class="h-3.5 w-3.5" />
+                                {{ count($task['comments'] ?? []) }}
                             </span>
 
-                            @if(!empty($task['end_date']))
-                            <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
-                                <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                    <path d="M7 3v3" />
-                                    <path d="M17 3v3" />
-                                    <path d="M3.5 9h17" />
-                                    <path d="M5.5 6h13A2 2 0 0 1 20.5 8v12A2 2 0 0 1 18.5 22h-13A2 2 0 0 1 3.5 20V8A2 2 0 0 1 5.5 6Z" />
-                                </svg>
-                                {{ \Carbon\Carbon::parse($task['end_date'])->format('d M') }}
+                            <span class="inline-flex items-center gap-1.5">
+                                <flux:icon name="users" class="h-3.5 w-3.5" />
+                                {{ count($assignees) }}
                             </span>
+                        </div>
+
+                        {{-- Last comment --}}
+                        <div class="relative z-10 mt-4 rounded-xl bg-slate-50/80 px-3 py-2.5 ring-1 ring-slate-100">
+                            @if($lastComment)
+                                <div class="flex items-center gap-2">
+                                    <flux:avatar name="{{ $lastCommentName }}" circle size="xs" class="shrink-0" />
+                                    <div class="min-w-0 flex-1 truncate text-xs text-slate-600">
+                                        <span class="font-semibold text-slate-700">{{ $lastCommentName }}</span>
+                                        <span class="text-slate-400">·</span>
+                                        <span class="text-slate-500">{{ $lastCommentBody !== '' ? $lastCommentBody : 'Melampirkan berkas.' }}</span>
+                                    </div>
+                                </div>
+                            @else
+                                <div class="flex items-center gap-2 text-xs text-slate-400">
+                                    <flux:icon name="chat-bubble-left-ellipsis" class="h-3.5 w-3.5" />
+                                    <span>Belum ada komentar</span>
+                                </div>
                             @endif
                         </div>
                     </div>
 
-                    <footer class="relative z-10 flex items-center justify-between gap-3 border-t border-slate-200/70 px-5 py-4">
+                    <footer class="relative z-10 flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3">
                         <div class="flex -space-x-2">
                             @php
-                            $maxVisible = 5;
-                            $visible = array_slice($assignees, 0, $maxVisible);
-                            $remaining = count($assignees) - $maxVisible;
+                                $maxVisible = 4;
+                                $visible = array_slice($assignees, 0, $maxVisible);
+                                $remaining = count($assignees) - $maxVisible;
                             @endphp
 
-                            <div class="flex -space-x-2">
-                                @foreach($visible as $assignee)
-                                <flux:avatar name="{{ $assignee }}" circle class="size-7 text-xs ring-1 ring-white" />
-                                @endforeach
+                            @foreach($visible as $assignee)
+                                <flux:avatar name="{{ $assignee }}" circle class="size-7 text-xs ring-2 ring-white" />
+                            @endforeach
 
-                                @if($remaining > 0)
-                                <flux:avatar circle class="size-7 text-xs ring-1 ring-white bg-slate-100 text-slate-600">
+                            @if($remaining > 0)
+                                <flux:avatar circle class="size-7 text-[11px] font-semibold ring-2 ring-white bg-slate-100 text-slate-600">
                                     +{{ $remaining }}
                                 </flux:avatar>
-                                @endif
-                            </div>
+                            @endif
                         </div>
 
-                        <span class="text-xs font-medium text-slate-500">
-                            Dimulai {{ \Carbon\Carbon::parse($task['start_date'])->subHours(2)->diffForHumans() }}
+                        <span class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400">
+                            <flux:icon name="clock" class="h-3 w-3" />
+                            {{ \Carbon\Carbon::parse($task['start_date'])->subHours(2)->diffForHumans() }}
                         </span>
                     </footer>
                 </article>

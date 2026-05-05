@@ -30,8 +30,14 @@ new class extends Component {
     public string $form_start_date = '';
     public string $form_end_date = '';
 
+    public function placeholder()
+    {
+        return view('components.placeholder.ph_project_timeline_tabs');
+    }
+
     #[On('timelineLoad')]
     public function mount(){
+
         // Dummy timelines
         $response = Http::get(config('services.api_project').'timelines/search?user_id='.$this->user_id.'&project_id='.$this->id)->json();
 
@@ -326,6 +332,7 @@ new class extends Component {
                 : ($this->months[0]['value'] ?? null);
         }
     }
+
 }
 
  ?>

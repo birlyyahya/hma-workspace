@@ -23,6 +23,11 @@ new class extends Component {
 
     public ?string $deletingTimdukName = null;
 
+    public function placeholder()
+    {
+        return view('components.placeholder.ph_project_team_tabs');
+    }
+
     public function mount(): void
     {
         $ids = collect($this->internal)->pluck('user_id');

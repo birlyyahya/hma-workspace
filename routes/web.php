@@ -31,6 +31,7 @@ Route::middleware('auth')->group(function () {
 
     // Izin
     Route::view('izin', 'izin')->name('izin');
+    Volt::route('izin/quick', 'izin.quick-izin')->middleware('mobile')->name('izin.quick');
     Volt::route('izin/{id}/detail', 'izin.izin-show')->name('izin.show');
     Volt::route('izin/{id}/pdf', 'izin.izin-show-pdf')->name('izin.pdf');
     Volt::route('izin/laporan-pengajuan', 'izin.laporan-pengajuan-izin')->name('izin.laporan-pengajuan');

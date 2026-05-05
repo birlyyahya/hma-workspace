@@ -24,6 +24,11 @@ new class extends Component {
     public ?int $deletingId = null;
     public ?string $deletingName = null;
 
+    public function placeholder()
+    {
+        return view('components.placeholder.ph_project_spectech_tabs');
+    }
+
     /**
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>

@@ -41,7 +41,7 @@
                         </flux:modal.trigger>
 
 
-                        @if (Auth::user()->level >= 60)
+                        @if (Auth::user()->level >= 55)
                         <flux:modal.trigger name="spd-form-modal">
                             <flux:button icon="plus-circle" variant="primary" class="cursor-pointer w-full sm:w-auto bg-white! text-red-700! hover:bg-white/90!">
                                 Buat SPD

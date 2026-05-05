@@ -24,6 +24,11 @@ new class extends Component {
         'from-sky-500 to-cyan-500',
     ];
 
+    public function placeholder()
+    {
+        return view('components.placeholder.ph_project_timeline_gantt');
+    }
+
     public function mount(): void
     {
         $this->loadTimelines();

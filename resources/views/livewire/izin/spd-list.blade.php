@@ -128,14 +128,13 @@ new class extends Component {
 
         try {
             $apiIzin = rtrim(config('services.api_izin'), '/');
-            if(Auth::user()->level <= 90){
+            if(Auth::user()->level >= 55){
                 $response = Http::timeout(60)
                     ->retry(2, 200)
                     ->get($apiIzin . '/global/dar/activity/list-spd', [
                         'page' => $this->page,
                         'perPage' => $this->perPage,
                         'search' => $this->search,
-                        'user_id' => Auth::user()->id
                     ])->json();
             }else {
                 $response = Http::timeout(60)
@@ -144,6 +143,7 @@ new class extends Component {
                         'page' => $this->page,
                         'perPage' => $this->perPage,
                         'search' => $this->search,
+                        'user_id' => Auth::user()->id
                     ])->json();
             }
             $this->list = $response ?? ['data' => []];
@@ -416,7 +416,7 @@ new class extends Component {
 
             <div class="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
                 <flux:input wire:model.live.debounce.400ms="search" icon="magnifying-glass" placeholder="Cari tujuan, tugas, departemen..." class="w-full sm:w-64" />
-                @if(Auth::user()->level >= 90)
+                @if(Auth::user()->level >= 55)
                 <flux:button wire:click="openCreate" icon="plus-circle" variant="primary">
                     Buat SPD
                 </flux:button>
@@ -563,7 +563,7 @@ new class extends Component {
                                     <button wire:click="downloadPdf({{ $spd['id'] }})" @click="open = false" type="button" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50">
                                         <flux:icon name="document-arrow-down" class="h-4 w-4" /> Download PDF
                                     </button>
-                                    @if(Auth::user()->level >= 90)
+                                    @if(Auth::user()->level >= 55)
                                     <div class="h-px bg-zinc-200/70"></div>
                                     <button wire:click="openEdit({{ $spd['id'] }})" @click="open = false" type="button" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50">
                                         <flux:icon name="pencil-square" class="h-4 w-4" /> Edit

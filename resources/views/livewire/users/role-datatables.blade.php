@@ -250,14 +250,14 @@ new class extends Component {
 }; ?>
 
 @php
-    $scopeColors = [
-        'global' => 'blue',
-        'it' => 'indigo',
-        'it-software' => 'cyan',
-        'it-infra' => 'cyan',
-        'hrd' => 'emerald',
-        'map' => 'emerald',
-    ];
+$scopeColors = [
+'global' => 'blue',
+'it' => 'indigo',
+'it-software' => 'cyan',
+'it-infra' => 'cyan',
+'hrd' => 'emerald',
+'map' => 'emerald',
+];
 @endphp
 
 <div class="space-y-5">
@@ -301,18 +301,13 @@ new class extends Component {
     {{-- Toolbar --}}
     <div class="rounded-xl border border-zinc-200 bg-white shadow-sm">
         <div class="flex flex-col gap-3 border-b border-zinc-100 p-4 lg:flex-row lg:items-center lg:justify-between">
-            <flux:input
-                icon="magnifying-glass"
-                wire:model.live.debounce.400ms="search"
-                placeholder="Cari nama, slug, atau scope role..."
-                class="w-full sm:max-w-sm"
-            />
+            <flux:input icon="magnifying-glass" wire:model.live.debounce.400ms="search" placeholder="Cari nama, slug, atau scope role..." class="w-full sm:max-w-sm" />
 
             <div class="flex flex-wrap items-center gap-2">
                 <flux:select wire:model.live="scopeFilter" class="w-full sm:w-44">
                     <option value="">Semua scope</option>
                     @foreach ($this->scopes as $sc)
-                        <option value="{{ $sc }}">{{ $sc }}</option>
+                    <option value="{{ $sc }}">{{ $sc }}</option>
                     @endforeach
                 </flux:select>
 
@@ -322,9 +317,9 @@ new class extends Component {
                 </flux:select>
 
                 @if ($search || $scopeFilter || $sort !== 'desc')
-                    <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="clearFilters" class="cursor-pointer">
-                        Reset
-                    </flux:button>
+                <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="clearFilters" class="cursor-pointer">
+                    Reset
+                </flux:button>
                 @endif
 
                 <flux:button icon="plus" variant="primary" class="cursor-pointer" wire:click="openCreate">
@@ -335,11 +330,7 @@ new class extends Component {
 
         {{-- Datatable --}}
         <div class="relative">
-            <div
-                wire:loading.flex
-                wire:target.except="editingId, deleteRoleId"
-                class="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-sm"
-            >
+            <div wire:loading.flex wire:target.except="editingId, deleteRoleId" class="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-sm">
                 <div class="flex flex-col items-center gap-2">
                     <div class="h-8 w-8 animate-spin rounded-full border-4 border-zinc-900 border-t-transparent"></div>
                     <span class="text-sm text-zinc-600">Loading data...</span>
@@ -361,78 +352,64 @@ new class extends Component {
                     </thead>
                     <tbody wire:loading.class="pointer-events-none" class="divide-y divide-zinc-100">
                         @forelse ($this->roles as $r)
-                            <tr wire:key="role-{{ $r->id }}" class="transition hover:bg-zinc-50/70">
-                                <td class="px-6 py-3 whitespace-nowrap text-zinc-500">
-                                    {{ ($this->roles->currentPage() - 1) * $this->roles->perPage() + $loop->iteration }}
-                                </td>
-                                <td class="px-4 py-3">
-                                    <p class="font-medium text-zinc-900">{{ $r->name }}</p>
-                                    <p class="text-xs text-zinc-500">{{ $r->slug }}</p>
-                                </td>
-                                <td class="px-4 py-3">
-                                    @if ($r->scope)
-                                        <flux:badge :color="$scopeColors[$r->scope] ?? 'gray'" size="sm">
-                                            {{ $r->scope }}
-                                        </flux:badge>
-                                    @else
-                                        <span class="text-xs text-zinc-400">—</span>
-                                    @endif
-                                </td>
-                                <td class="px-4 py-3">
-                                    <div class="flex items-center gap-2">
-                                        <span class="font-mono text-sm font-semibold text-zinc-900">{{ $r->level }}</span>
-                                        <div class="hidden h-1.5 w-16 overflow-hidden rounded-full bg-zinc-100 sm:block">
-                                            <div class="h-full bg-zinc-900" style="width: {{ min(100, $r->level) }}%"></div>
-                                        </div>
+                        <tr wire:key="role-{{ $r->id }}" class="transition hover:bg-zinc-50/70">
+                            <td class="px-6 py-3 whitespace-nowrap text-zinc-500">
+                                {{ ($this->roles->currentPage() - 1) * $this->roles->perPage() + $loop->iteration }}
+                            </td>
+                            <td class="px-4 py-3">
+                                <p class="font-medium text-zinc-900">{{ $r->name }}</p>
+                                <p class="text-xs text-zinc-500">{{ $r->slug }}</p>
+                            </td>
+                            <td class="px-4 py-3">
+                                @if ($r->scope)
+                                <flux:badge :color="$scopeColors[$r->scope] ?? 'gray'" size="sm">
+                                    {{ str_replace("-"," ",strtoupper($r->scope)) }}
+                                </flux:badge>
+                                @else
+                                <span class="text-xs text-zinc-400">—</span>
+                                @endif
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-mono text-sm font-semibold text-zinc-900">{{ $r->level }}</span>
+                                    <div class="hidden h-1.5 w-16 overflow-hidden rounded-full bg-zinc-100 sm:block">
+                                        <div class="h-full bg-zinc-900" style="width: {{ min(100, $r->level) }}%"></div>
                                     </div>
-                                </td>
-                                <td class="px-4 py-3">
-                                    @if ($r->can_approve)
-                                        <flux:badge color="emerald" size="sm" icon="check">Yes</flux:badge>
-                                    @else
-                                        <flux:badge color="zinc" size="sm">No</flux:badge>
-                                    @endif
-                                </td>
-                                <td class="px-4 py-3">
-                                    <span class="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
-                                        <flux:icon.user class="size-3" />
-                                        {{ $r->users_count }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-3 text-end">
-                                    <div class="flex items-center justify-end gap-1">
-                                        <flux:tooltip content="Edit">
-                                            <flux:button
-                                                :disabled="! $this->canManage($r->level)"
-                                                variant="ghost"
-                                                icon="pencil-square"
-                                                size="sm"
-                                                class="cursor-pointer"
-                                                wire:click="openEdit({{ $r->id }})"
-                                            />
-                                        </flux:tooltip>
-                                        <flux:tooltip content="Hapus">
-                                            <flux:button
-                                                :disabled="! $this->canManage($r->level) || $r->users_count > 0"
-                                                variant="ghost"
-                                                icon="trash"
-                                                size="sm"
-                                                class="cursor-pointer text-red-500 hover:text-red-600"
-                                                wire:click="openDelete({{ $r->id }})"
-                                            />
-                                        </flux:tooltip>
-                                    </div>
-                                </td>
-                            </tr>
+                                </div>
+                            </td>
+                            <td class="px-4 py-3">
+                                @if ($r->can_approve)
+                                <flux:badge color="emerald" size="sm" icon="check">Yes</flux:badge>
+                                @else
+                                <flux:badge color="zinc" size="sm">No</flux:badge>
+                                @endif
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                                    <flux:icon.user class="size-3" />
+                                    {{ $r->users_count }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-3 text-end">
+                                <div class="flex items-center justify-end gap-1">
+                                    <flux:tooltip content="Edit">
+                                        <flux:button :disabled="! $this->canManage($r->level)" variant="ghost" icon="pencil-square" size="sm" class="cursor-pointer" wire:click="openEdit({{ $r->id }})" />
+                                    </flux:tooltip>
+                                    <flux:tooltip content="Hapus">
+                                        <flux:button :disabled="! $this->canManage($r->level) || $r->users_count > 0" variant="ghost" icon="trash" size="sm" class="cursor-pointer text-red-500 hover:text-red-600" wire:click="openDelete({{ $r->id }})" />
+                                    </flux:tooltip>
+                                </div>
+                            </td>
+                        </tr>
                         @empty
-                            <tr>
-                                <td colspan="7" class="px-6 py-12">
-                                    <div class="flex flex-col items-center justify-center gap-2 text-zinc-400">
-                                        <flux:icon.shield-check class="size-10" />
-                                        <p class="text-sm">Tidak ada role yang cocok dengan filter.</p>
-                                    </div>
-                                </td>
-                            </tr>
+                        <tr>
+                            <td colspan="7" class="px-6 py-12">
+                                <div class="flex flex-col items-center justify-center gap-2 text-zinc-400">
+                                    <flux:icon.shield-check class="size-10" />
+                                    <p class="text-sm">Tidak ada role yang cocok dengan filter.</p>
+                                </div>
+                            </td>
+                        </tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -494,12 +471,11 @@ new class extends Component {
                 </flux:field>
                 <flux:field>
                     <flux:label>Scope</flux:label>
-                    <flux:input wire:model="scope" placeholder="contoh: it-software" list="role-scope-suggestions" />
-                    <datalist id="role-scope-suggestions">
+                    <flux:select wire:model="scope" placeholder="contoh: it-software">
                         @foreach ($this->scopes as $sc)
-                            <option value="{{ $sc }}"></option>
+                        <flux:select.option value="{{ $sc }}">{{ str_replace("-"," ",strtoupper($sc)) }}</flux:select.option>
                         @endforeach
-                    </datalist>
+                    </flux:select>
                     <flux:error name="scope" />
                 </flux:field>
             </div>
@@ -539,7 +515,7 @@ new class extends Component {
             </div>
             <flux:input placeholder="Ketik YA untuk konfirmasi..." wire:model="confirmDelete" />
             @error('confirmDelete')
-                <flux:text class="text-xs text-red-500">{{ $message }}</flux:text>
+            <flux:text class="text-xs text-red-500">{{ $message }}</flux:text>
             @enderror
             <div class="flex justify-end gap-2">
                 <flux:button variant="outline" x-on:click="$flux.modal('role-delete-modal').close()">Batal</flux:button>

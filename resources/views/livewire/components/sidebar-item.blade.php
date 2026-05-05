@@ -32,48 +32,49 @@ new class extends Component {
 }; ?>
 
 <div>
-    @if(Auth::user()->role_id <= 5) <flux:sidebar.item :href="route('projects')" icon="document-text" :current="
+        @if(Auth::user()->level >= 55)
+            <flux:sidebar.item :href="route('projects')" icon="document-text" :current="
                 request()->routeIs('projects') || request()->routeIs('projects.*')" wire:navigate>
-        <div class="flex-1 min-w-0 max-w-39 overflow-hidden">
-            <div class="truncate">
-                All Project
-            </div>
-        </div>
-        </flux:sidebar.item>
-        <flux:sidebar.item :href="route('perusahaan')" icon="document-text" :current="
-                request()->routeIs('perusahaan')" wire:navigate>
             <div class="flex-1 min-w-0 max-w-39 overflow-hidden">
                 <div class="truncate">
-                    Perusahaan
+                    All Project
                 </div>
             </div>
-        </flux:sidebar.item>
-        <flux:sidebar.item># Project</flux:sidebar.item>
-        @foreach ($this->projects as $project)
-        <flux:sidebar.item :href="route('projects.show', $project['id'])" icon="document-text" :current="
-        request()->routeIs('projects.show')
-        && request()->route('id') == $project['id']" wire:navigate>
-            <div class="flex-1 min-w-0 max-w-39 overflow-hidden">
-                <div class="truncate">
-                    {{ $project['code'] }} - {{ $project['name'] }}
+            </flux:sidebar.item>
+            <flux:sidebar.item :href="route('perusahaan')" icon="building-office" :current="
+                    request()->routeIs('perusahaan')" wire:navigate>
+                <div class="flex-1 min-w-0 max-w-39 overflow-hidden">
+                    <div class="truncate">
+                        Perusahaan
+                    </div>
                 </div>
-            </div>
-        </flux:sidebar.item>
-        @endforeach
+            </flux:sidebar.item>
+            <flux:sidebar.item># Project</flux:sidebar.item>
+            @foreach ($this->projects as $project)
+            <flux:sidebar.item :href="route('projects.show', $project['id'])" icon="document-text" :current="
+            request()->routeIs('projects.show')
+            && request()->route('id') == $project['id']" wire:navigate>
+                <div class="flex-1 min-w-0 max-w-39 overflow-hidden">
+                    <div class="truncate">
+                        {{ $project['code'] }} - {{ $project['name'] }}
+                    </div>
+                </div>
+            </flux:sidebar.item>
+            @endforeach
         @endif
         @if(!empty($this->projects))
-        @foreach ($this->projects as $project)
-        <flux:sidebar.item :href="route('projects.show', $project['id'])" icon="document-text" :current="
-        request()->routeIs('projects.show')
-        && request()->route('id') == $project['id']" wire:navigate>
-            <div class="flex-1 min-w-0 max-w-39 overflow-hidden">
-                <div class="truncate">
-                    {{ $project['code'] }} - {{ $project['name'] }}
+            @foreach ($this->projects as $project)
+            <flux:sidebar.item :href="route('projects.show', $project['id'])" icon="document-text" :current="
+            request()->routeIs('projects.show')
+            && request()->route('id') == $project['id']" wire:navigate>
+                <div class="flex-1 min-w-0 max-w-39 overflow-hidden">
+                    <div class="truncate">
+                        {{ $project['code'] }} - {{ $project['name'] }}
+                    </div>
                 </div>
-            </div>
-        </flux:sidebar.item>
-        @endforeach
+            </flux:sidebar.item>
+            @endforeach
         @else
-
+            <flux:sidebar.item>No Project</flux:sidebar.item>
         @endif
 </div>

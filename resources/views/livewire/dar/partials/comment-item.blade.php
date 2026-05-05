@@ -120,13 +120,13 @@
                     Edit
                 </button>
                 <button
-                    @click.prevent="open = false; if (confirm('Hapus komentar ini?')) $wire.deleteComment({{ $c['id'] }})"
+                    wire:click="confirmDeleteComment({{ $c['id'] }})"
+                    @click="open = false"
                     type="button"
                     class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50"
                 >
                     <flux:icon name="trash" class="h-4 w-4" />
-                    <span wire:loading.remove wire:target="deleteComment({{ $c['id'] }})">Delete</span>
-                    <span wire:loading wire:target="deleteComment({{ $c['id'] }})" class="animate-pulse">Deleting...</span>
+                    Delete
                 </button>
             </div>
         </div>
