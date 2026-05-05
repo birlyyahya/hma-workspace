@@ -325,7 +325,6 @@ new class extends Component {
 
                                 <div x-cloak x-show="menuOpen" @click.away="menuOpen = false" x-transition.origin.top.right class="absolute right-0 z-20 mt-2 w-44 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-slate-200/70">
                                     <a href="{{ $taskUrl }}" class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">Open</a>
-                                    <button type="button" class="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">Edit</button>
                                     <button type="button" class="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">Mark as done</button>
                                     <div class="h-px bg-slate-200/70"></div>
                                     <button type="button" @click="menuOpen = false" wire:click="confirmDeleteTask({{ $taskId }}, @js(ucwords($task['activity'] ?? 'Untitled task')))" class="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">
