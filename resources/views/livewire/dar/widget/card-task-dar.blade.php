@@ -16,11 +16,19 @@ new class extends Component {
 
     public array $tasks = [];
     public array $projectData = [];
+    public array $allProjects = [];
+    public array $accessibleProjectIds = [];
     public array $users = [];
+    public array $allUsers = [];
     public array $commentUsers = [];
     public $projectSelected = null;
     public array $timelines = [];
     public string $search = '';
+
+    public string $tab = 'all';
+    public string $statusFilter = 'all';
+    public string $projectFilter = '';
+    public string $userFilter = '';
 
     public bool $loading = true;
 
@@ -30,16 +38,38 @@ new class extends Component {
     public function mount(): void
     {
         $this->users = User::whereNotIn('role_id', [1, 2])->get()->toArray();
+        $this->allUsers = User::orderBy('name')->get(['id', 'name'])->toArray();
 
         try {
             $apiProject = rtrim(config('services.api_project'), '/');
             $this->projectData = Http::get($apiProject.'/projects/search?project_leader_id='.Auth::id())->json() ?? [];
+
+            $this->allProjects = Http::get($apiProject.'/projects/search?limit=99999')->json()['data'] ?? [];
         } catch (\Throwable $e) {
             $this->projectData = [];
+            $this->allProjects = [];
         }
 
         $this->fetchTasks();
         $this->resetForm();
+    }
+
+    public function updatedTab(): void
+    {
+        if ($this->projectFilter !== '') {
+            $this->projectFilter = '';
+            $this->fetchTasks();
+        }
+    }
+
+    public function updatedProjectFilter(): void
+    {
+        $this->fetchTasks();
+    }
+
+    public function updatedUserFilter(): void
+    {
+        $this->fetchTasks();
     }
 
     public function updatedProjectSelected(): void
@@ -57,16 +87,38 @@ new class extends Component {
         try {
             $apiIzin = rtrim(config('services.api_izin'), '/');
 
-            if(Auth::user()->role_id < 3){
-                $response = Http::timeout(120)->retry(3, 200)->get(
-                    $apiIzin.'/global/dar/list?limit=50000&search='.$this->search
-                )->json();
-            } else {
-            $response = Http::timeout(120)->retry(3, 200)->get(
-                $apiIzin.'/global/dar/list?team_user='.Auth::id().'&limit=50000&search='.$this->search
-            )->json();
+            $params = ['limit' => 50000];
+
+            if ($this->search !== '') {
+                $params['search'] = $this->search;
             }
+
+            if ((int) (Auth::user()->level ?? 0) >= 100) {
+                if ($this->userFilter !== '') {
+                    $params['team_user'] = $this->userFilter;
+                }
+            } else {
+                $params['team_user'] = Auth::id();
+            }
+
+            if ($this->tab === 'project' && $this->projectFilter !== '') {
+                $params['project_id'] = $this->projectFilter;
+            }
+
+            $response = Http::timeout(120)->retry(3, 200)
+                ->get($apiIzin.'/global/dar/list', $params)
+                ->json();
+
             $this->tasks = $response['data'] ?? [];
+
+            if ($this->projectFilter === '' && $this->search === '') {
+                $this->accessibleProjectIds = collect($this->tasks)
+                    ->pluck('project_id')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->toArray();
+            }
 
             $commenterIds = collect($this->tasks)
                 ->flatMap(fn ($task) => collect($task['comments'] ?? [])->pluck('user_id'))
@@ -94,9 +146,34 @@ new class extends Component {
         return $this->projectData['data'] ?? [];
     }
 
+    public function visibleTasks(): \Illuminate\Support\Collection
+    {
+        return collect($this->tasks)
+            ->when($this->tab === 'project', fn ($c) => $c->filter(fn ($t) => ! empty($t['project_id'])))
+            ->when($this->tab === 'nonproject', fn ($c) => $c->filter(fn ($t) => empty($t['project_id'])))
+            ->when($this->statusFilter !== 'all', fn ($c) => $c->filter(fn ($t) => (int) ($t['status'] ?? 0) === (int) $this->statusFilter))
+            ->sortBy('status')
+            ->values();
+    }
+
+    public function statusCounts(): array
+    {
+        $base = collect($this->tasks)
+            ->when($this->tab === 'project', fn ($c) => $c->filter(fn ($t) => ! empty($t['project_id'])))
+            ->when($this->tab === 'nonproject', fn ($c) => $c->filter(fn ($t) => empty($t['project_id'])));
+
+        return [
+            'all' => $base->count(),
+            1 => $base->where('status', 1)->count(),
+            2 => $base->where('status', 2)->count(),
+            3 => $base->where('status', 3)->count(),
+            4 => $base->where('status', 4)->count(),
+        ];
+    }
+
     public function teamUser($users): array
     {
-        $userMap = collect($this->users)->keyBy('id');
+        $userMap = collect($this->allUsers)->keyBy('id');
 
         return collect($users)
             ->map(fn ($id) => $userMap[$id]['name'] ?? null)
@@ -232,9 +309,26 @@ new class extends Component {
 
     </style>
 
+    @php
+        $isSuperadmin = (int) (Auth::user()->level ?? 0) >= 100;
+        $statusCounts = $this->statusCounts();
+        $statusOptions = [
+            'all' => ['label' => 'Semua', 'active' => 'bg-slate-900 text-white ring-slate-900'],
+            '1' => ['label' => 'Open', 'active' => 'bg-blue-600 text-white ring-blue-600'],
+            '2' => ['label' => 'Pending', 'active' => 'bg-amber-500 text-white ring-amber-500'],
+            '4' => ['label' => 'Closed', 'active' => 'bg-emerald-600 text-white ring-emerald-600'],
+            '3' => ['label' => 'Cancelled', 'active' => 'bg-rose-600 text-white ring-rose-600'],
+        ];
+        $tabOptions = [
+            'all' => 'Semua',
+            'project' => 'Project',
+            'nonproject' => 'Non-Project',
+        ];
+    @endphp
+
     <section>
         {{-- Basecamp-ish section header --}}
-        <header class="px-5 py-4">
+        <header class="space-y-4 px-5 py-4">
             <div class="flex items-center gap-3">
                 <flux:modal.trigger name="create-task">
                     <flux:button icon="plus-circle" iconClasses="size-6" variant="outline">
@@ -250,6 +344,110 @@ new class extends Component {
 
                 <flux:input x-on:keydown.enter="$wire.fetchTasks()" wire:model.live.debounce.300ms="search" icon="magnifying-glass" placeholder="Search task..." class="w-full md:w-64" />
             </div>
+
+            {{-- Tabs tipe + filter project/user --}}
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="inline-flex items-center rounded-xl bg-slate-100 p-1">
+                    @foreach ($tabOptions as $key => $label)
+                        <button type="button" wire:click="$set('tab', '{{ $key }}')"
+                            class="rounded-lg px-3 py-1.5 text-sm font-medium transition {{ $tab === $key ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900' }}">
+                            {{ $label }}
+                        </button>
+                    @endforeach
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    @if ($tab === 'project')
+                        @php
+                            $filterProjects = $isSuperadmin
+                                ? $allProjects
+                                : collect($allProjects)->whereIn('id', $accessibleProjectIds)->values()->toArray();
+                            $projectLabel = $projectFilter !== ''
+                                ? (collect($allProjects)->firstWhere('id', (int) $projectFilter)['name'] ?? 'Semua project')
+                                : 'Semua project';
+                        @endphp
+                        <div class="relative w-56" x-data="{ open: false, query: '' }" @click.away="open = false" @keydown.escape.window="open = false">
+                            <button type="button" @click="open = !open; if (open) $nextTick(() => $refs.projectSearch?.focus())"
+                                class="flex w-full items-center justify-between gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 transition hover:border-zinc-300">
+                                <span class="truncate">{{ $projectLabel }}</span>
+                                <flux:icon name="chevron-down" class="h-4 w-4 shrink-0 text-zinc-400" />
+                            </button>
+
+                            <div x-show="open" x-cloak x-transition.origin.top class="absolute left-0 right-0 z-30 mt-1 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-zinc-200/70">
+                                <div class="border-b border-zinc-100 p-2">
+                                    <input x-ref="projectSearch" x-model="query" type="text" placeholder="Cari project..."
+                                        class="w-full rounded-lg border-0 bg-zinc-50 px-2 py-1.5 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200" />
+                                </div>
+                                <div class="max-h-64 overflow-y-auto p-1">
+                                    <button type="button" wire:click="$set('projectFilter', '')" @click="open = false; query = ''"
+                                        class="block w-full rounded-lg px-2.5 py-2 text-left text-sm hover:bg-zinc-50 {{ $projectFilter === '' ? 'bg-zinc-50 font-semibold text-zinc-900' : 'text-zinc-600' }}">
+                                        Semua project
+                                    </button>
+                                    @foreach ($filterProjects as $p)
+                                        <button wire:key="filter-project-{{ $p['id'] }}" type="button"
+                                            x-show="query === '' || '{{ addslashes(strtolower($p['name'] ?? '')) }}'.includes(query.toLowerCase())"
+                                            wire:click="$set('projectFilter', '{{ $p['id'] }}')" @click="open = false; query = ''"
+                                            class="block w-full rounded-lg px-2.5 py-2 text-left text-sm hover:bg-zinc-50 {{ (string) $projectFilter === (string) $p['id'] ? 'bg-zinc-50 font-semibold text-zinc-900' : 'text-zinc-700' }}">
+                                            {{ $p['name'] ?? 'Untitled' }}
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
+                    @if ($isSuperadmin)
+                        @php
+                            $userLabel = $userFilter !== ''
+                                ? (collect($allUsers)->firstWhere('id', (int) $userFilter)['name'] ?? 'Semua user')
+                                : 'Semua user';
+                        @endphp
+                        <div class="relative w-56" x-data="{ open: false, query: '' }" @click.away="open = false" @keydown.escape.window="open = false">
+                            <button type="button" @click="open = !open; if (open) $nextTick(() => $refs.userSearch?.focus())"
+                                class="flex w-full items-center justify-between gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 transition hover:border-zinc-300">
+                                <span class="truncate">{{ $userLabel }}</span>
+                                <flux:icon name="chevron-down" class="h-4 w-4 shrink-0 text-zinc-400" />
+                            </button>
+
+                            <div x-show="open" x-cloak x-transition.origin.top class="absolute left-0 right-0 z-30 mt-1 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-zinc-200/70">
+                                <div class="border-b border-zinc-100 p-2">
+                                    <input x-ref="userSearch" x-model="query" type="text" placeholder="Cari user..."
+                                        class="w-full rounded-lg border-0 bg-zinc-50 px-2 py-1.5 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200" />
+                                </div>
+                                <div class="max-h-64 overflow-y-auto p-1">
+                                    <button type="button" wire:click="$set('userFilter', '')" @click="open = false; query = ''"
+                                        class="block w-full rounded-lg px-2.5 py-2 text-left text-sm hover:bg-zinc-50 {{ $userFilter === '' ? 'bg-zinc-50 font-semibold text-zinc-900' : 'text-zinc-600' }}">
+                                        Semua user
+                                    </button>
+                                    @foreach ($allUsers as $u)
+                                        <button wire:key="filter-user-{{ $u['id'] }}" type="button"
+                                            x-show="query === '' || '{{ addslashes(strtolower($u['name'])) }}'.includes(query.toLowerCase())"
+                                            wire:click="$set('userFilter', '{{ $u['id'] }}')" @click="open = false; query = ''"
+                                            class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-zinc-50 {{ (string) $userFilter === (string) $u['id'] ? 'bg-zinc-50 font-semibold text-zinc-900' : 'text-zinc-700' }}">
+                                            <flux:avatar circle name="{{ $u['name'] }}" size="xs" />
+                                            <span class="truncate">{{ $u['name'] }}</span>
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            {{-- Status pills dengan counter --}}
+            <div class="flex flex-wrap items-center gap-2">
+                @foreach ($statusOptions as $key => $opt)
+                    @php $isActive = (string) $statusFilter === (string) $key; @endphp
+                    <button type="button" wire:click="$set('statusFilter', '{{ $key }}')"
+                        class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 transition {{ $isActive ? $opt['active'] . ' shadow-sm' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50' }}">
+                        <span>{{ $opt['label'] }}</span>
+                        <span class="rounded-full {{ $isActive ? 'bg-white/25' : 'bg-slate-100' }} px-1.5 text-[10px] font-bold">
+                            {{ $statusCounts[$key] ?? 0 }}
+                        </span>
+                    </button>
+                @endforeach
+            </div>
         </header>
 
         <div class="px-5 pb-5">
@@ -259,7 +457,11 @@ new class extends Component {
             </div>
             @else
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" wire:loading.remove wire:target="fetchTasks">
-                @forelse(collect($tasks)->sortBy('status') as $task)
+                @php
+                    $projectMap = collect($allProjects)->keyBy('id');
+                    $userMap = collect($allUsers)->keyBy('id');
+                @endphp
+                @forelse($this->visibleTasks() as $task)
                 @php
                 $status = $task['status'] ?? 0;
                 $taskId = $task['id'] ?? null;
@@ -287,6 +489,10 @@ new class extends Component {
 
                 $endDate = !empty($task['end_date']) ? \Carbon\Carbon::parse($task['end_date']) : null;
                 $isOverdue = $endDate && $status !== 4 && $endDate->isPast();
+
+                $taskProjectId = $task['project_id'] ?? null;
+                $taskProjectName = $taskProjectId ? ($projectMap[$taskProjectId]['name'] ?? 'Project') : null;
+                $ownerName = $isSuperadmin && ! empty($task['user_id']) ? ($userMap[$task['user_id']]['name'] ?? null) : null;
                 @endphp
 
                 <article x-data="{ menuOpen: false }" class="group relative overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/70 shadow-sm transition hover:z-50 hover:-translate-y-0.5 hover:shadow-lg hover:ring-slate-300/70">
@@ -298,11 +504,21 @@ new class extends Component {
                     <div class="p-5">
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0 relative z-10">
-                                <div class="flex items-center gap-2">
+                                <div class="flex flex-wrap items-center gap-2">
                                     <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide {{ $statusMeta['text'] }}">
                                         <span class="h-1.5 w-1.5 rounded-full {{ $statusMeta['dot'] }}"></span>
                                         {{ $statusMeta['label'] }}
                                     </span>
+                                    @if ($taskProjectName)
+                                        <span class="inline-flex max-w-56 items-center gap-1 truncate rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 ring-1 ring-indigo-100">
+                                            <flux:icon name="folder" class="h-3 w-3 shrink-0" />
+                                            <span class="truncate">{{ $taskProjectName }}</span>
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 ring-1 ring-zinc-200">
+                                            Non-Project
+                                        </span>
+                                    @endif
                                 </div>
 
                                 <a href="{{ $taskUrl }}" wire:navigate class="mt-1.5 block text-base font-semibold leading-snug text-slate-900 line-clamp-1 group-hover:text-slate-950">
@@ -396,10 +612,18 @@ new class extends Component {
                             @endif
                         </div>
 
-                        <span class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400">
-                            <flux:icon name="clock" class="h-3 w-3" />
-                            {{ \Carbon\Carbon::parse($task['start_date'])->subHours(2)->diffForHumans() }}
-                        </span>
+                        <div class="flex items-center gap-3">
+                            @if ($ownerName)
+                                <span class="inline-flex max-w-32 items-center gap-1 truncate text-[11px] font-medium text-slate-500">
+                                    <flux:icon name="user" class="h-3 w-3 shrink-0" />
+                                    <span class="truncate">{{ $ownerName }}</span>
+                                </span>
+                            @endif
+                            <span class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400">
+                                <flux:icon name="clock" class="h-3 w-3" />
+                                {{ \Carbon\Carbon::parse($task['start_date'])->subHours(2)->diffForHumans() }}
+                            </span>
+                        </div>
                     </footer>
                 </article>
                 @empty

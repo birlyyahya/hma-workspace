@@ -1049,7 +1049,7 @@ class extends Component {
                                 @include('livewire.dar.partials.comment-item', [
                                     'c' => $c,
                                     'cu' => $commentUsers[$c['user_id']] ?? null,
-                                    'isOwn' => ($c['user_id'] ?? null) === Auth::id(),
+                                    'isOwn' => ($c['user_id'] ?? null) === Auth::id() || Auth::user()->level >= 90,
                                     'isEditing' => $editingCommentId !== null && isset($c['id']) && $editingCommentId === $c['id'],
                                 ])
                             @else

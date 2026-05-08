@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Forms\FilesForm;
+use Flux\Flux;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -36,6 +37,9 @@ new class extends Component {
     public int $limit = 8;
 
     public $selectId;
+
+    public ?int $deletingId = null;
+    public string $deletingName = '';
 
     public FilesForm $form;
 
@@ -257,8 +261,27 @@ new class extends Component {
         return $response;
     }
 
-    public function fileDelete(int $id): void
+    public function confirmDelete(int $id): void
     {
+        $item = collect($this->files)->firstWhere('id', $id);
+
+        if (! $item) {
+            Toaster::error('File tidak ditemukan');
+            return;
+        }
+
+        $this->deletingId = $id;
+        $this->deletingName = $item['title'] ?? '';
+        Flux::modal('delete-file-modal')->show();
+    }
+
+    public function fileDelete(): void
+    {
+        if ($this->deletingId === null) {
+            return;
+        }
+
+        $id = $this->deletingId;
         $response = $this->form->delete($id);
 
         if (($response['status'] ?? null) === 200) {
@@ -267,6 +290,8 @@ new class extends Component {
                 ->values()
                 ->all();
             $this->countAllFiles = max(0, $this->countAllFiles - 1);
+            $this->reset('deletingId', 'deletingName');
+            Flux::modal('delete-file-modal')->close();
             $this->mount();
             Toaster::success('File berhasil dihapus');
             return;
@@ -277,6 +302,9 @@ new class extends Component {
             'status' => $response->status(),
             'body'   => $response->body(),
         ]);
+
+        $this->reset('deletingId', 'deletingName');
+        Flux::modal('delete-file-modal')->close();
     }
 }; ?>
 
@@ -467,8 +495,7 @@ new class extends Component {
                                             </flux:navmenu.item>
                                             <flux:navmenu.separator />
                                             <flux:navmenu.item icon="trash" variant="danger"
-                                                wire:click="fileDelete({{ $item['id'] }})"
-                                                wire:confirm="Hapus file ini?">
+                                                wire:click="confirmDelete({{ $item['id'] }})">
                                                 Hapus
                                             </flux:navmenu.item>
                                         </flux:navmenu>
@@ -737,6 +764,35 @@ new class extends Component {
             </div>
         </template>
     </div>
+
+    {{-- ============ DELETE CONFIRMATION MODAL ============ --}}
+    <flux:modal name="delete-file-modal" class="md:w-110" :dismissible="false">
+        <div class="space-y-5">
+            <div class="flex items-start gap-4">
+                <div class="shrink-0 w-11 h-11 rounded-full bg-red-50 flex items-center justify-center ring-4 ring-red-50/50">
+                    <flux:icon.exclamation-triangle class="w-5 h-5 text-red-600" />
+                </div>
+                <div class="space-y-1 flex-1 min-w-0">
+                    <flux:heading size="lg">Hapus File?</flux:heading>
+                    <flux:text class="text-sm text-zinc-500">
+                        File <span class="font-medium text-zinc-800">"{{ $deletingName }}"</span>
+                        akan dihapus permanen beserta seluruh datanya. Tindakan ini tidak dapat dibatalkan.
+                    </flux:text>
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                <flux:modal.close>
+                    <flux:button variant="ghost" class="flex-1">Batal</flux:button>
+                </flux:modal.close>
+                <flux:button wire:click="fileDelete" variant="danger" icon="trash" class="flex-1"
+                    wire:loading.attr="disabled" wire:target="fileDelete">
+                    <span wire:loading.remove wire:target="fileDelete">Hapus</span>
+                    <span wire:loading wire:target="fileDelete">Menghapus...</span>
+                </flux:button>
+            </div>
+        </div>
+    </flux:modal>
 </div>
 
 @script

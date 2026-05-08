@@ -3,30 +3,67 @@
 use Livewire\Volt\Component;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\Url;
 use Masmerise\Toaster\Toaster;
 
 new class extends Component
 {
     public array $projects = [];
     public array $pagination = [];
+    public array $availableYears = [];
+
+    #[Url(as: 'q', except: '')]
     public string $search = '';
+
+    #[Url(as: 'year', except: '')]
+    public string $year = '';
+
+    #[Url(as: 'view', except: 'cards')]
+    public string $viewMode = 'cards';
+
     public int $limit = 12;
     public int $currentPage = 1;
 
     public function mount(): void
     {
         $this->fetchProjects();
+        $this->buildAvailableYears();
+    }
+
+    public function buildAvailableYears(): void
+    {
+        $currentYear = (int) now()->year;
+        $startYear = 2022;
+
+        $this->availableYears = collect(range($currentYear, $startYear))->all();
     }
 
     public function fetchProjects(): void
     {
-        $response = Http::timeout(120)->retry(3, 200)->get(config('services.api_project') . 'projects/search', [
+        $params = [
             'limit' => $this->limit,
-            'page'  => $this->currentPage,
-            'name'  => $this->search,
-        ])->json();
+            'page' => $this->currentPage,
+            'name' => $this->search,
+        ];
 
-        $this->projects   = $response['data'] ?? [];
+        if ($this->year !== '') {
+            $params['year'] = $this->year;
+        }
+
+        $response = Http::timeout(120)->retry(3, 200)->get(config('services.api_project') . 'projects/search', $params)->json();
+
+        $data = $response['data'] ?? [];
+
+        if ($this->year !== '') {
+            $data = array_values(array_filter(
+                $data,
+                fn ($p) => ! empty($p['start_date']) && (int) \Carbon\Carbon::parse($p['start_date'])->year === (int) $this->year
+            ));
+        }
+
+        $this->dispatch('fetchProject', $data);
+
+        $this->projects = $data;
         $this->pagination = $response['pagination'] ?? [];
     }
 
@@ -34,6 +71,16 @@ new class extends Component
     {
         $this->currentPage = 1;
         $this->fetchProjects();
+    }
+
+    public function updatedYear(): void
+    {
+        $this->applyFilters();
+    }
+
+    public function setView(string $mode): void
+    {
+        $this->viewMode = in_array($mode, ['cards', 'list']) ? $mode : 'cards';
     }
 
     public function goToPage(int $page): void
@@ -60,6 +107,7 @@ new class extends Component
                 }
 
                 $this->fetchProjects();
+
                 return;
             }
 
@@ -107,27 +155,59 @@ new class extends Component
         </flux:button>
     </div>
 
-    {{-- Search Bar --}}
-    <div class="relative">
-        <flux:input
-            icon="magnifying-glass"
-            wire:model="search"
-            wire:keydown.enter="applyFilters"
-            wire:loading.attr="disabled"
-            placeholder="Cari proyek berdasarkan nama..."
-            class="w-full"
-        />
-        <div wire:loading wire:target="applyFilters,goToPage" class="absolute right-3 top-1/2 -translate-y-1/2">
-            <svg class="animate-spin h-4 w-4 text-zinc-400" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" class="opacity-25"/>
-                <path fill="currentColor" class="opacity-75" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a10 10 0 00-10 10h4z"/>
-            </svg>
+    {{-- Filter Bar --}}
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+        {{-- Search Bar --}}
+        <div class="relative flex-1">
+            <flux:input
+                icon="magnifying-glass"
+                wire:model="search"
+                wire:keydown.enter="applyFilters"
+                wire:loading.attr="disabled"
+                placeholder="Cari proyek berdasarkan nama..."
+                class="w-full"
+            />
+            <div wire:loading wire:target="applyFilters,goToPage,updatedYear" class="absolute right-3 top-1/2 -translate-y-1/2">
+                <svg class="animate-spin h-4 w-4 text-zinc-400" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" class="opacity-25"/>
+                    <path fill="currentColor" class="opacity-75" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a10 10 0 00-10 10h4z"/>
+                </svg>
+            </div>
+        </div>
+
+        {{-- Year Filter --}}
+        <flux:select
+            wire:model.live="year"
+            placeholder="Semua Tahun"
+            class="w-full sm:w-44"
+        >
+            <flux:select.option value="">Semua Tahun</flux:select.option>
+            @foreach($availableYears as $y)
+                <flux:select.option value="{{ $y }}">{{ $y }}</flux:select.option>
+            @endforeach
+        </flux:select>
+
+        {{-- View Toggle --}}
+        <div class="inline-flex rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-0.5 shrink-0">
+            <button type="button"
+                    wire:click="setView('cards')"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition cursor-pointer {{ $viewMode === 'cards' ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white' }}">
+                <flux:icon name="squares-2x2" class="w-4 h-4"/>
+                Cards
+            </button>
+            <button type="button"
+                    wire:click="setView('list')"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition cursor-pointer {{ $viewMode === 'list' ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white' }}">
+                <flux:icon name="bars-3" class="w-4 h-4"/>
+                List
+            </button>
         </div>
     </div>
 
-    {{-- Project Grid --}}
+    {{-- Project Grid (Cards View) --}}
+    @if($viewMode === 'cards')
     <div class="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-         wire:loading.remove wire:target="applyFilters,goToPage">
+         wire:loading.remove wire:target="applyFilters,goToPage,year">
 
         @forelse($projects as $item)
             @php
@@ -257,8 +337,8 @@ new class extends Component
         @endforelse
     </div>
 
-    {{-- Loading skeleton --}}
-    <div wire:loading wire:target="applyFilters,goToPage"
+    {{-- Loading skeleton (Cards View) --}}
+    <div wire:loading wire:target="applyFilters,goToPage,year"
          class="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         @foreach(range(1, 1) as $_)
             <flux:skeleton.group animate="shimmer"
@@ -288,6 +368,159 @@ new class extends Component
             </flux:skeleton.group>
         @endforeach
     </div>
+    @endif
+
+    {{-- Project Table (List View) --}}
+    @if($viewMode === 'list')
+    <div wire:loading.remove wire:target="applyFilters,goToPage,year"
+         class="overflow-x-auto rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
+        <table class="min-w-full text-sm">
+            <thead class="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider">
+                <tr>
+                    <th class="px-4 py-3 text-left font-semibold">Kode</th>
+                    <th class="px-4 py-3 text-left font-semibold">Nama Proyek</th>
+                    <th class="px-4 py-3 text-left font-semibold">Klien</th>
+                    <th class="px-4 py-3 text-left font-semibold">Status</th>
+                    <th class="px-4 py-3 text-left font-semibold">Progress</th>
+                    <th class="px-4 py-3 text-left font-semibold">Periode</th>
+                    <th class="px-4 py-3 text-left font-semibold">Leader</th>
+                    <th class="px-4 py-3 text-right font-semibold">Aksi</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
+                @forelse($projects as $item)
+                    @php
+                        $status     = $statusConfig[$item['status']] ?? $defaultStatus;
+                        $progress   = (int) ($item['progress'] ?? 0);
+                        $teamCount  = count($item['support_teams'] ?? []) + count($item['support_team_internals'] ?? []);
+                        $value      = 'Rp ' . number_format($item['value'] ?? 0, 0, ',', '.');
+                        $startDate  = $item['start_date'] ? \Carbon\Carbon::parse($item['start_date'])->translatedFormat('d M Y') : '-';
+                        $endDate    = $item['end_date']   ? \Carbon\Carbon::parse($item['end_date'])->translatedFormat('d M Y')   : '-';
+                        $leaderName = $item['project_leader_name'] ?? 'Unknown';
+                        $initials   = collect(explode(' ', $leaderName))->take(2)->map(fn($w) => strtoupper($w[0] ?? ''))->join('');
+                    @endphp
+
+                    <tr wire:key="project-row-{{ $item['id'] }}"
+                        class="hover:bg-zinc-50 dark:hover:bg-zinc-800/40 transition-colors">
+
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <span class="inline-flex items-center gap-1.5 text-xs font-mono font-semibold text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md">
+                                {{ $item['code'] ?? '-' }}
+                            </span>
+                        </td>
+
+                        <td class="px-4 py-3 max-w-xs">
+                            <flux:tooltip :content="$item['name']">
+                            <a href="{{ route('projects.show', $item['id']) }}"
+                               wire:navigate
+                               class="font-semibold text-zinc-800 dark:text-zinc-100 hover:underline line-clamp-2">
+                                   {{ $item['name'] }}
+                                </a>
+                            </flux:tooltip>
+                            </td>
+
+                        <td class="px-4 py-3">
+                            <div class="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+                                <flux:icon name="building-office-2" class="w-4 h-4 shrink-0 text-zinc-400"/>
+                                <span class="truncate max-w-[160px]">{{ $item['client'] ?? '-' }}</span>
+                            </div>
+                        </td>
+
+                        <td class="px-4 py-3">
+                            <span class="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full {{ $status['bg'] }} {{ $status['text'] }}">
+                                {{ $status['label'] }}
+                            </span>
+                        </td>
+
+                        <td class="px-4 py-3 min-w-[140px]">
+                            <div class="flex items-center gap-2">
+                                <div class="flex-1 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                    <div class="h-full {{ $status['bar'] }} rounded-full transition-all duration-500"
+                                         style="width: {{ $progress }}%"></div>
+                                </div>
+                                <span class="text-xs font-bold {{ $status['text'] }} w-10 text-right">{{ $progress }}%</span>
+                            </div>
+                        </td>
+
+                        <td class="px-4 py-3 whitespace-nowrap text-xs text-zinc-500 dark:text-zinc-400">
+                            <div class="flex items-center gap-1.5">
+                                <flux:icon name="calendar-days" class="w-3.5 h-3.5 shrink-0"/>
+                                {{ $startDate }} &rarr; {{ $endDate }}
+                            </div>
+                        </td>
+
+                        <td class="px-4 py-3">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <div class="w-6 h-6 rounded-full bg-gradient-to-br {{ $status['accent'] }} flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                                    {{ $initials }}
+                                </div>
+                                <span class="text-xs text-zinc-600 dark:text-zinc-400 truncate max-w-[120px]">{{ $leaderName }}</span>
+                                @if($teamCount > 0)
+                                    <span class="inline-flex items-center gap-1 text-xs text-zinc-400 dark:text-zinc-500">
+                                        <flux:icon name="users" class="w-3.5 h-3.5"/>
+                                        {{ $teamCount }}
+                                    </span>
+                                @endif
+                            </div>
+                        </td>
+
+                        <td class="px-4 py-3 text-right">
+                            <flux:dropdown align="end">
+                                <flux:button size="xs" variant="ghost" icon="ellipsis-horizontal"/>
+                                <flux:menu>
+                                    <flux:menu.item icon="eye" :href="route('projects.show', $item['id'])" wire:navigate>
+                                        Detail
+                                    </flux:menu.item>
+                                    <flux:menu.item icon="pencil-square" :href="route('projects.edit', $item['id'])" wire:navigate>
+                                        Edit
+                                    </flux:menu.item>
+                                    <flux:menu.separator />
+                                    <flux:menu.item
+                                        icon="trash"
+                                        variant="danger"
+                                        wire:click="deleteProject({{ $item['id'] }})"
+                                        wire:confirm="Yakin ingin menghapus proyek &quot;{{ addslashes($item['name'] ?? '') }}&quot;? Tindakan ini tidak bisa dibatalkan."
+                                    >
+                                        Hapus Proyek
+                                    </flux:menu.item>
+                                </flux:menu>
+                            </flux:dropdown>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="9" class="py-16 text-center">
+                            <div class="flex flex-col items-center justify-center">
+                                <div class="w-16 h-16 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-4">
+                                    <flux:icon name="folder-open" class="w-8 h-8 text-zinc-400"/>
+                                </div>
+                                <p class="text-zinc-600 dark:text-zinc-400 font-medium">Tidak ada proyek ditemukan</p>
+                                <p class="text-zinc-400 dark:text-zinc-500 text-sm mt-1">Coba ubah filter atau kata kunci pencarian Anda</p>
+                            </div>
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    {{-- Loading skeleton (List View) --}}
+    <div wire:loading wire:target="applyFilters,goToPage,year"
+         class="overflow-hidden rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+        <flux:skeleton.group animate="shimmer" class="divide-y divide-zinc-100 dark:divide-zinc-800">
+            @foreach(range(1, 6) as $_)
+                <div class="flex items-center gap-4 px-4 py-4">
+                    <flux:skeleton class="h-5 w-16 rounded"/>
+                    <flux:skeleton class="h-5 flex-1 rounded"/>
+                    <flux:skeleton class="h-5 w-24 rounded"/>
+                    <flux:skeleton class="h-5 w-20 rounded-full"/>
+                    <flux:skeleton class="h-5 w-32 rounded"/>
+                    <flux:skeleton class="h-5 w-24 rounded"/>
+                </div>
+            @endforeach
+        </flux:skeleton.group>
+    </div>
+    @endif
 
     {{-- Pagination --}}
     @if(!empty($pagination) && ($pagination['last_page'] ?? 1) > 1)
@@ -299,7 +532,7 @@ new class extends Component
             )->values();
         @endphp
 
-        <div wire:loading.remove wire:target="applyFilters,goToPage"
+        <div wire:loading.remove wire:target="applyFilters,goToPage,year"
              class="flex items-center justify-center gap-1.5 pt-2">
 
             <flux:button
@@ -333,7 +566,7 @@ new class extends Component
             />
         </div>
 
-        <p wire:loading.remove wire:target="applyFilters,goToPage"
+        <p wire:loading.remove wire:target="applyFilters,goToPage,year"
            class="text-center text-xs text-zinc-400 dark:text-zinc-500 pb-2">
             Halaman {{ $currentPage }} dari {{ $lastPage }}
             &middot; Total {{ $pagination['total'] }} proyek

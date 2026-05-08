@@ -33,6 +33,7 @@ new class extends Component {
 
                 return [
                     'id' => $item['id'],
+                    'user_id' => $item['user_id'],
                     'activity' => $item['activity'],
                     'status' => $item['status'],
                     'project_id' => $item['project_id'],
@@ -317,6 +318,7 @@ new class extends Component {
                                 <label wire:key="todo-{{ $todo['id'] }}" class="group flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200/70 bg-white px-3 py-2 hover:bg-slate-50 {{ $isDone ? 'opacity-60' : '' }}">
                                     <input
                                         type="checkbox"
+                                        @disabled($todo['user_id'] !== Auth::id())
                                         @checked($isDone)
                                         wire:change="toggleTodo({{ $todo['id'] }})"
                                         wire:loading.attr="disabled"

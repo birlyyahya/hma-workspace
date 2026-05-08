@@ -257,7 +257,7 @@ new #[Lazy(isolate: false)]  class extends Component {
                     <tr>
                         <th class="px-5 py-3 font-semibold">Perusahaan</th>
                         <th class="px-5 py-3 font-semibold">Direktur</th>
-                        <th class="px-5 py-3 font-semibold">Tanda Tangan</th>
+                        <th class="px-5 py-3 font-semibold">Kop Surat PT</th>
                         <th class="px-5 py-3 font-semibold">Berdiri</th>
                         <th class="px-5 py-3 font-semibold text-right">Aksi</th>
                     </tr>
@@ -426,7 +426,7 @@ new #[Lazy(isolate: false)]  class extends Component {
 
                     {{-- Signature Upload --}}
                     <div>
-                        <flux:label>Tanda Tangan Direktur</flux:label>
+                        <flux:label>KOP Surat PT</flux:label>
                         <div class="mt-1.5 flex items-start gap-4">
                             <div class="w-32 h-20 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center overflow-hidden shrink-0">
                                 @if($director_signature)
