@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\ProjectCache;
 use Livewire\Volt\Component;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -40,17 +41,23 @@ new class extends Component
 
     public function fetchProjects(): void
     {
-        $params = [
-            'limit' => $this->limit,
-            'page' => $this->currentPage,
-            'name' => $this->search,
-        ];
+        $isDefaultView = $this->search === '' && $this->year === '' && $this->currentPage === 1;
 
-        if ($this->year !== '') {
-            $params['year'] = $this->year;
+        if ($isDefaultView) {
+            $response = app(ProjectCache::class)->defaultProjectsList($this->limit);
+        } else {
+            $params = [
+                'limit' => $this->limit,
+                'page' => $this->currentPage,
+                'name' => $this->search,
+            ];
+
+            if ($this->year !== '') {
+                $params['year'] = $this->year;
+            }
+
+            $response = Http::timeout(120)->retry(3, 200)->get(config('services.api_project').'projects/search', $params)->json();
         }
-
-        $response = Http::timeout(120)->retry(3, 200)->get(config('services.api_project') . 'projects/search', $params)->json();
 
         $data = $response['data'] ?? [];
 
@@ -95,6 +102,8 @@ new class extends Component
             $response = Http::delete(config('services.api_project') . 'projects/' . $id);
 
             if ($response->successful()) {
+                app(ProjectCache::class)->flushProjects();
+
                 $this->projects = array_values(array_filter(
                     $this->projects,
                     fn ($p) => (int) ($p['id'] ?? 0) !== $id

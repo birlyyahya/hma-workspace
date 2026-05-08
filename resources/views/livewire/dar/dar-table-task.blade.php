@@ -2,6 +2,7 @@
 
 use App\Livewire\Forms\ActivityForm;
 use App\Models\User;
+use App\Services\ProjectCache;
 use Carbon\Carbon;
 use Livewire\Volt\Component;
 use Masmerise\Toaster\Toaster;
@@ -140,15 +141,15 @@ new class extends Component {
 
     public function projectData(){
         try {
-            $this->projectData = Http::get(env('API_PROJECT'). 'projects/search?project_leader_id='.Auth::user()->id)->json();
-            return $this->projectData['data'];
+            $this->projectData = app(ProjectCache::class)->leaderProjects(Auth::user()->id);
+            return $this->projectData;
         }catch(\Exception $e){
             return [];
         }
     }
 
     public function updatedProjectSelected(){
-        $this->spectech = collect($this->projectData['data'])->where('id', $this->projectSelected)->first()['specktech'];
+        $this->spectech = collect($this->projectData)->where('id', $this->projectSelected)->first()['specktech'];
     }
 
     public function deleteTask($id){

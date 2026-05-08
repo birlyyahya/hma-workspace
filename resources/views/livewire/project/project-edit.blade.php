@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Services\ProjectCache;
 use Livewire\Volt\Component;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -91,9 +92,7 @@ new class extends Component
 
     public function getCompaniesProperty(): array
     {
-        $response = Http::get(config('services.api_project') . 'companies?limit=9999999999')->json();
-
-        return $response['data'] ?? [];
+        return app(ProjectCache::class)->allCompanies();
     }
 
     public function getUsersProperty(): \Illuminate\Database\Eloquent\Collection
@@ -195,6 +194,8 @@ new class extends Component
 
 
             if ($response->successful()) {
+                app(ProjectCache::class)->flushProjects();
+
                 Toaster::success('Proyek berhasil diperbarui!');
                 $this->redirect(route('projects.show', $this->id), navigate: true);
                 return;

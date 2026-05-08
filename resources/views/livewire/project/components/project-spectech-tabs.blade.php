@@ -493,7 +493,7 @@ new class extends Component {
 {{-- ============ EDIT SPECTECH MODAL ============ --}}
 <flux:modal name="editSpectech" wire:close="resetForm" class="md:w-120">
     <form wire:submit="update" class="space-y-6"
-        x-data="{ isComing: false }"
+        x-data="{ isComing: false, isTermin: false, }"
         x-effect="isComing = (Number($wire.form.received_quantity) || 0) > 0">
         <div class="space-y-1">
             <flux:heading size="lg">Edit Spectech</flux:heading>
@@ -539,6 +539,22 @@ new class extends Component {
                             :max="$form->quantity" placeholder="0" />
                         <flux:description>
                             Maksimal {{ $form->quantity ?? 0 }} (sesuai total qty).
+                        </flux:description>
+                        <flux:error name="form.received_quantity" />
+                    </flux:field>
+                </div>
+            </div>
+            <div class="rounded-lg border border-zinc-200 bg-zinc-50/50 p-4 space-y-3">
+                <flux:checkbox x-model="isTermin"
+                    label="Barang sudah pemeriksaan?" />
+
+                <div x-show="isTermin" x-collapse>
+                    <flux:field>
+                        <flux:label>Jumlah Disetujui</flux:label>
+                        <flux:input  wire:model="form.received_quantity" type="number" min="0"
+                            :max="$form->quantity" placeholder="0" />
+                        <flux:description>
+                            Jumlah barang yang lolos pemeriksaan
                         </flux:description>
                         <flux:error name="form.received_quantity" />
                     </flux:field>

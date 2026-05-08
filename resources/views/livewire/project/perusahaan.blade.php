@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\ProjectCache;
 use Illuminate\Support\Facades\Http;
 use Livewire\Attributes\Lazy;
 use Livewire\Volt\Component;
@@ -145,6 +146,8 @@ new #[Lazy(isolate: false)]  class extends Component {
                 return;
             }
 
+            app(ProjectCache::class)->flushCompanies();
+
             $this->showForm = false;
             $this->resetForm();
             $this->fetchCompanies();
@@ -182,6 +185,8 @@ new #[Lazy(isolate: false)]  class extends Component {
                 Toaster::error(getErrorMessages($response->json()));
                 return;
             }
+
+            app(ProjectCache::class)->flushCompanies();
 
             $this->showDelete   = false;
             $this->deletingId   = null;

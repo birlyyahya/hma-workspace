@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Notifications\DarCommentReceived;
+use App\Services\ProjectCache;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
@@ -58,9 +59,7 @@ class extends Component {
             ->toArray();
 
         try {
-            $apiProject = rtrim(config('services.api_project'), '/');
-            $response = Http::get($apiProject . '/projects/search?project_leader_id=' . Auth::id())->json();
-            $this->projectData = $response['data'] ?? [];
+            $this->projectData = app(ProjectCache::class)->leaderProjects(Auth::id());
         } catch (\Throwable $e) {
             $this->projectData = [];
             Log::warning('Failed to load project list for DAR edit', ['message' => $e->getMessage()]);

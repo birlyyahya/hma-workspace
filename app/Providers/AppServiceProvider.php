@@ -2,9 +2,7 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\View;
+use App\Services\ProjectCache;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -14,7 +12,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(ProjectCache::class, fn () => new ProjectCache(
+            rtrim((string) config('services.api_project'), '/')
+        ));
     }
 
     /**

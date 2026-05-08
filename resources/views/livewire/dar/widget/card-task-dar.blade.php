@@ -2,6 +2,7 @@
 
 use App\Livewire\Forms\ActivityForm;
 use App\Models\User;
+use App\Services\ProjectCache;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
@@ -41,10 +42,9 @@ new class extends Component {
         $this->allUsers = User::orderBy('name')->get(['id', 'name'])->toArray();
 
         try {
-            $apiProject = rtrim(config('services.api_project'), '/');
-            $this->projectData = Http::get($apiProject.'/projects/search?project_leader_id='.Auth::id())->json() ?? [];
-
-            $this->allProjects = Http::get($apiProject.'/projects/search?limit=99999')->json()['data'] ?? [];
+            $cache = app(ProjectCache::class);
+            $this->projectData = $cache->leaderProjects(Auth::id());
+            $this->allProjects = $cache->allProjects();
         } catch (\Throwable $e) {
             $this->projectData = [];
             $this->allProjects = [];
@@ -74,7 +74,7 @@ new class extends Component {
 
     public function updatedProjectSelected(): void
     {
-        collect($this->projectData['data'] ?? [])->firstWhere('id', $this->projectSelected);
+        collect($this->projectData)->firstWhere('id', $this->projectSelected);
         $this->timelines = Http::get(config('services.api_project').'timelines/search?project_id='.$this->projectSelected.'&user_id='.Auth::id())->json()['data'] ?? [];
         $this->form->project_id = $this->projectSelected;
     }
@@ -143,7 +143,7 @@ new class extends Component {
 
     public function projectData(): array
     {
-        return $this->projectData['data'] ?? [];
+        return $this->projectData;
     }
 
     public function visibleTasks(): \Illuminate\Support\Collection

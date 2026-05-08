@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Services\ProjectCache;
 use Livewire\Volt\Component;
 use Illuminate\Support\Facades\Http;
 use Masmerise\Toaster\Toaster;
@@ -37,9 +38,7 @@ new class extends Component
 
     public function getCompaniesProperty(): array
     {
-        $response = Http::get(config('services.api_project') . 'companies?limit=999999999')->json();
-
-        return $response['data'] ?? [];
+        return app(ProjectCache::class)->allCompanies();
     }
 
     public function getUsersProperty(): \Illuminate\Database\Eloquent\Collection
@@ -142,6 +141,8 @@ new class extends Component
             ]);
 
             if ($response->json()['status'] === 201) {
+                app(ProjectCache::class)->flushProjects();
+
                 $id = $response->json('data.id') ?? $response->json('data.0.id');
                 Toaster::success('Proyek berhasil dibuat!');
 

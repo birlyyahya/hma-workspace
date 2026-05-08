@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\ProjectCache;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -21,6 +22,8 @@ new #[Lazy] class extends Component {
             );
 
             if ($response->successful()) {
+                app(ProjectCache::class)->flushProjects();
+
                 Toaster::success('Proyek berhasil dihapus');
                 $this->redirect(route('projects'), navigate: true);
                 return;
