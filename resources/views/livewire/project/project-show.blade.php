@@ -90,7 +90,7 @@ new #[Lazy] class extends Component {
 
     $tabs = [
         ['key' => 'overview', 'label' => 'Overview',     'icon' => 'layout-grid'],
-        ['key' => 'spectech', 'label' => 'Spectech',     'icon' => 'cube'],
+        ['key' => 'spectech', 'label' => 'Spektek',     'icon' => 'cube'],
         ['key' => 'timeline', 'label' => 'Timeline',     'icon' => 'calendar-days'],
         ['key' => 'team',     'label' => 'Tim',          'icon' => 'users'],
         ['key' => 'file',     'label' => 'File',         'icon' => 'folder'],

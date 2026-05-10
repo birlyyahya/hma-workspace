@@ -194,7 +194,7 @@ new class extends Component {
             {{-- List header --}}
             <div class="flex items-center justify-between">
                 <div>
-                    <flux:heading size="lg" class="font-semibold text-zinc-900">Daftar Spectech</flux:heading>
+                    <flux:heading size="lg" class="font-semibold text-zinc-900">Daftar Spektek</flux:heading>
                     <flux:text class="text-sm text-zinc-500">
                         {{ $this->totalItems }} item terdaftar
                     </flux:text>
@@ -330,12 +330,12 @@ new class extends Component {
                         <div class="mx-auto w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center">
                             <flux:icon.cube class="w-6 h-6 text-zinc-400" />
                         </div>
-                        <flux:heading size="md" class="mt-4 text-zinc-900">Belum ada spectech</flux:heading>
+                        <flux:heading size="md" class="mt-4 text-zinc-900">Belum ada Spektek</flux:heading>
                         <flux:text class="text-sm text-zinc-500 mt-1">
                             Tambahkan item spectech pertama untuk mulai melacak progress pekerjaan.
                         </flux:text>
                         <flux:modal.trigger name="addSpectech">
-                            <flux:button variant="primary" icon="plus" size="sm" class="mt-4">Tambah Spectech</flux:button>
+                            <flux:button variant="primary" icon="plus" size="sm" class="mt-4">Tambah Spektek</flux:button>
                         </flux:modal.trigger>
                     </div>
                 @endforelse
@@ -347,7 +347,7 @@ new class extends Component {
             <div class="bg-white rounded-xl p-6 border border-zinc-200 space-y-5 md:sticky md:top-47 top-4">
                 <div class="flex items-center justify-between gap-3">
                     <flux:heading size="md" class="font-semibold text-zinc-900">
-                        Progress Pekerjaan
+                        Progress Spektek
                     </flux:heading>
                     <flux:field class="w-24">
                         <flux:input.group>
@@ -362,7 +362,7 @@ new class extends Component {
                     <div class="text-4xl font-bold text-zinc-900 tracking-tight">
                         {{ number_format($this->progress ?? 0, 0) }}<span class="text-2xl text-zinc-400">%</span>
                     </div>
-                    <flux:text class="text-zinc-500 text-xs mt-1">Progress Proyek Keseluruhan</flux:text>
+                    <flux:text class="text-zinc-500 text-xs mt-1">Progress Spektek Keseluruhan</flux:text>
                 </div>
 
                 {{-- Progress bar --}}
@@ -440,15 +440,15 @@ new class extends Component {
 <flux:modal name="addSpectech" wire:close="resetForm" class="md:w-120">
     <form wire:submit="create" class="space-y-6">
         <div class="space-y-1">
-            <flux:heading size="lg">Tambah Spectech</flux:heading>
+            <flux:heading size="lg">Tambah Spektek</flux:heading>
             <flux:text class="text-sm text-zinc-500">
-                Tambahkan item spectech baru ke proyek ini.
+                Tambahkan item spektek baru ke proyek ini.
             </flux:text>
         </div>
 
         <div class="space-y-4">
             <flux:field>
-                <flux:label badge="Wajib">Nama Spectech</flux:label>
+                <flux:label badge="Wajib">Nama spektek</flux:label>
                 <flux:input wire:model="form.name" placeholder="cth. Pipa PVC 4 inch" autofocus />
                 <flux:error name="form.name" />
             </flux:field>
@@ -496,15 +496,15 @@ new class extends Component {
         x-data="{ isComing: false, isTermin: false, }"
         x-effect="isComing = (Number($wire.form.received_quantity) || 0) > 0">
         <div class="space-y-1">
-            <flux:heading size="lg">Edit Spectech</flux:heading>
+            <flux:heading size="lg">Edit Spektek</flux:heading>
             <flux:text class="text-sm text-zinc-500">
-                Perbarui detail spectech & jumlah barang yang sudah diterima.
+                Perbarui detail spektek & jumlah barang yang sudah diterima.
             </flux:text>
         </div>
 
         <div class="space-y-4">
             <flux:field>
-                <flux:label badge="Wajib">Nama Spectech</flux:label>
+                <flux:label badge="Wajib">Nama Spektek</flux:label>
                 <flux:input wire:model="form.name" placeholder="cth. Pipa PVC 4 inch" />
                 <flux:error name="form.name" />
             </flux:field>
