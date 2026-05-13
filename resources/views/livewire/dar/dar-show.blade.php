@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Notifications\DarCommentReceived;
+use App\Services\DarCache;
 use App\Services\ProjectCache;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -238,6 +239,7 @@ class extends Component {
             ]);
 
             if ($response['success']) {
+                app(DarCache::class)->flush();
                 $this->task = [
                     ...$this->task,
                     'activity' => $this->editActivity,
@@ -278,6 +280,7 @@ class extends Component {
             ]);
 
             if ($response['success']) {
+                app(DarCache::class)->flush();
                 $this->task['status'] = 4;
                 Toaster::success('Task marked as done!');
 
@@ -331,6 +334,7 @@ class extends Component {
             $payload = $response->json();
 
             if ($payload['success'] ?? false) {
+                app(DarCache::class)->flush();
                 $userId = Auth::id();
 
                 if (! isset($this->commentUsers[$userId])) {
@@ -424,6 +428,7 @@ class extends Component {
             ]);
 
             if ($response['success']) {
+                app(DarCache::class)->flush();
                 $this->comments = array_map(function ($c) {
                     if ($c['id'] === $this->editingCommentId) {
                         $c['body'] = $this->editingCommentBody;
@@ -474,6 +479,7 @@ class extends Component {
             $response = Http::delete(config('services.api_izin') . "/global/dar/activity/delete-comment/{$commentId}");
 
             if ($response['success']) {
+                app(DarCache::class)->flush();
                 $this->comments = array_values(array_filter($this->comments, fn ($c) => ($c['id'] ?? null) !== $commentId));
                 $this->pendingDeleteCommentId = null;
                 \Flux\Flux::modal('delete-comment-modal')->close();
@@ -592,24 +598,24 @@ class extends Component {
                 @php
                     $status = $task['status'] ?? 0;
                     $statusColor = match ($status) {
-                        1 => 'bg-zinc-100 text-zinc-700 ring-zinc-200',
+                        1 => 'bg-blue-100 text-blue-700 ring-blue-200',
                         2 => 'bg-amber-50 text-amber-800 ring-amber-200',
-                        3 => 'bg-blue-50 text-blue-700 ring-blue-200',
+                        3 => 'bg-rose-50 text-rose-700 ring-rose-200',
                         4 => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-                        default => 'bg-zinc-100 text-zinc-700 ring-zinc-200',
+                        default => 'bg-blue-100 text-blue-700 ring-blue-200',
                     };
                     $statusDot = match ($status) {
-                        1 => 'bg-zinc-400',
+                        1 => 'bg-blue-400',
                         2 => 'bg-amber-500',
-                        3 => 'bg-blue-500',
+                        3 => 'bg-rose-500',
                         4 => 'bg-emerald-500',
-                        default => 'bg-zinc-400',
+                        default => 'bg-blue-400',
                     };
                     $statusLabel = match ($status) {
                         1 => 'OPEN',
                         2 => 'PENDING',
-                        3 => 'CANCELLED',
-                        4 => 'CLOSED',
+                        3 => 'CLOSED',
+                        4 => 'CANCELLED',
                         default => 'Draft',
                     };
 

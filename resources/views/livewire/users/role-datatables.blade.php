@@ -1,7 +1,10 @@
 <?php
 
+use App\Models\Department;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\PermissionCache;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -19,7 +22,7 @@ new class extends Component {
     public string $search = '';
 
     #[Url(except: '')]
-    public string $scopeFilter = '';
+    public string $departmentFilter = '';
 
     #[Url(except: 'desc')]
     public string $sort = 'desc';
@@ -31,8 +34,14 @@ new class extends Component {
     public string $slug = '';
     public ?string $description = '';
     public int $level = 1;
-    public ?string $scope = '';
+    public ?int $departmentId = null;
+    public bool $isSystem = false;
     public bool $canApprove = false;
+
+    /** @var array<int, int> */
+    public array $selectedPermissions = [];
+
+    public string $permissionSearch = '';
 
     public ?int $deleteRoleId = null;
     public string $confirmDelete = '';
@@ -42,14 +51,14 @@ new class extends Component {
         $this->resetPage();
     }
 
-    public function updatedScopeFilter(): void
+    public function updatedDepartmentFilter(): void
     {
         $this->resetPage();
     }
 
     public function updatedName(string $value): void
     {
-        if (!$this->editingId) {
+        if (! $this->editingId) {
             $this->slug = Str::slug($value);
         }
     }
@@ -58,29 +67,45 @@ new class extends Component {
     public function roles()
     {
         return Role::query()
-            ->withCount('users')
+            ->withCount(['users', 'permissions'])
+            ->with('department:id,name,code')
             ->when($this->search, function ($q) {
                 $term = "%{$this->search}%";
                 $q->where(function ($qq) use ($term) {
                     $qq->where('name', 'like', $term)
-                        ->orWhere('slug', 'like', $term)
-                        ->orWhere('scope', 'like', $term);
+                        ->orWhere('slug', 'like', $term);
                 });
             })
-            ->when($this->scopeFilter !== '', fn ($q) => $q->where('scope', $this->scopeFilter))
+            ->when($this->departmentFilter !== '', fn ($q) => $q->where('department_id', $this->departmentFilter))
             ->orderBy('level', $this->sort)
             ->paginate($this->perPage);
     }
 
     #[Computed]
-    public function scopes(): array
+    public function departments()
     {
-        return Role::query()
-            ->whereNotNull('scope')
-            ->distinct()
-            ->orderBy('scope')
-            ->pluck('scope')
-            ->all();
+        return Department::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'code', 'name']);
+    }
+
+    #[Computed]
+    public function permissionsByModule()
+    {
+        return Permission::query()
+            ->when($this->permissionSearch !== '', function ($q) {
+                $term = '%'.$this->permissionSearch.'%';
+                $q->where(function ($qq) use ($term) {
+                    $qq->where('name', 'like', $term)
+                        ->orWhere('label', 'like', $term)
+                        ->orWhere('module', 'like', $term);
+                });
+            })
+            ->orderBy('module')
+            ->orderBy('action')
+            ->get(['id', 'name', 'module', 'action', 'label'])
+            ->groupBy('module');
     }
 
     #[Computed]
@@ -90,6 +115,7 @@ new class extends Component {
             'total' => Role::query()->count(),
             'approver' => Role::query()->where('can_approve', true)->count(),
             'users' => User::query()->count(),
+            'permissions' => Permission::query()->count(),
         ];
     }
 
@@ -101,7 +127,7 @@ new class extends Component {
 
     public function openEdit(int $id): void
     {
-        $role = Role::find($id);
+        $role = Role::with('permissions:id')->find($id);
 
         if (! $role) {
             Toaster::error('Role tidak ditemukan.');
@@ -120,11 +146,29 @@ new class extends Component {
         $this->slug = $role->slug;
         $this->description = $role->description;
         $this->level = $role->level;
-        $this->scope = $role->scope;
+        $this->departmentId = $role->department_id;
+        $this->isSystem = (bool) $role->is_system;
         $this->canApprove = (bool) $role->can_approve;
+        $this->selectedPermissions = $role->permissions->pluck('id')->all();
         $this->resetErrorBag();
 
         Flux::modal('role-form-modal')->show();
+    }
+
+    public function toggleModulePermissions(string $module): void
+    {
+        $moduleIds = Permission::query()
+            ->where('module', $module)
+            ->pluck('id')
+            ->all();
+
+        $allSelected = empty(array_diff($moduleIds, $this->selectedPermissions));
+
+        if ($allSelected) {
+            $this->selectedPermissions = array_values(array_diff($this->selectedPermissions, $moduleIds));
+        } else {
+            $this->selectedPermissions = array_values(array_unique([...$this->selectedPermissions, ...$moduleIds]));
+        }
     }
 
     public function save(): void
@@ -141,8 +185,11 @@ new class extends Component {
             ],
             'description' => ['nullable', 'string', 'max:500'],
             'level' => ['required', 'integer', 'min:1', 'max:100'],
-            'scope' => ['nullable', 'string', 'max:50'],
+            'departmentId' => ['nullable', 'integer', 'exists:departments,id'],
+            'isSystem' => ['boolean'],
             'canApprove' => ['boolean'],
+            'selectedPermissions' => ['array'],
+            'selectedPermissions.*' => ['integer', 'exists:permissions,id'],
         ];
 
         $this->validate($rules, [
@@ -161,22 +208,35 @@ new class extends Component {
                 'slug' => $this->slug,
                 'description' => $this->description ?: null,
                 'level' => $this->level,
-                'scope' => $this->scope ?: null,
+                'department_id' => $this->departmentId ?: null,
+                'is_system' => $this->isSystem,
                 'can_approve' => $this->canApprove,
             ];
 
             if ($this->editingId) {
-                Role::where('id', $this->editingId)->update($payload);
+                $role = Role::findOrFail($this->editingId);
+
+                if ($role->is_system && ! Auth::user()?->hasRole('super-admin')) {
+                    Toaster::error('Role system hanya dapat diubah oleh super-admin.');
+
+                    return;
+                }
+
+                $role->update($payload);
+                $role->permissions()->sync($this->selectedPermissions);
+                PermissionCache::flushForRole($role);
                 Toaster::success('Role berhasil diperbarui.');
             } else {
-                Role::create($payload);
+                $role = Role::create($payload);
+                $role->permissions()->sync($this->selectedPermissions);
+                PermissionCache::flushForRole($role);
                 Toaster::success('Role berhasil dibuat.');
             }
 
             $this->resetForm();
             Flux::modal('role-form-modal')->close();
         } catch (\Throwable $e) {
-            Toaster::error('Gagal menyimpan role: ' . $e->getMessage());
+            Toaster::error('Gagal menyimpan role: '.$e->getMessage());
         }
     }
 
@@ -206,6 +266,12 @@ new class extends Component {
             return;
         }
 
+        if ($role->is_system) {
+            Toaster::error('Role system tidak dapat dihapus.');
+
+            return;
+        }
+
         if (! $this->canManage($role->level)) {
             Toaster::error('Anda tidak memiliki izin untuk menghapus role ini.');
 
@@ -224,45 +290,38 @@ new class extends Component {
             $this->reset(['deleteRoleId', 'confirmDelete']);
             Flux::modal('role-delete-modal')->close();
         } catch (\Throwable $e) {
-            Toaster::error('Gagal menghapus role: ' . $e->getMessage());
+            Toaster::error('Gagal menghapus role: '.$e->getMessage());
         }
     }
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'scopeFilter', 'sort']);
+        $this->reset(['search', 'departmentFilter', 'sort']);
         $this->sort = 'desc';
         $this->resetPage();
     }
 
     protected function resetForm(): void
     {
-        $this->reset(['editingId', 'name', 'slug', 'description', 'level', 'scope', 'canApprove']);
+        $this->reset([
+            'editingId', 'name', 'slug', 'description', 'level',
+            'departmentId', 'isSystem', 'canApprove',
+            'selectedPermissions', 'permissionSearch',
+        ]);
         $this->level = 1;
         $this->resetErrorBag();
     }
 
     protected function canManage(int $targetLevel): bool
     {
-        return (Auth::user()?->role?->level ?? 0) >= $targetLevel;
+        return (Auth::user()?->role?->level ?? 0) > $targetLevel;
     }
-
 }; ?>
 
-@php
-$scopeColors = [
-'global' => 'blue',
-'it' => 'indigo',
-'it-software' => 'cyan',
-'it-infra' => 'cyan',
-'hrd' => 'emerald',
-'map' => 'emerald',
-];
-@endphp
 
 <div class="space-y-5">
     {{-- Stats --}}
-    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div class="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
             <div class="flex items-center justify-between">
                 <div>
@@ -285,6 +344,17 @@ $scopeColors = [
                 </div>
             </div>
         </div>
+        <div class="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4 shadow-sm">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium uppercase tracking-wide text-emerald-700">Permission</p>
+                    <p class="mt-1 text-2xl font-bold text-emerald-900">{{ $this->stats['permissions'] }}</p>
+                </div>
+                <div class="rounded-lg bg-emerald-100 p-2.5">
+                    <flux:icon.key class="size-5 text-emerald-600" />
+                </div>
+            </div>
+        </div>
         <div class="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
             <div class="flex items-center justify-between">
                 <div>
@@ -301,13 +371,13 @@ $scopeColors = [
     {{-- Toolbar --}}
     <div class="rounded-xl border border-zinc-200 bg-white shadow-sm">
         <div class="flex flex-col gap-3 border-b border-zinc-100 p-4 lg:flex-row lg:items-center lg:justify-between">
-            <flux:input icon="magnifying-glass" wire:model.live.debounce.400ms="search" placeholder="Cari nama, slug, atau scope role..." class="w-full sm:max-w-sm" />
+            <flux:input icon="magnifying-glass" wire:model.live.debounce.400ms="search" placeholder="Cari nama atau slug role..." class="w-full sm:max-w-sm" />
 
             <div class="flex flex-wrap items-center gap-2">
-                <flux:select wire:model.live="scopeFilter" class="w-full sm:w-44">
-                    <option value="">Semua scope</option>
-                    @foreach ($this->scopes as $sc)
-                    <option value="{{ $sc }}">{{ $sc }}</option>
+                <flux:select wire:model.live="departmentFilter" class="w-full sm:w-44">
+                    <option value="">Semua departemen</option>
+                    @foreach ($this->departments as $d)
+                        <option value="{{ $d->id }}">{{ $d->name }}</option>
                     @endforeach
                 </flux:select>
 
@@ -316,10 +386,10 @@ $scopeColors = [
                     <option value="asc">Level terendah</option>
                 </flux:select>
 
-                @if ($search || $scopeFilter || $sort !== 'desc')
-                <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="clearFilters" class="cursor-pointer">
-                    Reset
-                </flux:button>
+                @if ($search || $departmentFilter || $sort !== 'desc')
+                    <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="clearFilters" class="cursor-pointer">
+                        Reset
+                    </flux:button>
                 @endif
 
                 <flux:button icon="plus" variant="primary" class="cursor-pointer" wire:click="openCreate">
@@ -330,7 +400,7 @@ $scopeColors = [
 
         {{-- Datatable --}}
         <div class="relative">
-            <div wire:loading.flex wire:target.except="editingId, deleteRoleId" class="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-sm">
+            <div wire:loading.flex wire:target.except="editingId, deleteRoleId, selectedPermissions, permissionSearch" class="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-sm">
                 <div class="flex flex-col items-center gap-2">
                     <div class="h-8 w-8 animate-spin rounded-full border-4 border-zinc-900 border-t-transparent"></div>
                     <span class="text-sm text-zinc-600">Loading data...</span>
@@ -343,73 +413,75 @@ $scopeColors = [
                         <tr>
                             <th class="px-6 py-3 whitespace-nowrap">#</th>
                             <th class="px-4 py-3">Role</th>
-                            <th class="px-4 py-3">Scope</th>
+                            <th class="px-4 py-3">Departemen</th>
                             <th class="px-4 py-3">Level</th>
-                            <th class="px-4 py-3">Approver</th>
+                            <th class="px-4 py-3">Perm.</th>
                             <th class="px-4 py-3">Users</th>
                             <th class="px-6 py-3 text-end whitespace-nowrap">Aksi</th>
                         </tr>
                     </thead>
                     <tbody wire:loading.class="pointer-events-none" class="divide-y divide-zinc-100">
                         @forelse ($this->roles as $r)
-                        <tr wire:key="role-{{ $r->id }}" class="transition hover:bg-zinc-50/70">
-                            <td class="px-6 py-3 whitespace-nowrap text-zinc-500">
-                                {{ ($this->roles->currentPage() - 1) * $this->roles->perPage() + $loop->iteration }}
-                            </td>
-                            <td class="px-4 py-3">
-                                <p class="font-medium text-zinc-900">{{ $r->name }}</p>
-                                <p class="text-xs text-zinc-500">{{ $r->slug }}</p>
-                            </td>
-                            <td class="px-4 py-3">
-                                @if ($r->scope)
-                                <flux:badge :color="$scopeColors[$r->scope] ?? 'gray'" size="sm">
-                                    {{ str_replace("-"," ",strtoupper($r->scope)) }}
-                                </flux:badge>
-                                @else
-                                <span class="text-xs text-zinc-400">—</span>
-                                @endif
-                            </td>
-                            <td class="px-4 py-3">
-                                <div class="flex items-center gap-2">
-                                    <span class="font-mono text-sm font-semibold text-zinc-900">{{ $r->level }}</span>
-                                    <div class="hidden h-1.5 w-16 overflow-hidden rounded-full bg-zinc-100 sm:block">
-                                        <div class="h-full bg-zinc-900" style="width: {{ min(100, $r->level) }}%"></div>
+                            <tr wire:key="role-{{ $r->id }}" class="transition hover:bg-zinc-50/70">
+                                <td class="px-6 py-3 whitespace-nowrap text-zinc-500">
+                                    {{ ($this->roles->currentPage() - 1) * $this->roles->perPage() + $loop->iteration }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-2">
+                                        <p class="font-medium text-zinc-900">{{ $r->name }}</p>
+                                        @if ($r->is_system)
+                                            <flux:badge color="amber" size="sm" icon="lock-closed">System</flux:badge>
+                                        @endif
                                     </div>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3">
-                                @if ($r->can_approve)
-                                <flux:badge color="emerald" size="sm" icon="check">Yes</flux:badge>
-                                @else
-                                <flux:badge color="zinc" size="sm">No</flux:badge>
-                                @endif
-                            </td>
-                            <td class="px-4 py-3">
-                                <span class="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
-                                    <flux:icon.user class="size-3" />
-                                    {{ $r->users_count }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-3 text-end">
-                                <div class="flex items-center justify-end gap-1">
-                                    <flux:tooltip content="Edit">
-                                        <flux:button :disabled="! $this->canManage($r->level)" variant="ghost" icon="pencil-square" size="sm" class="cursor-pointer" wire:click="openEdit({{ $r->id }})" />
-                                    </flux:tooltip>
-                                    <flux:tooltip content="Hapus">
-                                        <flux:button :disabled="! $this->canManage($r->level) || $r->users_count > 0" variant="ghost" icon="trash" size="sm" class="cursor-pointer text-red-500 hover:text-red-600" wire:click="openDelete({{ $r->id }})" />
-                                    </flux:tooltip>
-                                </div>
-                            </td>
-                        </tr>
+                                    <p class="text-xs text-zinc-500">{{ $r->slug }}</p>
+                                </td>
+                                <td class="px-4 py-3">
+                                    @if ($r->department)
+                                        <flux:badge color="zinc" size="sm">{{ $r->department->name }}</flux:badge>
+                                    @else
+                                        <span class="text-xs text-zinc-400">—</span>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-mono text-sm font-semibold text-zinc-900">{{ $r->level }}</span>
+                                        <div class="hidden h-1.5 w-16 overflow-hidden rounded-full bg-zinc-100 sm:block">
+                                            <div class="h-full bg-zinc-900" style="width: {{ min(100, $r->level) }}%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                        <flux:icon.key class="size-3" />
+                                        {{ $r->permissions_count }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span class="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                                        <flux:icon.user class="size-3" />
+                                        {{ $r->users_count }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-3 text-end">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <flux:tooltip content="Edit">
+                                            <flux:button :disabled="! $this->canManage($r->level)" variant="ghost" icon="pencil-square" size="sm" class="cursor-pointer" wire:click="openEdit({{ $r->id }})" />
+                                        </flux:tooltip>
+                                        <flux:tooltip content="Hapus">
+                                            <flux:button :disabled="! $this->canManage($r->level) || $r->users_count > 0 || $r->is_system" variant="ghost" icon="trash" size="sm" class="cursor-pointer text-red-500 hover:text-red-600" wire:click="openDelete({{ $r->id }})" />
+                                        </flux:tooltip>
+                                    </div>
+                                </td>
+                            </tr>
                         @empty
-                        <tr>
-                            <td colspan="7" class="px-6 py-12">
-                                <div class="flex flex-col items-center justify-center gap-2 text-zinc-400">
-                                    <flux:icon.shield-check class="size-10" />
-                                    <p class="text-sm">Tidak ada role yang cocok dengan filter.</p>
-                                </div>
-                            </td>
-                        </tr>
+                            <tr>
+                                <td colspan="7" class="px-6 py-12">
+                                    <div class="flex flex-col items-center justify-center gap-2 text-zinc-400">
+                                        <flux:icon.shield-check class="size-10" />
+                                        <p class="text-sm">Tidak ada role yang cocok dengan filter.</p>
+                                    </div>
+                                </td>
+                            </tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -424,12 +496,12 @@ $scopeColors = [
     </div>
 
     {{-- Form modal --}}
-    <flux:modal name="role-form-modal" class="min-w-xs md:min-w-3xl">
+    <flux:modal name="role-form-modal" class="min-w-xs md:min-w-5xl">
         <form wire:submit.prevent="save" class="space-y-5">
             <div>
                 <flux:heading size="lg">{{ $editingId ? 'Edit Role' : 'Tambah Role' }}</flux:heading>
                 <flux:text class="mt-1 text-sm text-zinc-500">
-                    Role menentukan hak akses dan level hierarki pengguna.
+                    Role menentukan hak akses, departemen, level hierarki, dan permission pengguna.
                 </flux:text>
             </div>
 
@@ -465,27 +537,85 @@ $scopeColors = [
                             <flux:icon.exclamation-circle class="size-5" />
                         </flux:tooltip>
                     </div>
-
                     <flux:input type="number" min="1" max="100" wire:model="level" />
                     <flux:error name="level" />
                 </flux:field>
+
                 <flux:field>
-                    <flux:label>Scope</flux:label>
-                    <flux:select wire:model="scope" placeholder="contoh: it-software">
-                        @foreach ($this->scopes as $sc)
-                        <flux:select.option value="{{ $sc }}">{{ str_replace("-"," ",strtoupper($sc)) }}</flux:select.option>
+                    <flux:label>Departemen</flux:label>
+                    <flux:select wire:model="departmentId" placeholder="Pilih departemen">
+                        <flux:select.option value="">— Tidak terkait —</flux:select.option>
+                        @foreach ($this->departments as $d)
+                            <flux:select.option value="{{ $d->id }}">{{ $d->name }}</flux:select.option>
                         @endforeach
                     </flux:select>
-                    <flux:error name="scope" />
+                    <flux:error name="departmentId" />
                 </flux:field>
             </div>
 
             <div class="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50/60 px-4 py-3">
                 <div>
                     <flux:label>Dapat menyetujui (approver)</flux:label>
-                    <flux:description>Aktifkan jika role ini dapat melakukan approval pengajuan.</flux:description>
+                    <flux:description>Role ini dapat melakukan approval pengajuan.</flux:description>
                 </div>
                 <flux:switch wire:model="canApprove" />
+            </div>
+
+            <div class="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50/40 px-4 py-3">
+                <div>
+                    <flux:label>Role Sistem</flux:label>
+                    <flux:description>Jika aktif, role tidak dapat dihapus dan hanya dapat diubah oleh super-admin.</flux:description>
+                </div>
+                <flux:switch wire:model="isSystem" />
+            </div>
+
+            {{-- Permission picker --}}
+            <div class="rounded-lg border border-zinc-200 bg-white">
+                <div class="flex flex-col gap-3 border-b border-zinc-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <flux:label>Permissions</flux:label>
+                        <flux:description>
+                            Pilih hak akses untuk role ini.
+                            Terpilih: <span class="font-semibold text-zinc-900">{{ count($selectedPermissions) }}</span>
+                        </flux:description>
+                    </div>
+                    <flux:input icon="magnifying-glass" wire:model.live.debounce.300ms="permissionSearch" placeholder="Cari permission..." class="w-full sm:max-w-xs" />
+                </div>
+
+                <div class="max-h-80 overflow-y-auto p-4">
+                    @forelse ($this->permissionsByModule as $module => $perms)
+                        @php
+                            $moduleIds = $perms->pluck('id')->all();
+                            $checkedCount = count(array_intersect($moduleIds, $selectedPermissions));
+                            $allChecked = $checkedCount === count($moduleIds);
+                        @endphp
+                        <div wire:key="perm-mod-{{ $module }}" class="mb-4">
+                            <div class="mb-2 flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <flux:badge color="zinc" size="sm">{{ strtoupper($module) }}</flux:badge>
+                                    <span class="text-xs text-zinc-500">{{ $checkedCount }}/{{ count($moduleIds) }}</span>
+                                </div>
+                                <button type="button" wire:click="toggleModulePermissions('{{ $module }}')" class="cursor-pointer text-xs font-medium text-indigo-600 hover:text-indigo-800">
+                                    {{ $allChecked ? 'Hapus semua' : 'Pilih semua' }}
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                @foreach ($perms as $perm)
+                                    <label wire:key="perm-{{ $perm->id }}" class="flex cursor-pointer items-start gap-2 rounded-md border border-zinc-100 p-2 hover:bg-zinc-50">
+                                        <flux:checkbox wire:model.live="selectedPermissions" value="{{ $perm->id }}" />
+                                        <div class="leading-tight">
+                                            <p class="text-sm font-medium text-zinc-800">{{ $perm->label }}</p>
+                                            <p class="font-mono text-[11px] text-zinc-500">{{ $perm->name }}</p>
+                                        </div>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    @empty
+                        <p class="py-6 text-center text-sm text-zinc-400">Belum ada permission. Tambahkan di tab Permissions.</p>
+                    @endforelse
+                </div>
+                <flux:error name="selectedPermissions" />
             </div>
 
             <div class="flex justify-end gap-2 border-t border-zinc-100 pt-4">
@@ -515,7 +645,7 @@ $scopeColors = [
             </div>
             <flux:input placeholder="Ketik YA untuk konfirmasi..." wire:model="confirmDelete" />
             @error('confirmDelete')
-            <flux:text class="text-xs text-red-500">{{ $message }}</flux:text>
+                <flux:text class="text-xs text-red-500">{{ $message }}</flux:text>
             @enderror
             <div class="flex justify-end gap-2">
                 <flux:button variant="outline" x-on:click="$flux.modal('role-delete-modal').close()">Batal</flux:button>

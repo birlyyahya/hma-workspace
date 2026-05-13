@@ -114,11 +114,11 @@ new #[Lazy] class extends Component {
             }"
         >
             {{-- ============ STICKY HEADER ============ --}}
-            <div class="md:sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-zinc-200">
-                <div class="px-4 sm:px-6 pt-4 pb-0">
+            <div class="bg-white/90 backdrop-blur ">
+                <div class="px-4 sm:px-6 pt-4 pb-4">
                     {{-- Breadcrumb --}}
                     <nav class="flex items-center gap-1.5 text-xs text-zinc-500 mb-3">
-                        @if(Auth::user()->level <= 60)
+                        @if(!Auth::user()->level >= 60)
                         <a class=" transition inline-flex items-center gap-1">
                             <flux:icon.ellipsis-vertical class="w-3.5 h-3.5" />
                             Project
@@ -228,23 +228,25 @@ new #[Lazy] class extends Component {
                         </div>
                     </div>
 
-                    {{-- ============ TAB NAVIGATION ============ --}}
-                    <nav class="mt-4 -mb-px flex items-center gap-1 overflow-x-auto">
-                        @foreach($tabs as $tab)
-                            <button
-                                type="button"
-                                @click="active = '{{ $tab['key'] }}'"
-                                :class="active === '{{ $tab['key'] }}'
-                                    ? 'text-red-600 border-red-600'
-                                    : 'text-zinc-500 border-transparent hover:text-zinc-800 hover:border-zinc-300'"
-                                class="flex items-center gap-2 px-3 py-2.5 border-b-2 text-sm font-medium transition cursor-pointer whitespace-nowrap"
-                            >
-                                <flux:icon name="{{ $tab['icon'] }}" class="w-4 h-4" />
-                                {{ $tab['label'] }}
-                            </button>
-                        @endforeach
-                    </nav>
                 </div>
+            </div>
+            <div class="md:sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-zinc-200  px-4 sm:px-6 pb-0">
+                {{-- ============ TAB NAVIGATION ============ --}}
+                <nav class=" -mb-px flex items-center gap-1 overflow-x-auto">
+                    @foreach($tabs as $tab)
+                        <button
+                            type="button"
+                            @click="active = '{{ $tab['key'] }}'"
+                            :class="active === '{{ $tab['key'] }}'
+                                ? 'text-red-600 border-red-600'
+                                : 'text-zinc-500 border-transparent hover:text-zinc-800 hover:border-zinc-300'"
+                            class="flex items-center gap-2 px-3 py-2.5 border-b-2 text-sm font-medium transition cursor-pointer whitespace-nowrap"
+                        >
+                            <flux:icon name="{{ $tab['icon'] }}" class="w-4 h-4" />
+                            {{ $tab['label'] }}
+                        </button>
+                    @endforeach
+                </nav>
             </div>
 
             {{-- ============ TAB CONTENT ============ --}}

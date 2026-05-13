@@ -1,6 +1,8 @@
 <?php
 
 use App\Notifications\DarCommentReceived;
+use App\Services\DarCache;
+use App\Services\ProjectCache;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
@@ -10,16 +12,24 @@ new class extends Component {
     public $messages;
     public $todos;
     public $schedules;
+    public array $projectMap = [];
 
     #[On('updatedTimeline')]
     #[On('darCommentAdded')]
     public function mount(): void
     {
-          if(Auth::user()->role_id < 3){
-              $response = Http::timeout(120)->retry(3, 200)->get(env('API_IZIN').'/global/dar/list?limit=1000000')->json();
-          }else {
-              $response = Http::timeout(120)->retry(3, 200)->get(env('API_IZIN').'/global/dar/list?limit=1000000&team_user='.Auth::id())->json();
-          }
+        $scope = Auth::user()->viewScopeFor('dar') === 'all' ? 'all' : 'user';
+        $response = app(DarCache::class)->list($scope, Auth::id());
+
+        try {
+            $this->projectMap = collect(app(ProjectCache::class)->allProjects())
+                ->keyBy('id')
+                ->map(fn ($p) => $p['name'] ?? null)
+                ->filter()
+                ->toArray();
+        } catch (\Throwable $e) {
+            $this->projectMap = [];
+        }
 
         $today = now()->startOfDay();
         $todayEnd = now()->endOfDay();
@@ -50,15 +60,15 @@ new class extends Component {
 
                 return ! $item['end_passed'];
             })
+            ->sortBy('status')
             ->values();
-
-        $user = Auth::user();
-
-        $this->messages = $this->loadMessages();
 
         [$project, $nonproject] = $collection->partition(function ($item) {
             return !is_null($item['project_id']);
         });
+
+        $this->messages = $this->loadMessages();
+
 
         $this->todos = [
             'project' => $project->values()->all(),
@@ -94,7 +104,7 @@ new class extends Component {
             return collect();
         }
 
-        if ($user->role_id < 3) {
+        if ($user->viewScopeFor('dar') === 'all') {
             $query = \Illuminate\Notifications\DatabaseNotification::query()
                 ->where('type', DarCommentReceived::class);
         } else {
@@ -161,6 +171,8 @@ new class extends Component {
         Http::put(env('API_IZIN').'global/dar/activity/'.$id.'/status', [
             'status' => $newStatus
         ]);
+
+        app(DarCache::class)->flush();
 
         Toaster::success('Todo status updated');
 
@@ -314,7 +326,10 @@ new class extends Component {
                                     </span>
                                 </div>
                                 @foreach($todos['project'] as $todo)
-                                @php $isDone = (int) $todo['status'] === 4; @endphp
+                                @php
+                                    $isDone = (int) $todo['status'] === 4;
+                                    $projName = $projectMap[$todo['project_id']] ?? null;
+                                @endphp
                                 <label wire:key="todo-{{ $todo['id'] }}" class="group flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200/70 bg-white px-3 py-2 hover:bg-slate-50 {{ $isDone ? 'opacity-60' : '' }}">
                                     <input
                                         type="checkbox"
@@ -325,8 +340,8 @@ new class extends Component {
                                         wire:target="toggleTodo({{ $todo['id'] }})"
                                         class="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900/20"
                                     >
-                                    <span class="flex-1 text-sm text-slate-800 group-hover:text-slate-950 {{ $isDone ? 'line-through text-slate-400' : '' }}">
-                                        {{ $todo['activity'] }}
+                                    <span class="flex-1 min-w-0 text-sm text-slate-800 group-hover:text-slate-950 {{ $isDone ? 'line-through text-slate-400' : '' }}">
+                                        <span class="truncate">{{ $todo['activity'] }}</span>
                                     </span>
                                 </label>
                                 @endforeach

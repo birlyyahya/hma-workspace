@@ -34,6 +34,7 @@ new class extends Component
 
     public function mount(int $id): void
     {
+        $this->authorize('project.update');
         $this->id = $id;
         $this->fetchProject();
         $this->dispatch('initSelects');

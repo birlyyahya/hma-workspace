@@ -2,6 +2,7 @@
 
 use App\Livewire\Forms\ActivityForm;
 use App\Models\User;
+use App\Services\DarCache;
 use App\Services\ProjectCache;
 use Carbon\Carbon;
 use Livewire\Volt\Component;
@@ -102,6 +103,8 @@ new class extends Component {
         $response = $this->form->store($this->projectSelected);
          if ($response['success']) {
 
+        app(DarCache::class)->flush();
+
         $this->reset('form');
 
         Toaster::success('Create Activity successfully');
@@ -126,6 +129,7 @@ new class extends Component {
         );
 
         if($response['success']) {
+            app(DarCache::class)->flush();
             Toaster::success('Update Activity successfully');
             $this->dispatch('updatedTimeline');
             return $this->fetch();
@@ -155,6 +159,7 @@ new class extends Component {
     public function deleteTask($id){
         $response = Http::delete(env('API_IZIN').'global/dar/activity/'.$id);
         if($response['success']){
+            app(DarCache::class)->flush();
             Toaster::success('Delete Activity successfully');
             $this->dispatch('updatedTimeline');
             return $this->fetch();

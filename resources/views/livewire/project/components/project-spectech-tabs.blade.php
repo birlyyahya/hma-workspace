@@ -24,6 +24,18 @@ new class extends Component {
     public ?int $deletingId = null;
     public ?string $deletingName = null;
 
+    public string $activeType = 'hardware';
+    public bool $bulkMode = false;
+    public array $selectedIds = [];
+
+    /**
+     * @var array<int, array{qty_recived: int, note: string}>
+     */
+    public array $bulkChanges = [];
+
+    public string $search = '';
+    public string $statusFilter = 'all';
+
     public function placeholder()
     {
         return view('components.placeholder.ph_project_spectech_tabs');
@@ -45,6 +57,8 @@ new class extends Component {
             'percentage'    => $data['percentage'],
             'note'          => $data['note'],
             'images'        => $data['images'] ?? [],
+            // Field type belum tersedia dari API; default hardware sampai backend menambahkan kolom ini.
+            'type'          => $data['type'] ?? 'hardware',
         ];
     }
 
@@ -169,6 +183,228 @@ new class extends Component {
         $this->resetErrorBag();
     }
 
+    public function setType(string $type): void
+    {
+        if (! in_array($type, ['hardware', 'software'], true)) {
+            return;
+        }
+
+        $this->activeType = $type;
+        $this->selectedIds = [];
+    }
+
+    public function toggleBulkMode(): void
+    {
+        $this->bulkMode = ! $this->bulkMode;
+        $this->selectedIds = [];
+    }
+
+    public function toggleSelect(int $id): void
+    {
+        if (in_array($id, $this->selectedIds, true)) {
+            $this->selectedIds = array_values(array_filter(
+                $this->selectedIds,
+                fn ($x) => (int) $x !== $id,
+            ));
+
+            return;
+        }
+
+        $this->selectedIds[] = $id;
+    }
+
+    public function selectAllVisible(): void
+    {
+        $this->selectedIds = collect($this->filteredSpectech)
+            ->pluck('id')
+            ->map(fn ($x) => (int) $x)
+            ->all();
+    }
+
+    public function toggleSelectAllVisible(): void
+    {
+        $visibleIds = collect($this->filteredSpectech)
+            ->pluck('id')
+            ->map(fn ($x) => (int) $x)
+            ->all();
+
+        $current = array_map('intval', $this->selectedIds);
+        $allSelected = ! empty($visibleIds) && empty(array_diff($visibleIds, $current));
+
+        $this->selectedIds = $allSelected ? [] : $visibleIds;
+    }
+
+    public function clearSelection(): void
+    {
+        $this->selectedIds = [];
+    }
+
+    public function openBulkEdit(): void
+    {
+        if (empty($this->selectedIds)) {
+            Toaster::error('Pilih minimal satu spektek');
+            return;
+        }
+
+        $this->bulkChanges = [];
+        $byId = collect($this->spectech)->keyBy('id');
+
+        foreach ($this->selectedIds as $id) {
+            $item = $byId->get($id);
+
+            if (! $item) {
+                continue;
+            }
+
+            $this->bulkChanges[(int) $id] = [
+                'qty_recived' => (int) ($item['qty_recived'] ?? 0),
+                'note'        => (string) ($item['note'] ?? ''),
+            ];
+        }
+
+        Flux::modal('bulkEditSpectech')->show();
+    }
+
+    public function applyBulkUpdate(): void
+    {
+        // TODO: integrasi API bulk update belum tersedia. Untuk sementara perubahan
+        // hanya diterapkan ke local state agar UI dapat diuji secara end-to-end.
+        $count = count($this->bulkChanges);
+
+        $this->spectech = collect($this->spectech)->map(function (array $item) {
+            $id = (int) $item['id'];
+
+            if (! isset($this->bulkChanges[$id])) {
+                return $item;
+            }
+
+            $changes = $this->bulkChanges[$id];
+            $qtyTotal = (int) ($item['qty_total'] ?? 0);
+            $qtyRecv = max(0, min((int) $changes['qty_recived'], $qtyTotal));
+
+            $item['qty_recived'] = $qtyRecv;
+            $item['note'] = (string) $changes['note'];
+            $item['percentage'] = $qtyTotal > 0 ? round(($qtyRecv / $qtyTotal) * 100, 2) : 0;
+
+            return $item;
+        })->all();
+
+        $this->resetBulk();
+        $this->afterMutation();
+
+        Toaster::success($count.' spektek berhasil diperbarui');
+        Flux::modal('bulkEditSpectech')->close();
+    }
+
+    public function confirmBulkDelete(): void
+    {
+        if (empty($this->selectedIds)) {
+            Toaster::error('Pilih minimal satu spektek');
+            return;
+        }
+
+        Flux::modal('bulkDeleteSpectech')->show();
+    }
+
+    public function bulkDelete(): void
+    {
+        // TODO: integrasi API bulk delete belum tersedia.
+        $ids = array_map('intval', $this->selectedIds);
+        $count = count($ids);
+
+        $this->spectech = collect($this->spectech)
+            ->reject(fn ($item) => in_array((int) $item['id'], $ids, true))
+            ->values()
+            ->all();
+
+        $this->resetBulk();
+        $this->afterMutation();
+
+        Toaster::success($count.' spektek berhasil dihapus');
+        Flux::modal('bulkDeleteSpectech')->close();
+    }
+
+    public function resetBulk(): void
+    {
+        $this->bulkMode = false;
+        $this->selectedIds = [];
+        $this->bulkChanges = [];
+    }
+
+    public function resetFilters(): void
+    {
+        $this->reset('search', 'statusFilter');
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    protected function statusOf(array $item): string
+    {
+        $qtyRecv = (int) ($item['qty_recived'] ?? 0);
+        $percentage = (float) ($item['percentage'] ?? 0);
+
+        if ($percentage >= 100) {
+            return 'completed';
+        }
+
+        return $qtyRecv > 0 ? 'in_progress' : 'not_started';
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    #[Computed]
+    public function filteredSpectech(): array
+    {
+        $needle = trim(mb_strtolower($this->search));
+
+        return collect($this->spectech)
+            ->filter(fn ($item) => ($item['type'] ?? 'hardware') === $this->activeType)
+            ->when($needle !== '', fn ($items) => $items->filter(
+                fn ($item) => str_contains(mb_strtolower((string) ($item['name'] ?? '')), $needle),
+            ))
+            ->when($this->statusFilter !== 'all', fn ($items) => $items->filter(
+                fn ($item) => $this->statusOf($item) === $this->statusFilter,
+            ))
+            ->values()
+            ->all();
+    }
+
+    #[Computed]
+    public function hasActiveFilters(): bool
+    {
+        return trim($this->search) !== '' || $this->statusFilter !== 'all';
+    }
+
+    /**
+     * @return array{hardware: int, software: int}
+     */
+    #[Computed]
+    public function typeCounts(): array
+    {
+        $items = collect($this->spectech);
+
+        return [
+            'hardware' => $items->filter(fn ($i) => ($i['type'] ?? 'hardware') === 'hardware')->count(),
+            'software' => $items->filter(fn ($i) => ($i['type'] ?? 'hardware') === 'software')->count(),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    #[Computed]
+    public function selectedSpectech(): array
+    {
+        $ids = array_map('intval', $this->selectedIds);
+
+        return collect($this->spectech)
+            ->filter(fn ($item) => in_array((int) $item['id'], $ids, true))
+            ->values()
+            ->all();
+    }
+
     #[Computed]
     public function nilaiDiterima(): float
     {
@@ -192,17 +428,100 @@ new class extends Component {
         {{-- ============ LEFT: SPECTECH LIST ============ --}}
         <div class="space-y-4 lg:col-span-2">
             {{-- List header --}}
-            <div class="flex items-center justify-between">
-                <div>
+            <div class="flex items-center justify-between gap-3">
+                <div class="min-w-0">
                     <flux:heading size="lg" class="font-semibold text-zinc-900">Daftar Spektek</flux:heading>
                     <flux:text class="text-sm text-zinc-500">
+                        @if($bulkMode && count($selectedIds) > 0)
+                            <span class="text-red-600 font-medium">{{ count($selectedIds) }} dipilih</span>
+                            <span class="text-zinc-400">·</span>
+                        @endif
                         {{ $this->totalItems }} item terdaftar
                     </flux:text>
                 </div>
-                <flux:modal.trigger name="addSpectech">
-                    <flux:button variant="primary" icon="plus" size="sm">Tambah</flux:button>
-                </flux:modal.trigger>
+                <div class="flex items-center gap-2">
+                    @if($bulkMode)
+                        <flux:button wire:click="toggleBulkMode" variant="ghost" size="sm" icon="x-mark">
+                            Selesai
+                        </flux:button>
+                    @else
+                        <flux:button wire:click="toggleBulkMode" variant="ghost" size="sm" icon="check-circle"
+                            :disabled="$this->totalItems === 0">
+                            Pilih
+                        </flux:button>
+                        <flux:modal.trigger name="addSpectech">
+                            <flux:button variant="primary" icon="plus" size="sm">Tambah</flux:button>
+                        </flux:modal.trigger>
+                    @endif
+                </div>
             </div>
+
+            {{-- Tabs horizontal: Hardware / Software --}}
+            <div class="bg-white border border-zinc-200 rounded-xl p-1 grid grid-cols-2 gap-1">
+                @foreach ([
+                    ['key' => 'hardware', 'label' => 'Spektek Barang', 'icon' => 'cube', 'count' => $this->typeCounts['hardware']],
+                    ['key' => 'software', 'label' => 'Spektek Aplikasi', 'icon' => 'computer-desktop', 'count' => $this->typeCounts['software']],
+                ] as $tab)
+                    <button type="button"
+                        wire:click="setType('{{ $tab['key'] }}')"
+                        @class([
+                            'flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition cursor-pointer',
+                            'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200' => $activeType === $tab['key'],
+                            'text-zinc-600 hover:bg-zinc-50' => $activeType !== $tab['key'],
+                        ])>
+                        <flux:icon name="{{ $tab['icon'] }}" class="w-4 h-4" />
+                        <span>{{ $tab['label'] }}</span>
+                        <span @class([
+                            'inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-semibold rounded-full',
+                            'bg-red-100 text-red-700' => $activeType === $tab['key'],
+                            'bg-zinc-100 text-zinc-600' => $activeType !== $tab['key'],
+                        ])>{{ $tab['count'] }}</span>
+                    </button>
+                @endforeach
+            </div>
+
+            {{-- Search + Status filter --}}
+            <div class="flex items-center gap-2">
+                <flux:input
+                    wire:model.live.debounce.300ms="search"
+                    icon="magnifying-glass"
+                    placeholder="Cari nama spektek..."
+                    size="sm"
+                    class="flex-1"
+                    clearable
+                />
+                <flux:select wire:model.live="statusFilter" size="sm" class="w-44 shrink-0">
+                    <flux:select.option value="all">Semua status</flux:select.option>
+                    <flux:select.option value="not_started">Belum Mulai</flux:select.option>
+                    <flux:select.option value="in_progress">Berjalan</flux:select.option>
+                    <flux:select.option value="completed">Selesai</flux:select.option>
+                </flux:select>
+                @if($this->hasActiveFilters)
+                    <flux:button wire:click="resetFilters" variant="ghost" size="sm" icon="x-mark"
+                        tooltip="Bersihkan filter" />
+                @endif
+            </div>
+
+            {{-- Bulk select-all toolbar --}}
+            @if($bulkMode && !$this->loadingSpectech && count($this->filteredSpectech) > 0)
+                @php $visibleCount = count($this->filteredSpectech); @endphp
+                <div class="flex items-center justify-between bg-zinc-50 border border-zinc-200 rounded-lg px-4 py-2.5">
+                    <label class="flex items-center gap-2 cursor-pointer text-sm text-zinc-700">
+                        <input type="checkbox"
+                            class="rounded border-zinc-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                            x-on:click.prevent="$wire.toggleSelectAllVisible()"
+                            x-bind:checked="$wire.selectedIds.length === {{ $visibleCount }} && {{ $visibleCount }} > 0"
+                        />
+                        <span>Pilih semua di tab ini</span>
+                    </label>
+                    @if(count($selectedIds) > 0)
+                        <button type="button" wire:click="clearSelection"
+                            class="text-xs text-zinc-500 hover:text-zinc-800 font-medium cursor-pointer">
+                            Bersihkan pilihan
+                        </button>
+                    @endif
+                </div>
+            @endif
 
             {{-- Loading state --}}
             @if($this->loadingSpectech)
@@ -224,7 +543,7 @@ new class extends Component {
                     </div>
                 @endfor
             @else
-                @forelse ($this->spectech as $data)
+                @forelse ($this->filteredSpectech as $data)
                     @php
                         $qtyRecv = (int) ($data['qty_recived'] ?? 0);
                         $qtyTotal = (int) ($data['qty_total'] ?? 0);
@@ -235,12 +554,28 @@ new class extends Component {
                         $statusColor = $isComplete
                             ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
                             : ($isStarted ? 'bg-amber-50 text-amber-700 ring-amber-600/20' : 'bg-zinc-50 text-zinc-600 ring-zinc-500/20');
+                        $isSelected = in_array((int) $data['id'], array_map('intval', $selectedIds), true);
                     @endphp
 
                     <div wire:key="spectech-card-{{ $data['id'] }}"
-                         class="group bg-white border border-zinc-200 rounded-xl p-6 hover:border-zinc-300 hover:shadow-sm transition">
+                         @class([
+                            'group bg-white border rounded-xl p-6 transition',
+                            'border-red-300 ring-1 ring-red-200 shadow-sm' => $bulkMode && $isSelected,
+                            'border-zinc-200 hover:border-zinc-300 hover:shadow-sm' => !($bulkMode && $isSelected),
+                            'cursor-pointer' => $bulkMode,
+                         ])
+                         @if($bulkMode) wire:click="toggleSelect({{ $data['id'] }})" @endif>
                         {{-- Header --}}
                         <div class="flex items-start justify-between gap-4">
+                            @if($bulkMode)
+                                <div class="pt-1 shrink-0">
+                                    <input type="checkbox"
+                                        class="w-4 h-4 rounded border-zinc-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                                        x-bind:checked="$wire.selectedIds.map(Number).includes({{ (int) $data['id'] }})"
+                                        x-on:click.stop.prevent="$wire.toggleSelect({{ (int) $data['id'] }})"
+                                    />
+                                </div>
+                            @endif
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2 flex-wrap">
                                     <h3 class="text-base font-semibold text-zinc-900 truncate">
@@ -255,14 +590,16 @@ new class extends Component {
                                 </p>
                             </div>
 
-                            <flux:dropdown wire:key="spectech-menu-{{ $data['id'] }}">
-                                <flux:button variant="ghost" size="sm" icon="ellipsis-vertical" class="text-zinc-400" />
-                                <flux:navmenu>
-                                    <flux:navmenu.item icon="pencil-square" wire:click="editSpectech({{ $data['id'] }})">Edit</flux:navmenu.item>
-                                    <flux:navmenu.item icon="trash" variant="danger"
-                                        wire:click="confirmDelete({{ $data['id'] }})">Hapus</flux:navmenu.item>
-                                </flux:navmenu>
-                            </flux:dropdown>
+                            @unless($bulkMode)
+                                <flux:dropdown wire:key="spectech-menu-{{ $data['id'] }}">
+                                    <flux:button variant="ghost" size="sm" icon="ellipsis-vertical" class="text-zinc-400" />
+                                    <flux:navmenu>
+                                        <flux:navmenu.item icon="pencil-square" wire:click="editSpectech({{ $data['id'] }})">Edit</flux:navmenu.item>
+                                        <flux:navmenu.item icon="trash" variant="danger"
+                                            wire:click="confirmDelete({{ $data['id'] }})">Hapus</flux:navmenu.item>
+                                    </flux:navmenu>
+                                </flux:dropdown>
+                            @endunless
                         </div>
 
                         {{-- Stats grid --}}
@@ -325,26 +662,65 @@ new class extends Component {
                         @endif
                     </div>
                 @empty
-                    {{-- Empty state --}}
-                    <div class="bg-white border border-dashed border-zinc-200 rounded-xl p-12 text-center">
-                        <div class="mx-auto w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center">
-                            <flux:icon.cube class="w-6 h-6 text-zinc-400" />
+                    @if($this->hasActiveFilters)
+                        {{-- No-results state --}}
+                        <div class="bg-white border border-dashed border-zinc-200 rounded-xl p-12 text-center">
+                            <div class="mx-auto w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center">
+                                <flux:icon.magnifying-glass class="w-6 h-6 text-zinc-400" />
+                            </div>
+                            <flux:heading size="md" class="mt-4 text-zinc-900">Tidak ada hasil</flux:heading>
+                            <flux:text class="text-sm text-zinc-500 mt-1">
+                                Tidak ada spektek yang cocok dengan pencarian atau filter saat ini.
+                            </flux:text>
+                            <flux:button wire:click="resetFilters" variant="ghost" size="sm" icon="x-mark" class="mt-4">
+                                Bersihkan filter
+                            </flux:button>
                         </div>
-                        <flux:heading size="md" class="mt-4 text-zinc-900">Belum ada Spektek</flux:heading>
-                        <flux:text class="text-sm text-zinc-500 mt-1">
-                            Tambahkan item spectech pertama untuk mulai melacak progress pekerjaan.
-                        </flux:text>
-                        <flux:modal.trigger name="addSpectech">
-                            <flux:button variant="primary" icon="plus" size="sm" class="mt-4">Tambah Spektek</flux:button>
-                        </flux:modal.trigger>
-                    </div>
+                    @else
+                        {{-- Empty state --}}
+                        <div class="bg-white border border-dashed border-zinc-200 rounded-xl p-12 text-center">
+                            <div class="mx-auto w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center">
+                                <flux:icon name="{{ $activeType === 'software' ? 'computer-desktop' : 'cube' }}" class="w-6 h-6 text-zinc-400" />
+                            </div>
+                            <flux:heading size="md" class="mt-4 text-zinc-900">
+                                Belum ada {{ $activeType === 'software' ? 'Spektek Aplikasi' : 'Spektek Barang' }}
+                            </flux:heading>
+                            <flux:text class="text-sm text-zinc-500 mt-1">
+                                Tambahkan item {{ $activeType === 'software' ? 'aplikasi' : 'barang' }} pertama untuk mulai melacak progress pekerjaan.
+                            </flux:text>
+                            <flux:modal.trigger name="addSpectech">
+                                <flux:button variant="primary" icon="plus" size="sm" class="mt-4">Tambah Spektek</flux:button>
+                            </flux:modal.trigger>
+                        </div>
+                    @endif
                 @endforelse
+            @endif
+
+            {{-- Sticky bulk action bar --}}
+            @if($bulkMode && count($selectedIds) > 0)
+                <div class="sticky bottom-4 z-30">
+                    <div class="mx-auto max-w-2xl bg-zinc-900 text-white rounded-xl shadow-lg ring-1 ring-black/5 px-4 py-3 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2 text-sm">
+                            <flux:icon.check-circle class="w-5 h-5 text-emerald-400" />
+                            <span class="font-medium">{{ count($selectedIds) }} spektek dipilih</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <flux:button wire:click="confirmBulkDelete" variant="ghost" size="sm" icon="trash"
+                                class="text-red-300! hover:text-red-200!">
+                                Hapus
+                            </flux:button>
+                            <flux:button wire:click="openBulkEdit" variant="primary" size="sm" icon="pencil-square">
+                                Edit Massal
+                            </flux:button>
+                        </div>
+                    </div>
+                </div>
             @endif
         </div>
         {{-- ============ RIGHT: SUMMARY ============ --}}
         <div class="space-y-4">
             {{-- Progress widget --}}
-            <div class="bg-white rounded-xl p-6 border border-zinc-200 space-y-5 md:sticky md:top-47 top-4">
+            <div class="bg-white rounded-xl p-6 border border-zinc-200 space-y-5 md:sticky md:top-12 top-4">
                 <div class="flex items-center justify-between gap-3">
                     <flux:heading size="md" class="font-semibold text-zinc-900">
                         Progress Spektek
@@ -491,7 +867,7 @@ new class extends Component {
 </flux:modal>
 
 {{-- ============ EDIT SPECTECH MODAL ============ --}}
-<flux:modal name="editSpectech" wire:close="resetForm" class="md:w-120">
+<flux:modal name="editSpectech" wire:close="resetForm" class="md:w-120 lg:min-w-5xl">
     <form wire:submit="update" class="space-y-6"
         x-data="{ isComing: false, isTermin: false, }"
         x-effect="isComing = (Number($wire.form.received_quantity) || 0) > 0">
@@ -560,6 +936,22 @@ new class extends Component {
                     </flux:field>
                 </div>
             </div>
+            <div class="rounded-lg border border-zinc-200 bg-zinc-50/50 p-4 space-y-3">
+                <flux:checkbox x-model="isTermin"
+                    label="Barang sudah uji fungsi?" />
+
+                <div x-show="isTermin" x-collapse>
+                    <flux:field>
+                        <flux:label>Jumlah Disetujui</flux:label>
+                        <flux:input  wire:model="form.received_quantity" type="number" min="0"
+                            :max="$form->quantity" placeholder="0" />
+                        <flux:description>
+                            Jumlah barang yang lolos pemeriksaan
+                        </flux:description>
+                        <flux:error name="form.received_quantity" />
+                    </flux:field>
+                </div>
+            </div>
 
             <flux:field>
                 <flux:label>Catatan</flux:label>
@@ -579,6 +971,116 @@ new class extends Component {
             </flux:button>
         </div>
     </form>
+</flux:modal>
+
+{{-- ============ BULK EDIT MODAL ============ --}}
+<flux:modal name="bulkEditSpectech" class="md:min-w-3xl lg:min-w-5xl">
+    <form wire:submit="applyBulkUpdate" class="space-y-6">
+        <div class="space-y-1">
+            <div class="flex items-center gap-2">
+                <flux:heading size="lg">Edit Massal Spektek</flux:heading>
+                <span class="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full bg-red-50 text-red-700 ring-1 ring-inset ring-red-200">
+                    {{ count($selectedIds) }} item
+                </span>
+            </div>
+            <flux:text class="text-sm text-zinc-500">
+                Atur jumlah diterima &amp; catatan untuk seluruh item terpilih dalam satu langkah.
+            </flux:text>
+        </div>
+
+        {{-- Inline editable table --}}
+        <div class="border border-zinc-200 rounded-xl overflow-hidden">
+            <div class="max-h-[60vh] overflow-y-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-zinc-50 sticky top-0 z-10">
+                        <tr class="text-left text-[11px] uppercase tracking-wide text-zinc-500">
+                            <th class="px-4 py-3 font-medium">Nama Spektek</th>
+                            <th class="px-3 py-3 font-medium w-24 text-right">Total</th>
+                            <th class="px-3 py-3 font-medium w-32">Diterima</th>
+                            <th class="px-4 py-3 font-medium w-[40%]">Catatan</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-100">
+                        @foreach($this->selectedSpectech as $row)
+                            @php $rid = (int) $row['id']; @endphp
+                            <tr wire:key="bulk-row-{{ $rid }}" class="hover:bg-zinc-50/60">
+                                <td class="px-4 py-3 align-top">
+                                    <p class="font-medium text-zinc-900 truncate">{{ $row['name'] }}</p>
+                                    <p class="text-xs text-zinc-500 mt-0.5">
+                                        Rp {{ number_format($row['qty_nominal'] ?? 0, 0, ',', '.') }} / unit
+                                    </p>
+                                </td>
+                                <td class="px-3 py-3 align-top text-right text-zinc-700 font-medium">
+                                    {{ $row['qty_total'] ?? 0 }}
+                                </td>
+                                <td class="px-3 py-3 align-top">
+                                    <flux:input
+                                        type="number"
+                                        size="sm"
+                                        min="0"
+                                        :max="$row['qty_total'] ?? 0"
+                                        wire:model="bulkChanges.{{ $rid }}.qty_recived"
+                                        placeholder="0"
+                                    />
+                                </td>
+                                <td class="px-4 py-3 align-top">
+                                    <flux:input
+                                        size="sm"
+                                        wire:model="bulkChanges.{{ $rid }}.note"
+                                        placeholder="Catatan (opsional)"
+                                    />
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+            <flux:text class="text-xs text-zinc-500">
+                Perubahan akan diterapkan ke {{ count($selectedIds) }} item sekaligus.
+            </flux:text>
+            <div class="flex gap-2">
+                <flux:modal.close>
+                    <flux:button variant="ghost">Batal</flux:button>
+                </flux:modal.close>
+                <flux:button type="submit" variant="primary" icon="check"
+                    wire:loading.attr="disabled" wire:target="applyBulkUpdate">
+                    <span wire:loading.remove wire:target="applyBulkUpdate">Simpan Semua</span>
+                    <span wire:loading wire:target="applyBulkUpdate">Menyimpan...</span>
+                </flux:button>
+            </div>
+        </div>
+    </form>
+</flux:modal>
+
+{{-- ============ BULK DELETE CONFIRMATION MODAL ============ --}}
+<flux:modal name="bulkDeleteSpectech" class="md:w-110">
+    <div class="space-y-5">
+        <div class="flex items-start gap-4">
+            <div class="shrink-0 w-11 h-11 rounded-full bg-red-50 flex items-center justify-center ring-4 ring-red-50/50">
+                <flux:icon.exclamation-triangle class="w-5 h-5 text-red-600" />
+            </div>
+            <div class="space-y-1 flex-1 min-w-0">
+                <flux:heading size="lg">Hapus {{ count($selectedIds) }} spektek?</flux:heading>
+                <flux:text class="text-sm text-zinc-500">
+                    Seluruh item terpilih beserta datanya akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.
+                </flux:text>
+            </div>
+        </div>
+
+        <div class="flex gap-2">
+            <flux:modal.close>
+                <flux:button variant="ghost" class="flex-1">Batal</flux:button>
+            </flux:modal.close>
+            <flux:button wire:click="bulkDelete" variant="danger" icon="trash" class="flex-1"
+                wire:loading.attr="disabled" wire:target="bulkDelete">
+                <span wire:loading.remove wire:target="bulkDelete">Hapus Semua</span>
+                <span wire:loading wire:target="bulkDelete">Menghapus...</span>
+            </flux:button>
+        </div>
+    </div>
 </flux:modal>
 
 {{-- ============ DELETE CONFIRMATION MODAL ============ --}}

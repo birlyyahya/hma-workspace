@@ -369,7 +369,7 @@ class extends Component {
         ? Carbon::parse($createdAt)->locale('id')->translatedFormat('d F Y')
         : Carbon::now()->locale('id')->translatedFormat('d F Y');
 
-        $idPadded = str_pad((string) ($spd['id'] ?? '0'), 2, '0', STR_PAD_LEFT);
+        $idPadded = str_pad((string) ($spd['number'] ?? '0'), 2, '0', STR_PAD_LEFT);
         $monthRoman = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'][Carbon::now()->month - 1];
         $year = Carbon::now()->year;
         $refNo = "HMA/IT RnD/SPD/{$idPadded}/{$monthRoman}/{$year}";

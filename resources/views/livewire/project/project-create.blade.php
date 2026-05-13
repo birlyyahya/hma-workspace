@@ -33,6 +33,7 @@ new class extends Component
 
     public function mount(): void
     {
+         $this->authorize('project.create');
         $this->dispatch('initSelects2');
     }
 

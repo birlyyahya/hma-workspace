@@ -2,6 +2,7 @@
 
 use App\Models\Role;
 use App\Models\User;
+use App\Services\PermissionCache;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -227,6 +228,7 @@ new class extends Component {
             }
 
             $user->update($data);
+            PermissionCache::flushForUser($user->id);
             Toaster::success('User berhasil diperbarui.');
             $this->reset(['editUserId', 'editName', 'editEmail', 'editRole', 'password', 'password_confirmation']);
             Flux::modal('edit-user-modal')->close();

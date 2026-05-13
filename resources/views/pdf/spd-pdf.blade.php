@@ -23,7 +23,7 @@ $tanggalDibuat = $createdAt
 ? Carbon::parse($createdAt)->locale('id')->translatedFormat('d F Y')
 : Carbon::now()->locale('id')->translatedFormat('d F Y');
 
-$idPadded = str_pad((string) data_get($spd, 'id', '0'), 2, '0', STR_PAD_LEFT);
+$idPadded = str_pad((string) data_get($spd, 'number', '0'), 2, '0', STR_PAD_LEFT);
 $monthRoman = (function ($m) {
 $r = ['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
 return $r[((int) $m) - 1] ?? '';

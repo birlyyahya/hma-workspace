@@ -21,6 +21,8 @@ new class extends Component {
     public int $page = 1;
     public int $perPage = 10;
     public string $search = '';
+    public string $startDateFilter = '';
+    public string $endDateFilter = '';
 
     public bool $loading = true;
 
@@ -28,6 +30,7 @@ new class extends Component {
     public ?int $editingId = null;
     public ?int $userId = null;
     public string $userSearch = '';
+    public ?int $number = null;
     public string $task = '';
     public string $department = '';
     public string $destination = '';
@@ -50,6 +53,7 @@ new class extends Component {
     {
         return [
             'userId' => ['required', 'integer', 'exists:users,id'],
+            'number' => ['required', 'integer', 'min:1'],
             'task' => ['required', 'string', 'min:3'],
             'department' => ['required', 'string'],
             'destination' => ['required', 'string'],
@@ -65,9 +69,51 @@ new class extends Component {
         return [
             'userId.required' => 'Pilih pegawai untuk SPD ini.',
             'userId.exists' => 'Pegawai tidak valid.',
+            'number.required' => 'Nomor surat wajib diisi.',
+            'number.integer' => 'Nomor surat harus berupa angka.',
+            'number.min' => 'Nomor surat minimal 1.',
             'endDate.after_or_equal' => 'Tanggal selesai tidak boleh sebelum tanggal mulai.',
             'attachment.max' => 'Lampiran maksimal 10 MB.',
         ];
+    }
+
+    protected function romanMonth(int $month): string
+    {
+        $map = [1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV', 5 => 'V', 6 => 'VI', 7 => 'VII', 8 => 'VIII', 9 => 'IX', 10 => 'X', 11 => 'XI', 12 => 'XII'];
+
+        return $map[$month] ?? '';
+    }
+
+    public function formatSpdNumber(?int $number, ?string $createdAt = null): string
+    {
+        if (! $number) {
+            return '-';
+        }
+
+        $date = $createdAt ? Carbon::parse($createdAt) : Carbon::now();
+
+        return sprintf('HMA/IT RnD/SPD/%d/%s/%d', $number, $this->romanMonth((int) $date->month), $date->year);
+    }
+
+    protected function nextNumber(): int
+    {
+        $currentYear = Carbon::now()->year;
+
+        $max = collect($this->list['data'] ?? [])
+            ->filter(function ($row) use ($currentYear) {
+                if (! isset($row['number']) || ! is_numeric($row['number'])) {
+                    return false;
+                }
+
+                $createdAt = $row['created_at'] ?? null;
+                $rowYear = $createdAt ? Carbon::parse($createdAt)->year : $currentYear;
+
+                return $rowYear === $currentYear;
+            })
+            ->map(fn ($row) => (int) $row['number'])
+            ->max();
+
+        return ($max ?: 0) + 1;
     }
 
     #[Computed]
@@ -128,24 +174,30 @@ new class extends Component {
 
         try {
             $apiIzin = rtrim(config('services.api_izin'), '/');
-            if(Auth::user()->level >= 55){
-                $response = Http::timeout(60)
-                    ->retry(2, 200)
-                    ->get($apiIzin . '/global/dar/activity/list-spd', [
-                        'page' => $this->page,
-                        'perPage' => $this->perPage,
-                        'search' => $this->search,
-                    ])->json();
-            }else {
-                $response = Http::timeout(60)
-                    ->retry(2, 200)
-                    ->get($apiIzin . '/global/dar/activity/list-spd', [
-                        'page' => $this->page,
-                        'perPage' => $this->perPage,
-                        'search' => $this->search,
-                        'user_id' => Auth::user()->id
-                    ])->json();
+
+            $params = [
+                'page' => $this->page,
+                'perPage' => $this->perPage,
+                'search' => $this->search,
+            ];
+
+            if ($this->startDateFilter !== '') {
+                $params['start_date'] = $this->startDateFilter;
             }
+
+            if ($this->endDateFilter !== '') {
+                $params['end_date'] = $this->endDateFilter;
+            }
+
+            if (Auth::user()->viewScopeFor('spd') !== 'all') {
+                $params['user_id'] = Auth::user()->id;
+            }
+
+            $response = Http::timeout(60)
+                ->retry(2, 200)
+                ->get($apiIzin.'/global/dar/activity/list-spd', $params)
+                ->json();
+
             $this->list = $response ?? ['data' => []];
         } catch (\Throwable $e) {
             Toaster::error('Server SPD error, silakan coba lagi.');
@@ -162,6 +214,26 @@ new class extends Component {
         $this->fetchList();
     }
 
+    public function updatedStartDateFilter(): void
+    {
+        $this->page = 1;
+        $this->fetchList();
+    }
+
+    public function updatedEndDateFilter(): void
+    {
+        $this->page = 1;
+        $this->fetchList();
+    }
+
+    public function resetDateFilter(): void
+    {
+        $this->startDateFilter = '';
+        $this->endDateFilter = '';
+        $this->page = 1;
+        $this->fetchList();
+    }
+
     public function goToPage(int $page): void
     {
         $this->page = max(1, $page);
@@ -171,6 +243,7 @@ new class extends Component {
     public function openCreate(): void
     {
         $this->resetForm();
+        $this->number = $this->nextNumber();
         Flux::modal('spd-form-modal')->show();
     }
 
@@ -187,6 +260,7 @@ new class extends Component {
         $this->editingId = (int) $row['id'];
         $this->userId = isset($row['user_id']) ? (int) $row['user_id'] : null;
         $this->userSearch = '';
+        $this->number = isset($row['number']) && is_numeric($row['number']) ? (int) $row['number'] : null;
         $this->task = (string) ($row['task'] ?? '');
         $this->department = (string) ($row['department'] ?? '');
         $this->destination = (string) ($row['destination'] ?? '');
@@ -227,6 +301,7 @@ new class extends Component {
 
             $payload = [
                 'user_id' => $this->userId,
+                'number' => $this->number,
                 'task' => $this->task,
                 'department' => $this->department,
                 'destination' => $this->destination,
@@ -378,7 +453,7 @@ new class extends Component {
     protected function resetForm(): void
     {
         $this->reset([
-            'editingId', 'userId', 'userSearch', 'task', 'department', 'destination', 'address',
+            'editingId', 'userId', 'userSearch', 'number', 'task', 'department', 'destination', 'address',
             'startDate', 'endDate', 'attachment', 'existingAttachmentUrl',
             'isSubmitted', 'isApproved',
         ]);
@@ -415,17 +490,59 @@ new class extends Component {
             </div>
 
             <div class="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-                <flux:input wire:model.live.debounce.400ms="search" icon="magnifying-glass" placeholder="Cari tujuan, tugas, departemen..." class="w-full sm:w-64" />
-                @if(Auth::user()->level >= 55)
+                <flux:input wire:model.live.debounce.400ms="search" icon="magnifying-glass" placeholder="Cari tujuan, tugas, departemen..." class="w-full sm:w-56" />
+
+                <flux:dropdown position="bottom" align="end">
+                    <flux:button icon="calendar" variant="ghost" size="sm" class="font-normal">
+                        @if ($startDateFilter || $endDateFilter)
+                            <span class="text-xs text-zinc-600">
+                                {{ $startDateFilter ? Carbon::parse($startDateFilter)->format('d M') : '...' }}
+                                –
+                                {{ $endDateFilter ? Carbon::parse($endDateFilter)->format('d M') : '...' }}
+                            </span>
+                        @else
+                            <span class="text-xs">Filter Tanggal</span>
+                        @endif
+                    </flux:button>
+                    <flux:menu class="min-w-64">
+                        <flux:menu.item disabled>
+                            <flux:input wire:model.live="startDateFilter" type="date" label="Dari Tanggal" />
+                        </flux:menu.item>
+                        <flux:menu.item disabled>
+                            <flux:input wire:model.live="endDateFilter" type="date" label="Sampai Tanggal" />
+                        </flux:menu.item>
+                        @if ($startDateFilter || $endDateFilter)
+                            <flux:menu.item>
+                                <flux:button size="sm" variant="ghost" class="w-full" wire:click="resetDateFilter" icon="x-mark">
+                                    Reset filter
+                                </flux:button>
+                            </flux:menu.item>
+                        @endif
+                    </flux:menu>
+                </flux:dropdown>
+
+                @can('spd.create')
                 <flux:button wire:click="openCreate" icon="plus-circle" variant="primary">
                     Buat SPD
                 </flux:button>
-                @endif
+                @endcan
             </div>
         </header>
 
         {{-- Body --}}
         <div class="relative">
+            {{-- Overlay loading saat search / pagination / filter --}}
+            <div
+                wire:loading.flex
+                wire:target="search,startDateFilter,endDateFilter,goToPage,resetDateFilter,fetchList"
+                class="absolute inset-0 z-20 hidden items-center justify-center bg-white/60 backdrop-blur-sm"
+            >
+                <div class="flex flex-col items-center gap-2">
+                    <div class="h-8 w-8 animate-spin rounded-full border-4 border-zinc-900 border-t-transparent"></div>
+                    <span class="text-sm text-zinc-600">Memuat data...</span>
+                </div>
+            </div>
+
             @if ($loading)
             <div class="space-y-2 p-5">
                 @for ($i = 0; $i < 3; $i++) <div class="flex animate-pulse items-center gap-4 rounded-xl border border-zinc-100 bg-zinc-50/40 p-4">
@@ -454,7 +571,8 @@ new class extends Component {
             <table class="w-full text-left text-sm overflow-visible">
                 <thead class="border-b border-zinc-100 bg-zinc-50/50 text-xs uppercase tracking-wide text-zinc-500">
                     <tr>
-                        <th class="pl-5 py-3 font-semibold">Pegawai</th>
+                        <th class="pl-5 py-3 font-semibold">NO SPD</th>
+                        <th class="px-5 py-3 font-semibold">Pegawai</th>
                         <th class="px-5 py-3 font-semibold">Tugas</th>
                         <th class="px-5 py-3 font-semibold">Tujuan</th>
                         <th class="px-5 py-3 font-semibold">Periode</th>
@@ -475,7 +593,7 @@ new class extends Component {
                     $statusClass = 'bg-emerald-50 text-emerald-700 ring-emerald-200';
                     $dotClass = 'bg-emerald-500';
                     } elseif ($isSubmitted) {
-                    $statusLabel = 'Menunggu persetujuan Direktur';
+                    $statusLabel = 'Menunggu';
                     $statusClass = 'bg-blue-50 text-blue-800 ring-blue-200';
                     $dotClass = 'bg-blue-500';
                     } else {
@@ -485,6 +603,9 @@ new class extends Component {
                     }
                     @endphp
                     <tr wire:key="spd-{{ $spd['id'] }}" class="transition hover:bg-zinc-50/60">
+                        <td class="px-5 py-3.5 min-w-20 text-center">
+                            <p class="font-semibold text-zinc-900 line-clamp-1">{{ $spd['number'] ? str_pad((string) ($spd['number'] ?? '0'), 2, '0', STR_PAD_LEFT) : '-'}}</p>
+                        </td>
                         <td class=" py-3.5">
                             @if ($rowUser)
                             <div class="flex justify-center gap-2.5">
@@ -496,7 +617,7 @@ new class extends Component {
                             <span class="text-xs italic text-zinc-400">Pegawai tidak ditemukan</span>
                             @endif
                         </td>
-                        <td class="px-5 py-3.5 max-w-[400px]">
+                        <td class="px-5 py-3.5 max-w-[300px]">
                             <p class="font-semibold text-zinc-900 line-clamp-1">{{ $spd['task'] }}</p>
                             <p class="mt-0.5 text-xs text-zinc-500">{{ $spd['department'] }}</p>
                         </td>
@@ -563,17 +684,19 @@ new class extends Component {
                                     <button wire:click="downloadPdf({{ $spd['id'] }})" @click="open = false" type="button" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50">
                                         <flux:icon name="document-arrow-down" class="h-4 w-4" /> Download PDF
                                     </button>
-                                    @if(Auth::user()->level >= 55)
+                                    @can('spd.update')
                                     <div class="h-px bg-zinc-200/70"></div>
                                     <button wire:click="openEdit({{ $spd['id'] }})" @click="open = false" type="button" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50">
                                         <flux:icon name="pencil-square" class="h-4 w-4" /> Edit
                                     </button>
-                                    @if (! $isApproved)
+                                    @endcan
+                                    @can('spd.delete')
+                                    @if (!$isApproved)
                                     <button wire:click="confirmDelete({{ $spd['id'] }})" @click="open = false" type="button" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">
                                         <flux:icon name="trash" class="h-4 w-4" /> Hapus
                                     </button>
                                     @endif
-                                    @endif
+                                    @endcan
                                 </div>
                             </div>
                         </td>
@@ -719,6 +842,19 @@ new class extends Component {
                 </div>
                 @endif
                 @error('userId')
+                <flux:error message="{{ $message }}" /> @enderror
+            </div>
+
+            <div class="lg:col-span-2">
+                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Nomor Surat</label>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-[140px_1fr]">
+                    <flux:input wire:model.live="number" type="number" min="1" placeholder="Nomor" />
+                    <div class="flex items-center rounded-xl border border-zinc-200 bg-zinc-50/60 px-3 py-2 text-sm text-zinc-700">
+                        <span class="truncate font-mono">{{ $this->formatSpdNumber($number ? (int) $number : null) }}</span>
+                    </div>
+                </div>
+                <p class="mt-1 text-[11px] text-zinc-400">Hanya angka yang diinput. Bagian bulan & tahun mengikuti tanggal pembuatan.</p>
+                @error('number')
                 <flux:error message="{{ $message }}" /> @enderror
             </div>
 

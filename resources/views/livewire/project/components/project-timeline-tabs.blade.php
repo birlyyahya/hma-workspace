@@ -403,7 +403,7 @@ new class extends Component {
             1 => ['label' => 'Open', 'class' => 'bg-blue-100 text-blue-700', 'dot' => 'bg-blue-500'],
             2 => ['label' => 'Pending', 'class' => 'bg-amber-100 text-amber-700', 'dot' => 'bg-amber-500'],
             3 => ['label' => 'Cancelled', 'class' => 'bg-red-100 text-red-700', 'dot' => 'bg-red-500'],
-            4 => ['label' => 'Completed', 'class' => 'bg-emerald-100 text-emerald-700', 'dot' => 'bg-emerald-500'],
+            4 => ['label' => 'Closed', 'class' => 'bg-emerald-100 text-emerald-700', 'dot' => 'bg-emerald-500'],
         ];
         @endphp
 

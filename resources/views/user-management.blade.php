@@ -37,6 +37,15 @@
                         <flux:icon.shield-check class="size-4" />
                         Roles
                     </button>
+                    <button
+                        type="button"
+                        @click="tab = 'permissions'"
+                        :class="tab === 'permissions' ? 'bg-zinc-900 text-white shadow-sm' : 'text-zinc-600 hover:bg-zinc-100'"
+                        class="flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition md:flex-none"
+                    >
+                        <flux:icon.key class="size-4" />
+                        Permissions
+                    </button>
                 </div>
             </div>
 
@@ -46,6 +55,10 @@
 
             <div x-show="tab === 'roles'" x-cloak>
                 <livewire:users.role-datatables lazy />
+            </div>
+
+            <div x-show="tab === 'permissions'" x-cloak>
+                <livewire:users.permission-datatables lazy />
             </div>
         </div>
     </div>

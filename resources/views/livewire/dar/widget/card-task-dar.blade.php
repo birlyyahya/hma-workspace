@@ -2,6 +2,7 @@
 
 use App\Livewire\Forms\ActivityForm;
 use App\Models\User;
+use App\Services\DarCache;
 use App\Services\ProjectCache;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
@@ -43,7 +44,11 @@ new class extends Component {
 
         try {
             $cache = app(ProjectCache::class);
-            $this->projectData = $cache->leaderProjects(Auth::id());
+            if(Auth::user()->viewScopeFor('project') === 'all'){
+                $this->projectData = $cache->allProjects();
+            }else {
+                $this->projectData = $cache->leaderProjects(Auth::id());
+            }
             $this->allProjects = $cache->allProjects();
         } catch (\Throwable $e) {
             $this->projectData = [];
@@ -74,8 +79,9 @@ new class extends Component {
 
     public function updatedProjectSelected(): void
     {
-        collect($this->projectData)->firstWhere('id', $this->projectSelected);
-        $this->timelines = Http::get(config('services.api_project').'timelines/search?project_id='.$this->projectSelected.'&user_id='.Auth::id())->json()['data'] ?? [];
+        $project = collect($this->projectData)->firstWhere('id', $this->projectSelected);
+        $this->timelines = Http::get(config('services.api_project').'timelines/search?project_id='.$this->projectSelected.'&user_id='.$project['project_leader_id'])->json()['data'] ?? [];
+
         $this->form->project_id = $this->projectSelected;
     }
 
@@ -93,7 +99,7 @@ new class extends Component {
                 $params['search'] = $this->search;
             }
 
-            if ((int) (Auth::user()->level ?? 0) >= 100) {
+            if (Auth::user()->viewScopeFor('dar') === 'all') {
                 if ($this->userFilter !== '') {
                     $params['team_user'] = $this->userFilter;
                 }
@@ -223,6 +229,8 @@ new class extends Component {
 
         Toaster::success('Create Activity successfully');
 
+        app(DarCache::class)->flush();
+
         $this->resetForm();
         $this->projectSelected = null;
         $this->timelines = [];
@@ -276,6 +284,7 @@ new class extends Component {
             $body = method_exists($response, 'json') ? $response->json() : null;
 
             if ($status === 200 || ($body['success'] ?? false)) {
+                app(DarCache::class)->flush();
                 Toaster::success('Task berhasil dihapus');
                 $this->pendingDeleteId = null;
                 $this->pendingDeleteName = '';
@@ -316,8 +325,8 @@ new class extends Component {
             'all' => ['label' => 'Semua', 'active' => 'bg-slate-900 text-white ring-slate-900'],
             '1' => ['label' => 'Open', 'active' => 'bg-blue-600 text-white ring-blue-600'],
             '2' => ['label' => 'Pending', 'active' => 'bg-amber-500 text-white ring-amber-500'],
-            '4' => ['label' => 'Closed', 'active' => 'bg-emerald-600 text-white ring-emerald-600'],
             '3' => ['label' => 'Cancelled', 'active' => 'bg-rose-600 text-white ring-rose-600'],
+            '4' => ['label' => 'Closed', 'active' => 'bg-emerald-600 text-white ring-emerald-600'],
         ];
         $tabOptions = [
             'all' => 'Semua',

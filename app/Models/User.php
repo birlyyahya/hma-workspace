@@ -4,8 +4,10 @@ namespace App\Models;
 
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class User extends Authenticatable implements MustVerifyEmail
@@ -69,13 +71,61 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->role?->level;
     }
 
+    /**
+     * Resolusi view scope untuk sebuah modul berdasarkan permission.
+     * Urutan prioritas: all > department > own. Super-admin selalu 'all'.
+     * Default 'own' jika role tidak punya permission view khusus untuk modul.
+     */
+    public function viewScopeFor(string $module): string
+    {
+        if ($this->hasRole('super-admin')) {
+            return 'all';
+        }
+
+        foreach (['all', 'department', 'own'] as $scope) {
+            if ($this->hasPermission("{$module}.view.{$scope}")) {
+                return $scope;
+            }
+        }
+
+        return 'own';
+    }
+
     public function assigments()
     {
         return $this->hasMany(TaskAssignments::class, 'user_id');
     }
 
-    public function role()
+    public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
+    }
+
+    public function permissions(): Collection
+    {
+        return $this->role?->permissions ?? collect();
+    }
+
+    public function hasPermission(string $name): bool
+    {
+        return $this->permissions()->contains('name', $name);
+    }
+
+    public function hasAnyPermission(array $names): bool
+    {
+        $permissionNames = $this->permissions()->pluck('name');
+
+        return $permissionNames->intersect($names)->isNotEmpty();
+    }
+
+    public function hasRole(string|array $slug): bool
+    {
+        $current = $this->role?->slug;
+
+        if ($current === null) {
+            return false;
+        }
+
+        return \is_array($slug) ? \in_array($current, $slug, true) : $current === $slug;
     }
 }

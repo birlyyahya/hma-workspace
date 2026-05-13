@@ -41,18 +41,20 @@
                         </flux:modal.trigger>
 
 
-                        @if (Auth::user()->level >= 55)
+                        @can('spd.create')
                         <flux:modal.trigger name="spd-form-modal">
                             <flux:button icon="plus-circle" variant="primary" class="cursor-pointer w-full sm:w-auto bg-white! text-red-700! hover:bg-white/90!">
                                 Buat SPD
                             </flux:button>
                         </flux:modal.trigger>
+                        @endcan
+                        @can('izin.view.all')
                         <a href="{{ route('izin.laporan-pengajuan') }}" class="w-full sm:w-auto">
                             <flux:button icon="document-text" variant="primary" class="cursor-pointer w-full sm:w-auto bg-white! text-red-700! hover:bg-white/90!">
                                 Laporan Pengajuan
                             </flux:button>
                         </a>
-                        @endif
+                        @endcan
                     </div>
                 </div>
             </div>
@@ -61,7 +63,8 @@
                 <livewire:izin.widget.report-izin-category lazy />
             </div>
 
-            @if(Auth::user()->level <= 90) <div x-data="{ tab: 'izin' }" class="space-y-4">
+            @if(Auth::user()->level <= 90)
+            <div x-data="{ tab: 'izin' }" class="space-y-4">
                 <div class="flex justify-center">
                     <div class="inline-flex w-full rounded-xl bg-zinc-100 p-1 shadow-sm">
 

@@ -1,9 +1,10 @@
 <?php
 
+use App\Services\DarCache;
+use App\Services\ProjectCache;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 
@@ -12,6 +13,7 @@ new class extends Component {
     public string $date = '';
     public array $hours = [];
     public bool $loading = true;
+    public array $projectMap = [];
 
     public int $rangeStartHour = 8;
     public int $rangeEndHour = 18;
@@ -30,11 +32,19 @@ new class extends Component {
         $this->date = now()->format('d/m/Y');
 
         try {
-              if(Auth::user()->role_id < 3){
-                $response = Http::timeout(120)->retry(3, 200)->get(env('API_IZIN').'/global/dar/list?limit=1000000')->json();
-            }else {
-                $response = Http::timeout(120)->retry(3, 200)->get(env('API_IZIN').'/global/dar/list?limit=1000000&team_user='.Auth::id())->json();
+            $scope = Auth::user()->viewScopeFor('dar') === 'all' ? 'all' : 'user';
+            $response = app(DarCache::class)->list($scope, Auth::id());
+
+            try {
+                $this->projectMap = collect(app(ProjectCache::class)->allProjects())
+                    ->keyBy('id')
+                    ->map(fn ($p) => $p['name'] ?? null)
+                    ->filter()
+                    ->toArray();
+            } catch (\Throwable $e) {
+                $this->projectMap = [];
             }
+
             $this->buildTimeline($response['data'] ?? []);
         } catch (\Throwable $e) {
             $this->events = [];
@@ -118,6 +128,8 @@ new class extends Component {
                 default => self::COLORS[$index % count(self::COLORS)],
             };
 
+            $projectId = $entry['item']['project_id'] ?? null;
+
             return [
                 'title' => $entry['item']['activity'] ?? 'Untitled',
                 'description' => $entry['item']['description'] ?? null,
@@ -130,6 +142,7 @@ new class extends Component {
                 'color' => $color,
                 'timing' => $timing,
                 'user' => $entry['item']['user'] ?? null,
+                'project_name' => $projectId ? ($this->projectMap[$projectId] ?? null) : null,
             ];
         })->toArray();
     }
@@ -298,6 +311,9 @@ new class extends Component {
                                     <p class="truncate text-[13px] font-semibold leading-tight">{{ $event['title'] }}</p>
                                     <p class="truncate text-[10px] font-medium opacity-70">
                                         {{ $event['start_label'] }} – {{ $event['end_label'] }}
+                                        @if(! empty($event['project_name']))
+                                            · {{ $event['project_name'] }}
+                                        @endif
                                     </p>
                                 </div>
                             </div>

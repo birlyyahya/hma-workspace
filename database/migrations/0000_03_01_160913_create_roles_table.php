@@ -24,9 +24,9 @@ return new class extends Migration
 
             $table->unsignedInteger('level')->default(1);
             // hirarki akses
+            $table->unsignedInteger('departemend_id');
 
-            $table->string('scope')->nullable();
-            // contoh: it-software, it-infra, hrd, global
+            $table->boolean('is_system');
 
             $table->boolean('can_approve')->default(false);
 

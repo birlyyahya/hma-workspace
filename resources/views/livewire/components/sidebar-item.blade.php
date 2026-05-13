@@ -1,80 +1,64 @@
 <?php
 
+use App\Services\ProjectCache;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Livewire\Volt\Component;
-use Masmerise\Toaster\Toaster;
 
 new class extends Component {
-
-    public function getProjectsProperty()
+    public function getProjectsProperty(): array
     {
-        return Cache::remember(
-        'projects_sidebar_' . Auth::user()->username,
-        now()->addDay(),
-        function () {
-            try {
-                $response = Http::timeout(120)
-                    ->get(env('API_PROJECT') . 'projects/search?project_leader_id=' . Auth::user()->id)
-                    ->json();
+        try {
+            return app(ProjectCache::class)->leaderProjects(Auth::id());
+        } catch (\Throwable $e) {
+            Log::warning('Sidebar projects load failed', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
 
-                if (($response['status'] ?? null) === 200) {
-                    return $response['data'];
-                }
-
-                return [];
-
-            } catch (\Exception $e) {
-                Toaster::error('Server PM Error, silahkan coba lagi atau menghubungi tim IT');
-                return [];
-            }
+            return [];
         }
-    );
     }
 }; ?>
 
 <div>
-        @if(Auth::user()->level >= 55)
-            <flux:sidebar.item :href="route('projects')" icon="document-text" :current="
-                request()->routeIs('projects') || request()->routeIs('projects.*')" wire:navigate>
+    @if (Auth::user()->viewScopeFor('project') === 'all')
+        <flux:sidebar.item :href="route('projects')" icon="document-text"
+            :current="request()->routeIs('projects')" wire:navigate>
             <div class="flex-1 min-w-0 max-w-39 overflow-hidden">
-                <div class="truncate">
-                    All Project
-                </div>
+                <div class="truncate">All Project</div>
             </div>
-            </flux:sidebar.item>
-            <flux:sidebar.item :href="route('perusahaan')" icon="building-office" :current="
-                    request()->routeIs('perusahaan')" wire:navigate>
-                <div class="flex-1 min-w-0 max-w-39 overflow-hidden">
-                    <div class="truncate">
-                        Perusahaan
-                    </div>
-                </div>
-            </flux:sidebar.item>
-            <flux:sidebar.item># Project</flux:sidebar.item>
-            @foreach ($this->projects as $project)
-            <flux:sidebar.item :href="route('projects.show', $project['id'])" icon="document-text" :current="
-            request()->routeIs('projects.show')
-            && request()->route('id') == $project['id']" wire:navigate>
+        </flux:sidebar.item>
+
+        <flux:sidebar.item :href="route('perusahaan')" icon="building-office"
+            :current="request()->routeIs('perusahaan')" wire:navigate>
+            <div class="flex-1 min-w-0 max-w-39 overflow-hidden">
+                <div class="truncate">Perusahaan</div>
+            </div>
+        </flux:sidebar.item>
+
+        @if (! empty($this->projects))
+        <flux:separator class="my-1"></flux:separator>
+        @endif
+
+    @endif
+
+    @if (! empty($this->projects))
+        @foreach ($this->projects as $project)
+            <flux:sidebar.item wire:key="sidebar-project-{{ $project['id'] }}"
+                :href="route('projects.show', $project['id'])" icon="document-text"
+                :current="request()->routeIs('projects.show') && request()->route('id') == $project['id']"
+                wire:navigate>
                 <div class="flex-1 min-w-0 max-w-39 overflow-hidden">
                     <div class="truncate">
                         {{ $project['code'] }} - {{ $project['name'] }}
                     </div>
                 </div>
             </flux:sidebar.item>
-            @endforeach
+        @endforeach
+    @else
+        @if (Auth::user()->viewScopeFor('project') === 'own')
+        <flux:sidebar.item disabled>No Own Project</flux:sidebar.item>
         @endif
-        @if(!empty($this->projects))
-            @foreach ($this->projects as $project)
-            <flux:sidebar.item :href="route('projects.show', $project['id'])" icon="document-text" :current="
-            request()->routeIs('projects.show')
-            && request()->route('id') == $project['id']" wire:navigate>
-                <div class="flex-1 min-w-0 max-w-39 overflow-hidden">
-                    <div class="truncate">
-                        {{ $project['code'] }} - {{ $project['name'] }}
-                    </div>
-                </div>
-            </flux:sidebar.item>
-            @endforeach
-        @else
-            <flux:sidebar.item>No Project</flux:sidebar.item>
-        @endif
+    @endif
 </div>

@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Role extends Model
@@ -15,7 +17,8 @@ class Role extends Model
         'name',
         'description',
         'level',
-        'scope',
+        'department_id',
+        'is_system',
         'can_approve',
     ];
 
@@ -24,11 +27,27 @@ class Role extends Model
         return [
             'level' => 'integer',
             'can_approve' => 'boolean',
+            'is_system' => 'boolean',
         ];
     }
 
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    public function permissions(): BelongsToMany
+    {
+        return $this->belongsToMany(Permission::class, 'role_permission')->withTimestamps();
+    }
+
+    public function hasPermission(string $name): bool
+    {
+        return $this->permissions()->where('name', $name)->exists();
     }
 }
