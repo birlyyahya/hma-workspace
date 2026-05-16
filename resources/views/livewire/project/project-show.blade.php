@@ -43,6 +43,16 @@ new #[Lazy] class extends Component {
                 rtrim((string) config('services.api_project'), '/').'/projects/'.$this->id
             )->json();
 
+            // Ambil data dari cache
+        //        $getCacheProject = app(ProjectCache::class)->allProjects();
+
+        //    $project = array_filter($getCacheProject, function ($project) {
+        //         return $project['id'] == $this->id;
+        //     });
+
+        //     $project = reset($project);
+        //     $this->project = collect($project);
+
             if (($response['status'] ?? null) === 200) {
                 $this->project = collect($response['data'])->first();
             }

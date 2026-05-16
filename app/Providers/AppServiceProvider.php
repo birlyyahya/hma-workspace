@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Services\DarCache;
+use App\Services\IzinCache;
 use App\Services\ProjectCache;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
@@ -20,6 +21,10 @@ class AppServiceProvider extends ServiceProvider
         ));
 
         $this->app->singleton(DarCache::class, fn () => new DarCache(
+            rtrim((string) config('services.api_izin'), '/')
+        ));
+
+        $this->app->singleton(IzinCache::class, fn () => new IzinCache(
             rtrim((string) config('services.api_izin'), '/')
         ));
     }

@@ -1,5 +1,7 @@
 <?php
 
+use App\Jobs\RegisterUserToApiIzinJob;
+use App\Jobs\RegisterUserToApiProjectJob;
 use App\Models\Role;
 use App\Models\User;
 use Flux\Flux;
@@ -33,13 +35,18 @@ new class extends Component {
         ]);
 
         try {
-            User::create([
+            $plainPassword = $this->password;
+
+            $user = User::create([
                 'name' => $this->name,
                 'username' => $this->username,
                 'email' => $this->email,
-                'password' => Hash::make($this->password),
+                'password' => Hash::make($plainPassword),
                 'role_id' => $this->role,
             ]);
+
+            RegisterUserToApiProjectJob::dispatch($user, $plainPassword);
+            RegisterUserToApiIzinJob::dispatch($user, $plainPassword);
 
             $this->dispatch('user-created');
             Toaster::success('User berhasil dibuat.');

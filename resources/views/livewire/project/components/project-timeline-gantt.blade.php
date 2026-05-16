@@ -52,6 +52,7 @@ new class extends Component {
             }
         } catch (\Throwable $e) {
             $this->timelines = [];
+            Toaster::
             Log::error('Gantt timeline exception', ['message' => $e->getMessage()]);
         }
 

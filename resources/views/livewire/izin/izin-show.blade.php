@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\IzinCache;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Livewire\Attributes\Layout;
@@ -14,20 +15,12 @@ class extends Component {
     public $pdfPreview;
 
     public function mount() {
-        // nanti fetch detail izin by id
-        $response = Http::get(env('API_IZIN') . '/global/izin/detail/' . $this->id)->json();
-        Cache::remember(
-            'ttd_user_' . Auth::user()->id,now()->addMonths(6), // key unik per user
-            function () use ($response) {
-                return $response['data']['url_sign'];
-            }
-        );
+        $response = app(IzinCache::class)->detail((int) $this->id);
 
-        if (!$response['success']) {
+        if (! ($response['success'] ?? false)) {
             Toaster::error('Failed to fetch izin detail from API.');
             \Log::error('Izin Detail API failed', [
-                'status' => $response['status'],
-                'body'   => $response['message'] ?? 'No message',
+                'body' => $response['message'] ?? 'No message',
             ]);
         }
 

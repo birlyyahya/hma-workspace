@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\IzinCache;
 use Carbon\Carbon;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
@@ -11,8 +12,7 @@ class extends Component {
 
     public function getIzinProperty()
     {
-        \Log::info('Fetching izin data for ID: ' . $this->id);
-        $response = Http::get(env('API_IZIN') . '/global/izin/detail/' . $this->id)->json();
+        $response = app(IzinCache::class)->detail((int) $this->id);
 
         if (($response['success'] ?? false) === true) {
             return $response['data'] ?? [];

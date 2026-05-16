@@ -1,7 +1,6 @@
 <?php
 
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
+use App\Services\IzinCache;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
@@ -21,8 +20,9 @@ new class extends Component {
     #[On('izinAdded')]
     public function refreshData(): void
     {
-        Cache::forget($this->cacheKeyGroup());
-        Cache::forget($this->cacheKeyUser());
+        $cache = app(IzinCache::class);
+        $cache->flushUser(Auth::user()->username);
+        $cache->flushGroup();
         $this->loadData();
     }
 
@@ -62,21 +62,36 @@ new class extends Component {
 
     protected function loadData(): void
     {
-        // cache per user (tanpa group)
-        $data = Cache::remember(
-            $this->cacheKeyUser(),
-            now()->addHour(),
-            fn () => $this->fetchUserData()
-        );
+        try {
+            $cache = app(IzinCache::class);
 
-        // cache global (group)
-        $group = Cache::remember(
-            $this->cacheKeyGroup(),
-            now()->addHour(),
-            fn () => $this->fetchGroupData()
-        );
+            if (Auth::user()->level <= 90) {
+                // Response dashboard sudah berisi group, extract langsung (hemat 1 API call).
+                $json = $cache->dashboard(Auth::user()->username);
+                $data = [
+                    'approved' => $json['data']['approve_izin'] ?? 0,
+                    'rejected' => $json['data']['failed_izin'] ?? 0,
+                    'total'    => $json['data']['all_izin'] ?? 0,
+                ];
+                $group = $json['data']['group'] ?? [];
+            } else {
+                // Endpoint SPD tidak punya field group → fetch terpisah dari groupDashboard().
+                $json = $cache->spdListAll();
+                $rows = collect($json['data'] ?? []);
+                $data = [
+                    'approved' => $rows->where('is_submitted', 1)->where('is_approved', 1)->count(),
+                    'waiting'  => $rows->where('is_submitted', 1)->where('is_approved', 0)->count(),
+                    'total'    => $rows->count(),
+                ];
+                $group = $cache->groupDashboard();
+            }
+        } catch (\Throwable $e) {
+            Log::error('Failed to load izin widget data', ['message' => $e->getMessage()]);
+            $data = ['approved' => 0, 'rejected' => 0, 'waiting' => 0, 'total' => 0];
+            $group = [];
+        }
 
-        $this->dispatch('widget-pengajuan', data: $group ?? []);
+        $this->dispatch('widget-pengajuan', data: $group);
 
         $this->approvedCount = (int) ($data['approved'] ?? 0);
 
@@ -87,77 +102,6 @@ new class extends Component {
         }
 
         $this->totalCount = (int) ($data['total'] ?? 0);
-    }
-
-    /**
-     * @return array{approved:int,rejected:int,total:int,group:array}
-     */
-    protected function fetchUserData(): array
-    {
-        try {
-            if (Auth::user()->level <= 90) {
-                $response = Http::get(config('services.api_izin').'/global/izin/dashboard/'.Auth::user()->username);
-            } else {
-                $response = Http::get(config('services.api_izin').'/global/dar/activity/list-spd');
-            }
-
-            if (! $response->successful()) {
-                return ['approved' => 0, 'rejected' => 0, 'waiting' => 0, 'total' => 0];
-            }
-
-            $json = $response->json();
-
-            if (! ($json['success'] ?? false)) {
-                return ['approved' => 0, 'rejected' => 0, 'waiting' => 0, 'total' => 0];
-            }
-
-            if (Auth::user()->level <= 90) {
-                return [
-                    'approved' => $json['data']['approve_izin'] ?? 0,
-                    'rejected' => $json['data']['failed_izin'] ?? 0,
-                    'total'    => $json['data']['all_izin'] ?? 0,
-                ];
-            } else {
-                $data = collect($json['data'] ?? []);
-
-                return [
-                    'approved' => $data->where('is_submitted', 1)->where('is_approved', 1)->count(),
-                    'waiting'  => $data->where('is_submitted', 1)->where('is_approved', 0)->count(),
-                    'total'    => $data->count(),
-                ];
-            }
-
-        } catch (\Throwable $e) {
-            return ['approved' => 0, 'rejected' => 0, 'waiting' => 0, 'total' => 0];
-        }
-    }
-
-    protected function fetchGroupData(): array
-    {
-        try {
-            $response = Http::get(config('services.api_izin').'/global/izin/dashboard/'.Auth::user()->username);
-
-            if (! $response->successful()) {
-                return [];
-            }
-
-            $json = $response->json();
-
-            return $json['data']['group'] ?? [];
-
-        } catch (\Throwable $e) {
-            return [];
-        }
-    }
-
-    protected function cacheKeyUser(): string
-    {
-        return 'izin_widget_user_' . Auth::user()->username;
-    }
-
-    protected function cacheKeyGroup(): string
-    {
-        return 'izin_widget_group_global';
     }
 }; ?>
 

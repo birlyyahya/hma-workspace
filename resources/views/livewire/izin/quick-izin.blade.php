@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\IzinCache;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -113,6 +114,9 @@ class extends Component {
         }
 
         $this->createdIzinId = $this->resolveCreatedIzinId($response);
+        $cache = app(IzinCache::class);
+        $cache->flushUser(Auth::user()->username);
+        $cache->flushGroup();
         $this->dispatch('izinAdded');
         Toaster::success('Izin berhasil diajukan!');
         $this->step = 'success';
@@ -160,7 +164,7 @@ class extends Component {
             return $this->streamPdf(Cache::get($cacheKey), "izin_{$this->createdIzinId}.pdf");
         }
 
-        $detail = Http::get(config('services.api_izin').'/global/izin/detail/'.$this->createdIzinId)->json();
+        $detail = app(IzinCache::class)->detail((int) $this->createdIzinId);
 
         if (! ($detail['success'] ?? false)) {
             Toaster::error('Gagal mengambil detail izin untuk PDF.');

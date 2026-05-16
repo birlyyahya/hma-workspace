@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\IzinCache;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -115,7 +116,7 @@ new class extends Component {
             return $this->streamPdf(Cache::get($cacheKey), "izin_{$id}.pdf");
         }
 
-        $response = Http::timeout(120)->retry(3, 200)->get(config('services.api_izin').'/global/izin/detail/'.$id)->json();
+        $response = app(IzinCache::class)->detail((int) $id);
 
         if (($response['success'] ?? false) !== true) {
             Toaster::error('Gagal generate PDF. Data izin tidak ditemukan.');
