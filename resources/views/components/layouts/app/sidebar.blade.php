@@ -19,10 +19,10 @@
             <flux:sidebar.group icon="folder" expandable heading="Projects" class="grid">
                 <livewire:components.sidebar-item />
             </flux:sidebar.group>
-            <flux:sidebar.item icon="qr-code" :href="route('events')" :current="request()->routeIs('events') || request()->routeIs('events.show')" wire:navigate>
+            <flux:sidebar.item class="hidden" icon="qr-code" :href="route('events')" :current="request()->routeIs('events') || request()->routeIs('events.show')" wire:navigate>
                 Events
             </flux:sidebar.item>
-            <flux:sidebar.item icon="banknotes" :href="route('cashadvance')" :current="request()->routeIs('cashadvance')" wire:navigate>
+            <flux:sidebar.item class="hidden" icon="banknotes" :href="route('cashadvance')" :current="request()->routeIs('cashadvance')" wire:navigate>
                 Cash Advance
             </flux:sidebar.item>
             <flux:sidebar.item icon="bookmark-square" :href="route('dar')" :current="request()->routeIs('dar') || request()->routeIs('dar.dar-show')" wire:navigate>
