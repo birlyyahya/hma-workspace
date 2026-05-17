@@ -20,9 +20,10 @@ new class extends Component {
 
     public function updateEmail()
     {
+
         $this->validate([
             'email' => ['required', 'email', 'max:255'],
-            'password' => ['required', 'string', 'min:8', 'current_password'],
+            'password' => ['required', 'string', 'current_password'],
         ]);
 
         auth()->user()->update(['email' => $this->email]);
