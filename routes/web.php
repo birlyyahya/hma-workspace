@@ -72,7 +72,6 @@ Route::middleware('auth')->group(function () {
     Route::post('project-files/upload-chunk', [ProjectFileChunkUploadController::class, 'uploadChunk'])
         ->name('project-files.upload-chunk');
 
-    Route::view('/test', 'testclean')->name('settings');
 });
 
 require __DIR__.'/settings.php';

@@ -614,3 +614,26 @@ Fortify is a headless authentication backend that provides authentication routes
 - `Features::updatePasswords()` to let users change their passwords.
 - `Features::resetPasswords()` for password reset via email.
 </laravel-boost-guidelines>
+
+## HMA Workspace — Project Context
+
+Portal internal perusahaan (Hana Tekindo). Laravel 12 + Livewire 3/Volt + Flux UI Free + Tailwind v4. Auth via Fortify (2FA + email verification). DB: MySQL `hma_workspace`. Cache: Redis (predis).
+
+### Arsitektur penting
+
+- **Data hybrid.** DB lokal HANYA: RBAC (users/roles/permissions/departments), tasks/task_assignments, knowledge (support_*), notifications. **Projects & Izin TIDAK di DB lokal** — diambil dari API eksternal.
+- API eksternal (lihat `config/services.php` → `API_PROJECT`, `API_IZIN`):
+  - BEPM (projects/companies): `bepm.hanatekindo.com/api/v2/`
+  - DARBE (izin/DAR): `darbe.hanatekindo.com`
+- **Selalu lewat Service di `app/Services/`** (`ProjectCache`, `IzinCache`, `DarCache`) — JANGAN panggil `Http` langsung di komponen. Service ini cache berbasis tag; panggil `flush*()` saat data berubah.
+
+### Konvensi
+
+- UI baru = Volt single-file component (cek apakah functional/class-based dulu). Komponen lama `EventShow` class-based Livewire.
+- Pakai Flux UI Free; fallback Blade. Mode gelap pakai `dark:`.
+- Otorisasi: `Role->level` + permission many-to-many, `Gate::before` (super-admin bypass). Scope view: `all`/`department`/`own` via `User::viewScopeFor()`.
+- Bahasa domain Indonesia: "izin" = cuti/perizinan, "perusahaan" = company, "spektek" = spesifikasi teknis, "SPD" = surat perjalanan dinas.
+
+### Modul
+
+Dashboard, Projects, DAR, Izin, Knowledge Hub, User Management (aktif); Events (hidden); Inventaris & Cash Advance (coming soon — route ke `maintenance/comingsoon`).

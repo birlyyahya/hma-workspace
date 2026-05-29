@@ -423,15 +423,13 @@ new class extends Component {
                 <div class="p-4">
                     {{-- Loading --}}
                     <div wire:loading wire:target="type, search, sort, loadMore" class="space-y-2">
-                        @for ($i = 0; $i < 4; $i++)
                             <div class="flex items-center gap-3 p-3 rounded-xl bg-zinc-50 animate-pulse">
                                 <div class="w-10 h-10 bg-zinc-200 rounded-lg"></div>
                                 <div class="flex-1 space-y-2">
-                                    <div class="h-3 w-1/3 bg-zinc-200 rounded"></div>
+                                    <div class="h-3 w-100 bg-zinc-200 rounded"></div>
                                     <div class="h-2 w-1/4 bg-zinc-100 rounded"></div>
                                 </div>
                             </div>
-                        @endfor
                     </div>
 
                     <div wire:loading.remove wire:target="type, search, sort, loadMore" class="space-y-1.5">
@@ -968,6 +966,8 @@ new class extends Component {
                     if (!res.ok) {
                         throw new Error(json?.message || json?.error || `Upload chunk gagal (HTTP ${res.status}).`);
                     }
+
+                    console.log('Chunk upload response:', json);
 
                     const candidate =
                         json?.filename ??
