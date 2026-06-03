@@ -783,10 +783,16 @@ new class extends Component {
                 <flux:modal.close>
                     <flux:button variant="ghost" class="flex-1">Batal</flux:button>
                 </flux:modal.close>
-                <flux:button wire:click="fileDelete" variant="danger" icon="trash" class="flex-1"
+                <flux:button wire:click="fileDelete" variant="danger" class="flex-1"
                     wire:loading.attr="disabled" wire:target="fileDelete">
-                    <span wire:loading.remove wire:target="fileDelete">Hapus</span>
-                    <span wire:loading wire:target="fileDelete">Menghapus...</span>
+                    <span class="flex items-center justify-center gap-2" wire:loading.remove wire:target="fileDelete">
+                        <flux:icon.trash variant="micro" />
+                        Hapus
+                    </span>
+                    <span class="flex items-center justify-center gap-2" wire:loading wire:target="fileDelete">
+                        <flux:icon.loading variant="micro" />
+                        Menghapus...
+                    </span>
                 </flux:button>
             </div>
         </div>

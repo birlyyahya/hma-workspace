@@ -426,7 +426,7 @@ new class extends Component {
 <div>
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {{-- ============ LEFT: SPECTECH LIST ============ --}}
-        <div class="space-y-4 lg:col-span-2">
+        <div class="space-y-4 lg:col-span-3">
             {{-- List header --}}
             <div class="flex items-center justify-between gap-3">
                 <div class="min-w-0">
@@ -581,9 +581,9 @@ new class extends Component {
                                     <h3 class="text-base font-semibold text-zinc-900 truncate">
                                         {{ $data['name'] }}
                                     </h3>
-                                    <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ring-1 ring-inset {{ $statusColor }}">
+                                    {{-- <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ring-1 ring-inset {{ $statusColor }}">
                                         {{ $statusLabel }}
-                                    </span>
+                                    </span> --}}
                                 </div>
                                 <p class="mt-1 text-xs text-zinc-500">
                                     Harga satuan: <span class="font-medium text-zinc-700">Rp {{ number_format($data['qty_nominal'] ?? 0, 0, ',', '.') }}</span>
@@ -603,19 +603,20 @@ new class extends Component {
                         </div>
 
                         {{-- Stats grid --}}
-                        <div class="grid grid-cols-3 gap-3 mt-5">
+                        <div class="grid grid-cols-2 gap-3 mt-5">
                             <div class="rounded-lg bg-zinc-50 p-3">
-                                <p class="text-[11px] uppercase tracking-wide text-zinc-500">Qty Diterima</p>
+                                <p class="text-[11px] uppercase tracking-wide text-zinc-500">Quantity</p>
                                 <p class="mt-1 text-sm font-semibold text-zinc-900">
-                                    {{ $qtyRecv }} <span class="text-zinc-400 font-normal">/ {{ $qtyTotal }}</span>
+                                    {{ $qtyTotal }}
+                                    {{-- <span class="text-zinc-400 font-normal"></span> --}}
                                 </p>
                             </div>
-                            <div class="rounded-lg bg-zinc-50 p-3">
+                            {{-- <div class="rounded-lg bg-zinc-50 p-3">
                                 <p class="text-[11px] uppercase tracking-wide text-zinc-500">Nilai Diterima</p>
                                 <p class="mt-1 text-sm font-semibold text-zinc-900 truncate">
                                     Rp {{ number_format(($data['qty_nominal'] ?? 0) * $qtyRecv, 0, ',', '.') }}
                                 </p>
-                            </div>
+                            </div> --}}
                             <div class="rounded-lg bg-zinc-50 p-3">
                                 <p class="text-[11px] uppercase tracking-wide text-zinc-500">Total Nominal</p>
                                 <p class="mt-1 text-sm font-semibold text-zinc-900 truncate">
@@ -625,7 +626,7 @@ new class extends Component {
                         </div>
 
                         {{-- Progress --}}
-                        <div class="mt-5">
+                        {{-- <div class="mt-5">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-xs font-medium text-zinc-500">Progress Penerimaan</span>
                                 <span class="text-xs font-semibold {{ $isComplete ? 'text-emerald-700' : 'text-zinc-800' }}">
@@ -636,7 +637,7 @@ new class extends Component {
                                 <div class="h-full {{ $isComplete ? 'bg-emerald-600' : 'bg-red-600' }} rounded-full transition-all"
                                      style="width: {{ min($percentage, 100) }}%"></div>
                             </div>
-                        </div>
+                        </div> --}}
 
                         {{-- Note --}}
                         @if(!empty($data['note']))
@@ -717,8 +718,9 @@ new class extends Component {
                 </div>
             @endif
         </div>
+
         {{-- ============ RIGHT: SUMMARY ============ --}}
-        <div class="space-y-4">
+        <div class="hidden space-y-4">
             {{-- Progress widget --}}
             <div class="bg-white rounded-xl p-6 border border-zinc-200 space-y-5 md:sticky md:top-12 top-4">
                 <div class="flex items-center justify-between gap-3">
@@ -869,7 +871,7 @@ new class extends Component {
 {{-- ============ EDIT SPECTECH MODAL ============ --}}
 <flux:modal name="editSpectech" wire:close="resetForm" class="md:w-120 lg:min-w-5xl">
     <form wire:submit="update" class="space-y-6"
-        x-data="{ isComing: false, isTermin: false, }"
+        x-data="{ isComing: false}"
         x-effect="isComing = (Number($wire.form.received_quantity) || 0) > 0">
         <div class="space-y-1">
             <flux:heading size="lg">Edit Spektek</flux:heading>
@@ -903,7 +905,7 @@ new class extends Component {
             </div>
 
             {{-- Penerimaan Barang --}}
-            <div class="rounded-lg border border-zinc-200 bg-zinc-50/50 p-4 space-y-3">
+            {{-- <div class="rounded-lg border border-zinc-200 bg-zinc-50/50 p-4 space-y-3">
                 <flux:checkbox x-model="isComing"
                     @change="if (!isComing) $wire.set('form.received_quantity', 0)"
                     label="Sudah ada barang diterima?" />
@@ -919,39 +921,7 @@ new class extends Component {
                         <flux:error name="form.received_quantity" />
                     </flux:field>
                 </div>
-            </div>
-            <div class="rounded-lg border border-zinc-200 bg-zinc-50/50 p-4 space-y-3">
-                <flux:checkbox x-model="isTermin"
-                    label="Barang sudah pemeriksaan?" />
-
-                <div x-show="isTermin" x-collapse>
-                    <flux:field>
-                        <flux:label>Jumlah Disetujui</flux:label>
-                        <flux:input  wire:model="form.received_quantity" type="number" min="0"
-                            :max="$form->quantity" placeholder="0" />
-                        <flux:description>
-                            Jumlah barang yang lolos pemeriksaan
-                        </flux:description>
-                        <flux:error name="form.received_quantity" />
-                    </flux:field>
-                </div>
-            </div>
-            <div class="rounded-lg border border-zinc-200 bg-zinc-50/50 p-4 space-y-3">
-                <flux:checkbox x-model="isTermin"
-                    label="Barang sudah uji fungsi?" />
-
-                <div x-show="isTermin" x-collapse>
-                    <flux:field>
-                        <flux:label>Jumlah Disetujui</flux:label>
-                        <flux:input  wire:model="form.received_quantity" type="number" min="0"
-                            :max="$form->quantity" placeholder="0" />
-                        <flux:description>
-                            Jumlah barang yang lolos pemeriksaan
-                        </flux:description>
-                        <flux:error name="form.received_quantity" />
-                    </flux:field>
-                </div>
-            </div>
+            </div> --}}
 
             <flux:field>
                 <flux:label>Catatan</flux:label>

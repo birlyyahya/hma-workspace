@@ -2,7 +2,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {{-- ============ LEFT: SPECTECH LIST ============ --}}
-        <div class="space-y-4 lg:col-span-2">
+        <div class="space-y-4 lg:col-span-3">
 
             {{-- List header --}}
             <div class="flex items-center justify-between">
@@ -62,7 +62,7 @@
         </div>
 
         {{-- ============ RIGHT: SUMMARY ============ --}}
-        <div class="space-y-4">
+        <div class="space-y-4 hidden">
 
             {{-- Progress widget --}}
             <div class="bg-white rounded-xl p-6 border border-slate-200 space-y-5">

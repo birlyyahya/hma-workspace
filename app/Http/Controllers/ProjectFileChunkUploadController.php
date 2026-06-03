@@ -27,8 +27,7 @@ class ProjectFileChunkUploadController extends Controller
             ->attach('file', $bytes, $validated['original_name'])
             ->post($base.'upload-chunks', [
                 'upload_id' => $validated['upload_id'],
-                'chunk_index' => (int) $validated['chunk_index'],
-                'chunk_index_zero_based' => ((int) $validated['chunk_index']) - 1,
+                'chunk_index' => ((int) $validated['chunk_index']) - 1,
                 'total_chunks' => (int) $validated['total_chunks'],
                 'original_name' => $validated['original_name'],
             ]);
