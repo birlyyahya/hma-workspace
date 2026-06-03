@@ -42,8 +42,8 @@ Route::middleware('auth')->group(function () {
     Volt::route('inventaris', 'maintenance/comingsoon')->name('inventaris');
 
     // Cash Advance
-    // Route::view('cashadvance', 'cashadvance')->name('cashadvance');
-    Volt::route('cashadvance', 'maintenance/comingsoon')->name('cashadvance');
+    Route::view('cashadvance', 'cashadvance')->name('cashadvance');
+    // Volt::route('cashadvance', 'maintenance/comingsoon')->name('cashadvance');
 
     // Event
     Route::prefix('event')->group(function () {

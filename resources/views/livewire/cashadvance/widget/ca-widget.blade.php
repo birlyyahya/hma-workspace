@@ -3,7 +3,17 @@
 use Livewire\Volt\Component;
 
 new class extends Component {
-    //
+    public array $dompet = [];
+
+    public function mount(){
+        $response = Http::get(config('services.api_ca') . '/ca-pl?user_id=' . Auth::id())
+        ->throw(function ($error) {
+            Toaster::error('Failed to load cash advance data: ' . getErrorMessages($error));
+        })
+        ->json();
+
+        $this->dompet = $response['data'] ?? [];
+    }
 }; ?>
 
 <div>
@@ -120,7 +130,7 @@ new class extends Component {
 
                 <div class="flex justify-between items-center">
                     <h3 class="font-semibold text-gray-900">
-                        My card
+                        Dompet
                     </h3>
 
                     <a class="text-sm text-orange-500 hover:underline">
@@ -130,79 +140,34 @@ new class extends Component {
 
 
                 {{-- CARD ITEM --}}
+                @foreach ($dompet as $item)
                 <div class="flex items-center justify-between">
 
                     <div class="flex items-center gap-3">
 
-                        <div class="w-10 h-10 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500"></div>
+                        <flux:avatar :name="$item['data_category']['name']" :color="match($item['data_category']['id']){
+                            1 => 'red',
+                            2 => 'blue',
+                        }" />
 
                         <div>
                             <p class="text-sm font-medium">
-                                **** **** **** 9213
+                                {{ $item['judul_kegiatan'] }}
                             </p>
 
                             <p class="text-xs text-gray-500">
-                                06/28
+                                {{ $item['tahun_anggaran'] }}
                             </p>
                         </div>
 
                     </div>
 
                     <p class="text-sm font-medium">
-                        $102,489.00
+                        Rp {{ number_format($item['total_penerimaan'], 2, ',', '.') }}
                     </p>
 
                 </div>
-
-
-                <div class="flex items-center justify-between">
-
-                    <div class="flex items-center gap-3">
-
-                        <div class="w-10 h-10 rounded-lg bg-blue-500"></div>
-
-                        <div>
-                            <p class="text-sm font-medium">
-                                **** **** **** 9213
-                            </p>
-
-                            <p class="text-xs text-gray-500">
-                                04/29
-                            </p>
-                        </div>
-
-                    </div>
-
-                    <p class="text-sm font-medium">
-                        $10,238.00
-                    </p>
-
-                </div>
-
-
-                <div class="flex items-center justify-between">
-
-                    <div class="flex items-center gap-3">
-
-                        <div class="w-10 h-10 rounded-lg bg-red-500"></div>
-
-                        <div>
-                            <p class="text-sm font-medium">
-                                **** **** **** 9213
-                            </p>
-
-                            <p class="text-xs text-gray-500">
-                                02/30
-                            </p>
-                        </div>
-
-                    </div>
-
-                    <p class="text-sm font-medium">
-                        $4,122.00
-                    </p>
-
-                </div>
+                @endforeach
 
 
                 <flux:button variant="outline" class="w-full">

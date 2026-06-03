@@ -39,15 +39,6 @@
                                 Ajukan Izin
                             </flux:button>
                         </flux:modal.trigger>
-
-
-                        @can('spd.create')
-                        <flux:modal.trigger name="spd-form-modal">
-                            <flux:button icon="plus-circle" variant="primary" class="cursor-pointer w-full sm:w-auto bg-white! text-red-700! hover:bg-white/90!">
-                                Buat SPD
-                            </flux:button>
-                        </flux:modal.trigger>
-                        @endcan
                         @can('izin.view.all')
                         <a href="{{ route('izin.laporan-pengajuan') }}" class="w-full sm:w-auto">
                             <flux:button icon="document-text" variant="primary" class="cursor-pointer w-full sm:w-auto bg-white! text-red-700! hover:bg-white/90!">
@@ -103,7 +94,6 @@
         <livewire:izin.spd-list lazy />
         @endif
     </div>
-
     <livewire:izin.add-izin-modal />
     </div>
 </x-layouts.app>

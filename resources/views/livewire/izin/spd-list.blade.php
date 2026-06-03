@@ -12,6 +12,7 @@ use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
 use Masmerise\Toaster\Toaster;
 use App\Services\NotificationService;
+use Livewire\Attributes\On;
 
 new class extends Component {
     use WithFileUploads;
@@ -240,6 +241,7 @@ new class extends Component {
         $this->fetchList();
     }
 
+    #[On('open-create-spd')]
     public function openCreate(): void
     {
         $this->resetForm();
