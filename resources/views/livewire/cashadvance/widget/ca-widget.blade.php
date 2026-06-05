@@ -1,18 +1,81 @@
 <?php
 
+use App\Services\CaCache;
+use Livewire\Attributes\On;
 use Livewire\Volt\Component;
+use Masmerise\Toaster\Toaster;
 
 new class extends Component {
-    public array $dompet = [];
+    /** @var array<string, mixed> Dompet PL utama (data_category id 1, status approved) */
+    public array $dompetPl = [];
 
-    public function mount(){
-        $response = Http::get(config('services.api_ca') . '/ca-pl?user_id=' . Auth::id())
-        ->throw(function ($error) {
-            Toaster::error('Failed to load cash advance data: ' . getErrorMessages($error));
-        })
-        ->json();
+    /** @var array<int, array<string, mixed>> Daftar dompet kegiatan (data_category id 2) */
+    public array $dompetKegiatan = [];
 
-        $this->dompet = $response['data'] ?? [];
+    /** @var array<int, string> Label bulan untuk sumbu X chart */
+    public array $chartCategories = [];
+
+    /** @var array<int, float> Total penerimaan per bulan */
+    public array $chartIncome = [];
+
+    /** @var array<int, float> Total pengeluaran per bulan */
+    public array $chartExpense = [];
+
+    public function mount(CaCache $ca): void
+    {
+        $userId = (int) Auth::id();
+
+        $this->dompetPl = $ca->dompetPl($userId);
+        $this->dompetKegiatan = $ca->dompetKegiatan($userId);
+
+        if (empty($this->dompetPl) && empty($this->dompetKegiatan)) {
+            Toaster::error('Belum ada data dompet yang tersedia');
+        }
+
+        $this->buildChart($ca);
+    }
+
+    #[On('transaksi-added')]
+    public function refreshDompet(CaCache $ca): void
+    {
+        $userId = (int) Auth::id();
+
+        $this->dompetPl = $ca->dompetPl($userId);
+        $this->dompetKegiatan = $ca->dompetKegiatan($userId);
+
+        $this->buildChart($ca);
+
+        $this->dispatch('ca-chart-updated', income: $this->chartIncome, expense: $this->chartExpense);
+    }
+
+    protected function buildChart(CaCache $ca): void
+    {
+        $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        $income = array_fill(0, 12, 0.0);
+        $expense = array_fill(0, 12, 0.0);
+
+        if (! empty($this->dompetPl)) {
+            $saldoAwal = (float) ($this->dompetPl['total_penerimaan'] ?? 0);
+
+            foreach ($ca->transaksi($this->dompetPl['kode_ca']) as $trx) {
+                $monthIndex = (int) \Carbon\Carbon::parse($trx['tanggal'])->format('n') - 1;
+                $amount = (float) ($trx['jumlah'] ?? 0);
+
+                if (($trx['jenis'] ?? null) === 'penerimaan') {
+                    $income[$monthIndex] += $amount;
+                    $saldoAwal -= $amount;
+                } else {
+                    $expense[$monthIndex] += $amount;
+                }
+            }
+
+            $startMonth = (int) \Carbon\Carbon::parse($this->dompetPl['tanggal_mulai'])->format('n') - 1;
+            $income[$startMonth] += max($saldoAwal, 0);
+        }
+
+        $this->chartCategories = $months;
+        $this->chartIncome = array_values($income);
+        $this->chartExpense = array_values($expense);
     }
 }; ?>
 
@@ -28,29 +91,30 @@ new class extends Component {
                 <div class="flex justify-between items-start">
 
                     <div class="space-y-2">
-                        <p class="text-sm text-gray-500">Total Balance</p>
+                        <p class="text-sm text-gray-500">
+                            Total Balance
+                            @if (! empty($dompetPl))
+                                <span class="text-gray-400">• {{ $dompetPl['judul_kegiatan'] }}</span>
+                            @endif
+                        </p>
 
                         <h2 class="text-4xl font-semibold text-gray-900">
-                            $116,849.00
+                            Rp {{ number_format((float) ($dompetPl['saldo_akhir'] ?? 0), 2, ',', '.') }}
                         </h2>
 
-                        <p class="text-sm text-green-600 mt-1">
-                            +$7,845.00 (12.09%) <span class="text-gray-400">vs last month</span>
+                        <p class="text-sm text-gray-500 mt-1">
+                            @if (! empty($dompetPl))
+                                {{ $dompetPl['kode_ca'] }} • Tahun Anggaran {{ $dompetPl['tahun_anggaran'] }}
+                            @else
+                                Belum ada dompet PL yang disetujui
+                            @endif
                         </p>
                     </div>
 
                     <div class="flex gap-2 self-end">
-                        <flux:modal.trigger name="sendModal">
-                            <flux:button size="sm" variant="primary" class="cursor-pointer" iconTrailing="arrow-up-right">
-                                Send
-                            </flux:button>
-                        </flux:modal.trigger>
-
-                        <flux:modal.trigger name="receiveModal">
-                            <flux:button size="sm" variant="outline" class="cursor-pointer" iconTrailing="arrow-down-left">
-                                Receive
-                            </flux:button>
-                        </flux:modal.trigger>
+                        @if (! empty($dompetPl))
+                            <livewire:cashadvance.transaksi-modal :kode-ca="$dompetPl['kode_ca']" :key="'trx-pl-' . $dompetPl['kode_ca']" />
+                        @endif
 
                         <flux:button size="sm" variant="outline" class="cursor-pointer" iconTrailing="plus">
                             Top up
@@ -78,18 +142,18 @@ new class extends Component {
 
                         <p class="text-sm text-gray-500">Income</p>
 
-                        <span class="text-green-600 text-xs bg-green-100 px-2 py-1 rounded">
-                            +12.73%
+                        <span class="text-blue-600 text-xs bg-blue-100 px-2 py-1 rounded">
+                            Penerimaan
                         </span>
 
                     </div>
 
                     <h3 class="text-2xl font-semibold mt-2">
-                        9,834.00
+                        Rp {{ number_format((float) ($dompetPl['total_penerimaan'] ?? 0), 2, ',', '.') }}
                     </h3>
 
                     <p class="text-sm text-gray-500 mt-1">
-                        You made an extra <span class="text-green-600">$1,245.00</span> this month
+                        Total dana yang diterima pada dompet PL
                     </p>
 
                 </div>
@@ -103,17 +167,17 @@ new class extends Component {
                         <p class="text-sm text-gray-500">Expense</p>
 
                         <span class="text-red-600 text-xs bg-red-100 px-2 py-1 rounded">
-                            -3.19%
+                            Pengeluaran
                         </span>
 
                     </div>
 
                     <h3 class="text-2xl font-semibold mt-2">
-                        1,371.00
+                        Rp {{ number_format((float) ($dompetPl['total_pengeluaran'] ?? 0), 2, ',', '.') }}
                     </h3>
 
                     <p class="text-sm text-gray-500 mt-1">
-                        You made an extra <span class="text-green-600">$891.00</span> this month
+                        Total dana yang dikeluarkan pada dompet PL
                     </p>
 
                 </div>
@@ -130,7 +194,7 @@ new class extends Component {
 
                 <div class="flex justify-between items-center">
                     <h3 class="font-semibold text-gray-900">
-                        Dompet
+                        Dompet kegiatan
                     </h3>
 
                     <a class="text-sm text-orange-500 hover:underline">
@@ -140,17 +204,19 @@ new class extends Component {
 
 
                 {{-- CARD ITEM --}}
-                @foreach ($dompet as $item)
-                <div class="flex items-center justify-between">
+                @forelse ($dompetKegiatan as $item)
+                <a
+                    wire:key="dompet-{{ $item['kode_ca'] }}"
+                    href="{{ route('cashadvance.dompet-show', $item['kode_ca']) }}"
+                    wire:navigate
+                    class="flex items-center justify-between w-full -mx-2 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-gray-50 transition"
+                >
 
                     <div class="flex items-center gap-3">
 
-                        <flux:avatar :name="$item['data_category']['name']" :color="match($item['data_category']['id']){
-                            1 => 'red',
-                            2 => 'blue',
-                        }" />
+                        <flux:avatar :name="$item['judul_kegiatan']" color="blue" />
 
-                        <div>
+                        <div class="text-left">
                             <p class="text-sm font-medium">
                                 {{ $item['judul_kegiatan'] }}
                             </p>
@@ -163,11 +229,15 @@ new class extends Component {
                     </div>
 
                     <p class="text-sm font-medium">
-                        Rp {{ number_format($item['total_penerimaan'], 2, ',', '.') }}
+                        Rp {{ number_format((float) $item['saldo_akhir'], 2, ',', '.') }}
                     </p>
 
-                </div>
-                @endforeach
+                </a>
+                @empty
+                <p class="text-sm text-gray-400 text-center py-2">
+                    Belum ada dompet kegiatan
+                </p>
+                @endforelse
 
 
                 <flux:button variant="outline" class="w-full">
@@ -219,52 +289,16 @@ new class extends Component {
         </div>
 
     </div>
-
-
-    {{-- Modal --}}
-    <flux:modal name="sendModal" class="w-lg">
-        <div class="space-y-6">
-            <div>
-                <flux:heading size="lg">Send Money</flux:heading>
-            </div>
-
-            <flux:input label="Amount" type="number" placeholder="Enter amount"></flux:input>
-            <flux:select label="Category" placeholder="Select a Category">
-                <flux:select.option>Transportation</flux:select.option>
-                <flux:select.option>Food</flux:select.option>
-                <flux:select.option>Entertainment</flux:select.option>
-                <flux:select.option>Electronic</flux:select.option>
-                <flux:select.option>Health</flux:select.option>
-                <flux:select.option>Clothing</flux:select.option>
-                <flux:select.option>Education</flux:select.option>
-                <flux:select.option>Travel</flux:select.option>
-                <flux:select.option>Others</flux:select.option>
-            </flux:select>
-            <flux:input label="Notes" placeholder="Enter notes"></flux:input>
-            <flux:button variant="primary" class="w-full">Send Money</flux:button>
-        </div>
-    </flux:modal>
-    <flux:modal name="receiveModal" class="w-lg">
-        <div class="space-y-6">
-            <div>
-                <flux:heading size="lg">Received Money</flux:heading>
-            </div>
-
-            <flux:input label="Amount" type="number" placeholder="Enter amount"></flux:input>
-            <flux:input label="Notes" placeholder="Enter notes"></flux:input>
-            <flux:button variant="primary" class="w-full">Confirm</flux:button>
-        </div>
-    </flux:modal>
 </div>
 @script
 <script>
     const optionLine = {
         series: [{
             name: 'Income'
-            , data: [100000, 50000, 300008, 200000, 340000, 439200, 540020, 400000 ,1000000]
+            , data: @json($chartIncome)
         }, {
             name: 'Expense'
-            , data: [110000, 102000, 360000, 400000, 200000, 329000, 300000, 450000, 1000000]
+            , data: @json($chartExpense)
         }]
         , chart: {
             height: 290
@@ -287,16 +321,14 @@ new class extends Component {
         , colors: ['#2E93fA', '#E91E63']
         , xaxis: {
             type: 'category'
-            , categories: [
-               "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-            ]
+            , categories: @json($chartCategories)
         }
         , yaxis: {
             labels: {
                 minWidth: 0
                 , align: 'left'
                 , formatter: function(val) {
-                    return "Rp " + val
+                    return "Rp " + new Intl.NumberFormat('id-ID').format(val)
                 }
             }
         }
@@ -310,6 +342,13 @@ new class extends Component {
     if (el) {
         const chartline = new ApexCharts(el, optionLine);
         chartline.render();
+
+        $wire.on('ca-chart-updated', ({ income, expense }) => {
+            chartline.updateSeries([
+                { name: 'Income', data: income }
+                , { name: 'Expense', data: expense }
+            ]);
+        });
     }
 
 </script>

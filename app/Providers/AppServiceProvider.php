@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\CaCache;
 use App\Services\DarCache;
 use App\Services\IzinCache;
 use App\Services\ProjectCache;
@@ -26,6 +27,10 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(IzinCache::class, fn () => new IzinCache(
             rtrim((string) config('services.api_izin'), '/')
+        ));
+
+        $this->app->singleton(CaCache::class, fn () => new CaCache(
+            rtrim((string) config('services.api_ca'), '/')
         ));
     }
 

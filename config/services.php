@@ -39,6 +39,6 @@ return [
     'api_izin' => env('API_IZIN'),
     'api_project' => env('API_PROJECT'),
     'url_project' => env('URL_PROJECT'),
-    'api_ca' => env('API_CA')
-
+    'api_ca' => env('API_CA'),
+    'url_ca' => env('URL_CA'),
 ];
