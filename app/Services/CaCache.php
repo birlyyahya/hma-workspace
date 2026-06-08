@@ -26,7 +26,7 @@ class CaCache
     {
         return Cache::tags([self::TAG, "ca:user:{$userId}"])
             ->remember("ca:dompet:{$userId}", self::TTL_DOMPET, function () use ($userId) {
-                $response = Http::timeout(30)->retry(2, 200)
+                $response = Http::timeout(30)->retry(2, 200, throw: false)
                     ->get($this->apiBase.'/ca-pl', ['user_id' => $userId]);
 
                 if (! $response->successful()) {
@@ -90,7 +90,7 @@ class CaCache
     {
         return Cache::tags([self::TAG, "ca:transaksi:{$kodeCa}"])
             ->remember("ca:transaksi:{$kodeCa}", self::TTL_TRANSAKSI, function () use ($kodeCa) {
-                $response = Http::timeout(30)->retry(2, 200)
+                $response = Http::timeout(30)->retry(2, 200, throw: false)
                     ->get($this->apiBase.'/transaksi/'.$kodeCa);
 
                 if (! $response->successful()) {
@@ -116,7 +116,7 @@ class CaCache
      */
     public function addTransaksi(string $kodeCa, array $payload, ?UploadedFile $bukti = null): array
     {
-        $request = Http::timeout(60);
+        $request = Http::timeout(60)->retry(2, 200, throw: false);
 
         if ($bukti !== null) {
             $request = $request->attach(

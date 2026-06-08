@@ -595,7 +595,7 @@ new class extends Component {
     {{-- ============== MODAL: MANAGE ALL TIMELINES ============== --}}
     <flux:modal wire:model.self="showManageModal" class="md:w-160">
         <div class="space-y-5">
-            <div class="flex items-center justify-between">
+            <div class="flex justify-between gap-10 mr-10">
                 <div>
                     <flux:heading size="lg">Kelola Timeline</flux:heading>
                     <flux:text class="text-sm text-gray-500">
