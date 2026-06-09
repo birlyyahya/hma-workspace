@@ -105,6 +105,7 @@ new class extends Component {
         if ($response->successful() && ($response->json('success') ?? false)) {
             app(DarCache::class)->flush();
             $this->reset('form');
+            $this->dispatch('updatedTimeline');
             Toaster::success('Create Activity successfully');
         } else {
             Toaster::error('Create Activity failed');
