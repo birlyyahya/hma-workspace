@@ -117,7 +117,6 @@ class extends Component {
         $cache = app(IzinCache::class);
         $cache->flushUser(Auth::user()->username);
         $cache->flushGroup();
-        $cache->flushList();
         $this->dispatch('izinAdded');
         Toaster::success('Izin berhasil diajukan!');
         $this->step = 'success';

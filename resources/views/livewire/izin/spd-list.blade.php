@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\User;
-use App\Services\IzinCache;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Flux\Flux;
@@ -101,9 +100,7 @@ new class extends Component {
     {
         $currentYear = Carbon::now()->year;
 
-        $all = app(IzinCache::class)->spdListAll()['data'] ?? [];
-
-        $max = collect($all)
+        $max = collect($this->list['data'] ?? [])
             ->filter(function ($row) use ($currentYear) {
                 if (! isset($row['number']) || ! is_numeric($row['number'])) {
                     return false;
@@ -177,43 +174,32 @@ new class extends Component {
         $this->loading = true;
 
         try {
-            $rows = collect(app(IzinCache::class)->spdListAll()['data'] ?? []);
+            $apiIzin = rtrim(config('services.api_izin'), '/');
 
-            if (Auth::user()->viewScopeFor('spd') !== 'all') {
-                $rows = $rows->where('user_id', Auth::user()->id);
-            }
-
-            if ($this->search !== '') {
-                $term = mb_strtolower(trim($this->search));
-                $rows = $rows->filter(function ($r) use ($term) {
-                    $haystack = mb_strtolower(implode(' ', [
-                        $r['task'] ?? '', $r['destination'] ?? '', $r['department'] ?? '', $r['address'] ?? '',
-                    ]));
-
-                    return str_contains($haystack, $term);
-                });
-            }
+            $params = [
+                'page' => $this->page,
+                'perPage' => $this->perPage,
+                'search' => $this->search,
+            ];
 
             if ($this->startDateFilter !== '') {
-                $rows = $rows->filter(fn ($r) => ($r['start_date'] ?? '') >= $this->startDateFilter);
+                $params['start_date'] = $this->startDateFilter;
             }
 
             if ($this->endDateFilter !== '') {
-                $rows = $rows->filter(fn ($r) => ($r['start_date'] ?? '') <= $this->endDateFilter);
+                $params['end_date'] = $this->endDateFilter;
             }
 
-            $rows = $rows->sortByDesc('created_at')->values();
+            if (Auth::user()->viewScopeFor('spd') !== 'all') {
+                $params['user_id'] = Auth::user()->id;
+            }
 
-            $total = $rows->count();
-            $lastPage = max(1, (int) ceil($total / $this->perPage));
-            $this->page = min(max(1, $this->page), $lastPage);
+            $response = Http::timeout(60)
+                ->retry(2, 200)
+                ->get($apiIzin.'/global/dar/activity/list-spd', $params)
+                ->json();
 
-            $this->list = [
-                'data' => $rows->forPage($this->page, $this->perPage)->values()->all(),
-                'total' => $total,
-                'current_page' => $this->page,
-                'last_page' => $lastPage,
-            ];
+            $this->list = $response ?? ['data' => []];
         } catch (\Throwable $e) {
             Toaster::error('Server SPD error, silakan coba lagi.');
             Log::error('SPD list API failed', ['message' => $e->getMessage()]);
@@ -349,8 +335,6 @@ new class extends Component {
             // kirim ke service
             NotificationService::send($user, $message, $response['data']);
 
-            app(IzinCache::class)->flushSpd();
-
             Toaster::success($this->editingId ? 'SPD berhasil diperbarui.' : 'SPD berhasil dibuat.');
             Flux::modal('spd-form-modal')->close();
             $this->resetForm();
@@ -388,8 +372,6 @@ new class extends Component {
 
                 return;
             }
-
-            app(IzinCache::class)->flushSpd();
 
             Toaster::success('SPD berhasil dihapus.');
             $this->pendingDeleteId = null;

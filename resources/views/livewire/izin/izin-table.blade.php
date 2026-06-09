@@ -71,78 +71,41 @@ new class extends Component {
     public function fetchData(): void
     {
         try {
-            $json = app(IzinCache::class)->allIzin();
-            $rows = collect($json['data'] ?? []);
+            $response = Http::timeout(120)
+                ->retry(3)
+                ->get(config('services.api_izin').'/global/izin/list', $this->buildQuery());
+
+            if (! $response->successful()) {
+                Log::error('Izin API failed', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                $this->data = [];
+
+                return;
+            }
+
+            $json = $response->json();
+
+            if (! ($json['success'] ?? false)) {
+                Toaster::error('Failed to fetch izin data from API.');
+                Log::error('Izin API returned error', [
+                    'message' => $json['message'] ?? null,
+                    'error' => $json['error'] ?? null,
+                ]);
+                $this->data = $json ?? [];
+
+                return;
+            }
+
+            $this->data = $json;
         } catch (\Throwable $e) {
             Toaster::error('Error Server Izin, silahkan coba lagi atau menghubungi tim IT.');
             Log::error('Izin API connection error', [
                 'message' => $e->getMessage(),
             ]);
             $this->data = [];
-
-            return;
         }
-
-        $this->data = $this->paginateRows($this->filterRows($rows));
-    }
-
-    /**
-     * Filter + sort koleksi izin global sesuai state komponen (in-memory).
-     *
-     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $rows
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
-     */
-    protected function filterRows(\Illuminate\Support\Collection $rows): \Illuminate\Support\Collection
-    {
-        $searchField = $this->laporan ? 'user_name' : 'reason';
-
-        $filtered = $rows
-            ->when(! $this->laporan, function ($c) {
-                $username = mb_strtolower(trim((string) Auth::user()->username));
-
-                return $c->filter(fn ($r) => mb_strtolower(trim((string) ($r['username'] ?? ''))) === $username);
-            })
-            ->when($this->status !== '', fn ($c) => $c->where('status', $this->status))
-            ->when($this->start_date !== '', fn ($c) => $c->filter(fn ($r) => ($r['start_date'] ?? '') >= $this->start_date))
-            ->when($this->end_date !== '', fn ($c) => $c->filter(fn ($r) => ($r['start_date'] ?? '') <= $this->end_date))
-            ->when($this->search !== '', function ($c) use ($searchField) {
-                $term = mb_strtolower(trim($this->search));
-
-                return $c->filter(fn ($r) => str_contains(mb_strtolower((string) ($r[$searchField] ?? '')), $term));
-            });
-
-        return $this->sort === 'asc'
-            ? $filtered->sortBy('created_at')->values()
-            : $filtered->sortByDesc('created_at')->values();
-    }
-
-    /**
-     * Bentuk array shape paginator dari koleksi terfilter untuk halaman aktif.
-     *
-     * @param  \Illuminate\Support\Collection<int, array<string, mixed>>  $rows
-     * @return array<string, mixed>
-     */
-    protected function paginateRows(\Illuminate\Support\Collection $rows): array
-    {
-        $total = $rows->count();
-        $lastPage = max(1, (int) ceil($total / $this->perPage));
-        $page = min(max(1, $this->page), $lastPage);
-        $this->page = $page;
-
-        $items = $rows->forPage($page, $this->perPage)->values();
-        $from = $total === 0 ? 0 : (($page - 1) * $this->perPage) + 1;
-        $to = $total === 0 ? 0 : $from + $items->count() - 1;
-
-        return [
-            'data' => $items->all(),
-            'total' => $total,
-            'current_page' => $page,
-            'last_page' => $lastPage,
-            'from' => $from,
-            'to' => $to,
-            'prev_page_url' => $page > 1 ? '#' : null,
-            'next_page_url' => $page < $lastPage ? '#' : null,
-        ];
     }
 
     public function generatePDF(int $id)
@@ -178,6 +141,30 @@ new class extends Component {
     public function placeholder()
     {
         return view('components.placeholder.ph_izin_table');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function buildQuery(): array
+    {
+        $base = [
+            'page' => $this->page,
+            'per_page' => $this->perPage,
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'status' => $this->status,
+            'sort_order' => $this->sort,
+        ];
+
+        if ($this->laporan) {
+            return $base + ['search_name' => $this->search];
+        }
+
+        return $base + [
+            'username' => Auth::user()->username,
+            'search_alasan' => $this->search,
+        ];
     }
 
     protected function streamPdf(string $pdfBase64, string $filename)

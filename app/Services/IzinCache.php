@@ -78,34 +78,7 @@ class IzinCache
     }
 
     /**
-     * Cache list izin global (seluruh user, tanpa filter) — satu kali fetch
-     * lalu diolah in-memory (paginate/search/filter/sort) oleh komponen.
-     * Shared antar semua user: siapa pun yang memicu fetch akan men-seed cache
-     * yang dipakai bersama sampai TTL habis atau di-flush saat ada mutasi.
-     *
-     * @return array<string, mixed>
-     */
-    public function allIzin(): array
-    {
-        return Cache::tags([self::TAG])
-            ->remember('izin:list:all', self::TTL_DASHBOARD, function () {
-                $response = Http::timeout(120)->retry(3, 200)
-                    ->get($this->apiBase.'/global/izin/list', [
-                        'per_page' => 1000000,
-                        'sort_order' => 'desc',
-                    ]);
-
-                if (! $response->successful()) {
-                    return [];
-                }
-
-                return $response->json() ?? [];
-            });
-    }
-
-    /**
-     * Cache SPD list global (limit besar) — dipakai widget level > 90 di report-izin,
-     * spd-list, dan spd-show. Satu cache untuk semua kebutuhan SPD.
+     * Cache SPD list global (limit besar) — dipakai widget level > 90 di report-izin.
      *
      * @return array<string, mixed>
      */
@@ -113,10 +86,8 @@ class IzinCache
     {
         return Cache::tags([self::TAG])
             ->remember('izin:spd:list:all', self::TTL_SPD, function () {
-                $response = Http::timeout(60)->retry(2, 200)
-                    ->get($this->apiBase.'/global/dar/activity/list-spd', [
-                        'per_page' => 1000000,
-                    ]);
+                $response = Http::timeout(30)->retry(2, 200)
+                    ->get($this->apiBase.'/global/dar/activity/list-spd');
 
                 if (! $response->successful()) {
                     return [];
@@ -160,16 +131,6 @@ class IzinCache
     public function flushGroup(): void
     {
         Cache::forget('izin:dashboard:group');
-    }
-
-    public function flushList(): void
-    {
-        Cache::tags([self::TAG])->forget('izin:list:all');
-    }
-
-    public function flushSpd(): void
-    {
-        Cache::tags([self::TAG])->forget('izin:spd:list:all');
     }
 
     public function flushDetail(int $id): void
