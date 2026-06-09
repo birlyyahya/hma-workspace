@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Services\IzinCache;
 use App\Services\NotificationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -26,12 +27,7 @@ class extends Component {
     protected function loadSpd(): void
     {
         try {
-            $apiIzin = rtrim(config('services.api_izin'), '/');
-            $response = Http::timeout(30)->get($apiIzin . '/global/dar/activity/list-spd', [
-                'per_page' => 1000,
-            ])->json();
-
-            $rows = $response['data'] ?? [];
+            $rows = app(IzinCache::class)->spdListAll()['data'] ?? [];
             $this->spd = collect($rows)->firstWhere('id', (int) $this->id);
         } catch (\Throwable $e) {
             Log::error('SPD preview load failed', ['message' => $e->getMessage(), 'id' => $this->id]);
