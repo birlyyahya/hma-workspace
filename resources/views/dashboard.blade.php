@@ -42,21 +42,6 @@
         <livewire:widget.dashboard.announcement />
 
         <livewire:widget.dashboard.event-calendar />
-        {{-- Cash Advance + Inventory --}}
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <livewire:widget.dashboard.summary-cash-advance />
-            <livewire:widget.dashboard.summary-inventory />
-        </div>
-
-        {{-- DAR + Izin --}}
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            <div class="lg:col-span-2">
-                <livewire:widget.dashboard.summary-dar />
-            </div>
-            <div class="lg:col-span-1">
-                <livewire:izin.widget.report-izin />
-            </div>
-        </div>
 
         {{-- Latest Articles --}}
         <div class="bg-white rounded-2xl border border-zinc-200 p-5 sm:p-6 shadow-xs space-y-5">
