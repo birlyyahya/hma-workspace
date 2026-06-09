@@ -77,7 +77,7 @@ class ActivityForm extends Form
         $teamUser = ! empty($this->team_user) ? $this->team_user : ($this->team ?? []);
         $date = $this->date ?: $this->start_date;
 
-        $response = Http::post(env('API_IZIN').'/global/dar/create', [
+        $response = Http::post(config('services.api_izin').'/global/dar/create', [
             'user_id' => Auth::user()->id,
             'activity' => $this->activity,
             'description' => $this->description,

@@ -168,7 +168,7 @@ new class extends Component {
 
         $newStatus = $todo['status'] == 1 ? 4 : 1;
 
-        Http::put(env('API_IZIN').'global/dar/activity/'.$id.'/status', [
+        Http::put(config('services.api_izin').'global/dar/activity/'.$id.'/status', [
             'status' => $newStatus
         ]);
 

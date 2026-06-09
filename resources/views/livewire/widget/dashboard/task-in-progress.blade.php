@@ -7,7 +7,7 @@ new class extends Component {
 
     public function getTasksProperty()
     {
-        $response = Http::get(env('API_IZIN'). '/global/dar/list?user_id='.Auth::user()->id.'&limit=1000000&status=1')->json();
+        $response = Http::get(config('services.api_izin'). '/global/dar/list?user_id='.Auth::user()->id.'&limit=1000000&status=1')->json();
 
         return $response['data'] ?? [];
     }

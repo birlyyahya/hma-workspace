@@ -44,6 +44,8 @@ Route::middleware('auth')->group(function () {
     // Cash Advance
     Route::view('cashadvance', 'cashadvance')->name('cashadvance');
     Volt::route('cashadvance/dompet/{kodeCa}', 'cashadvance.dompet-show')->name('cashadvance.dompet-show');
+    Volt::route('cashadvance/laporan/ca-pl/{seq?}', 'cashadvance.laporan-capl')->name('cashadvance.laporan.capl');
+    Volt::route('cashadvance/laporan/kegiatan/{kodeCa}', 'cashadvance.laporan-kegiatan')->name('cashadvance.laporan.kegiatan');
     // Volt::route('cashadvance', 'maintenance/comingsoon')->name('cashadvance');
 
     // Event

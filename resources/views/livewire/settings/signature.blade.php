@@ -22,7 +22,7 @@ class extends Component {
         }
 
         try{
-            $response = Http::get(env('API_IZIN') . '/global/user/get-user/'.Auth::user()->username)->json();
+            $response = Http::get(config('services.api_izin') . '/global/user/get-user/'.Auth::user()->username)->json();
             if ($response['success']) {
                 Cache::remember(
                 'ttd_user_' . Auth::user()->id,now()->addMonths(6), // key unik per user
@@ -47,7 +47,7 @@ class extends Component {
 
     public function save(){
         $signatureBase64 = "data:" . $this->signature->getMimeType() . ";base64," . base64_encode(file_get_contents($this->signature->getRealPath()));
-        $response = Http::post(env('API_IZIN') . '/global/user/update-signature/'.Auth::user()->username, [
+        $response = Http::post(config('services.api_izin') . '/global/user/update-signature/'.Auth::user()->username, [
             "base64" => $signatureBase64
         ])->json();
 
@@ -66,7 +66,7 @@ class extends Component {
         }
     }
     public function saveDraw(){
-        $response = Http::post(env('API_IZIN') . '/global/user/update-signature/'.Auth::user()->username, [
+        $response = Http::post(config('services.api_izin') . '/global/user/update-signature/'.Auth::user()->username, [
             "base64" => $this->signature
         ])->json();
 

@@ -27,7 +27,7 @@ new class extends Component {
     public function mount(){
 
         try {
-            $response = Http::get(env('API_IZIN'). '/global/dar/list?page='.$this->page.'&perPage='.$this->perPage.'&user_id='.Auth::user()->id.'&search='.$this->search.'&start_date='.$this->start_date.'&end_date='.$this->end_date.'')->json();
+            $response = Http::get(config('services.api_izin'). '/global/dar/list?page='.$this->page.'&perPage='.$this->perPage.'&user_id='.Auth::user()->id.'&search='.$this->search.'&start_date='.$this->start_date.'&end_date='.$this->end_date.'')->json();
 
             $activities = collect($response['data']);
 
@@ -90,7 +90,7 @@ new class extends Component {
     public function fetch()
     {
         $this->loading = true;
-        $response = Http::get(env('API_IZIN'). '/global/dar/list?page='.$this->page.'&perPage='.$this->perPage.'&search='.$this->search.'&start_date='.$this->start_date.'&end_date='.$this->end_date.'&user_id='.Auth::user()->id)->json();
+        $response = Http::get(config('services.api_izin'). '/global/dar/list?page='.$this->page.'&perPage='.$this->perPage.'&search='.$this->search.'&start_date='.$this->start_date.'&end_date='.$this->end_date.'&user_id='.Auth::user()->id)->json();
         $this->tasks = $response;
         $this->loading = false;
     }
@@ -101,19 +101,16 @@ new class extends Component {
 
     public function createActivity(){
         $response = $this->form->store($this->projectSelected);
-         if ($response['success']) {
 
-        app(DarCache::class)->flush();
-
-        $this->reset('form');
-
-        Toaster::success('Create Activity successfully');
-
+        if ($response->successful() && ($response->json('success') ?? false)) {
+            app(DarCache::class)->flush();
+            $this->reset('form');
+            Toaster::success('Create Activity successfully');
         } else {
             Toaster::error('Create Activity failed');
             \Log::error('Activity API failed', [
-                'status' => $response['success'],
-                'body'   => $response['message'] ?? 'No message',
+                'status' => $response->status(),
+                'body'   => $response->json('message') ?? $response->body(),
             ]);
         }
     }
@@ -121,7 +118,7 @@ new class extends Component {
     public function updatedTaskStatus($value, $id)
     {
         $response = Http::post(
-            env('API_IZIN').'global/dar/activity/'.$id.'/status',
+            config('services.api_izin').'global/dar/activity/'.$id.'/status',
             [
                 '_method' => 'PUT',
                 'status' => $value
@@ -157,7 +154,7 @@ new class extends Component {
     }
 
     public function deleteTask($id){
-        $response = Http::delete(env('API_IZIN').'global/dar/activity/'.$id);
+        $response = Http::delete(config('services.api_izin').'global/dar/activity/'.$id);
         if($response['success']){
             app(DarCache::class)->flush();
             Toaster::success('Delete Activity successfully');
