@@ -31,7 +31,7 @@ class IzinCache
     {
         return Cache::tags([self::TAG, "izin:user:{$username}"])
             ->remember("izin:dashboard:{$username}", self::TTL_DASHBOARD, function () use ($username) {
-                $response = Http::timeout(30)->retry(2, 200)
+                $response = Http::timeout(5)->retry(2, 200)
                     ->get($this->apiBase.'/global/izin/dashboard/'.$username);
 
                 if (! $response->successful()) {
@@ -86,7 +86,7 @@ class IzinCache
     {
         return Cache::tags([self::TAG])
             ->remember('izin:spd:list:all', self::TTL_SPD, function () {
-                $response = Http::timeout(30)->retry(2, 200)
+                $response = Http::timeout(5)->retry(2, 200)
                     ->get($this->apiBase.'/global/dar/activity/list-spd');
 
                 if (! $response->successful()) {
@@ -107,7 +107,7 @@ class IzinCache
     {
         return Cache::tags([self::TAG, "izin:detail:{$id}"])
             ->remember("izin:detail:{$id}", self::TTL_DETAIL, function () use ($id) {
-                $response = Http::timeout(30)->retry(2, 200)
+                $response = Http::timeout(5)->retry(2, 200)
                     ->get($this->apiBase.'/global/izin/detail/'.$id);
 
                 if (! $response->successful()) {

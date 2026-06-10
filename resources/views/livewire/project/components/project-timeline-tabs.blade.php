@@ -39,7 +39,7 @@ new class extends Component {
     public function mount(){
 
         // Dummy timelines
-        $response = Http::timeout(300)->retry(3)->get(config('services.api_project').'timelines/search?user_id='.$this->user_id.'&project_id='.$this->id)->json();
+        $response = Http::timeout(5)->retry(3)->get(config('services.api_project').'timelines/search?user_id='.$this->user_id.'&project_id='.$this->id)->json();
 
         if($response['status'] !== 200) {
             Toaster::error('Failed to load timelines. Please refresh the page.');
@@ -54,7 +54,7 @@ new class extends Component {
 
         $this->timelines = $response['data'] ?? [];
 
-        $response_dar = Http::get(config('services.api_izin'). '/global/dar/list?team_user='.$this->user_id.'&project_id='.$this->id)->json();
+        $response_dar = Http::timeout(5)->retry(3)->get(config('services.api_izin'). '/global/dar/list?team_user='.$this->user_id.'&project_id='.$this->id)->json();
 
         if(!$response_dar['success']) {
             Toaster::error('Failed to load activities. Please refresh the page.');

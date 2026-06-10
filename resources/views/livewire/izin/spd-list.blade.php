@@ -194,7 +194,7 @@ new class extends Component {
                 $params['user_id'] = Auth::user()->id;
             }
 
-            $response = Http::timeout(60)
+            $response = Http::timeout(5)
                 ->retry(2, 200)
                 ->get($apiIzin.'/global/dar/activity/list-spd', $params)
                 ->json();

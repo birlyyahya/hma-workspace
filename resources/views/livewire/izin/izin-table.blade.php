@@ -71,7 +71,7 @@ new class extends Component {
     public function fetchData(): void
     {
         try {
-            $response = Http::timeout(120)
+            $response = Http::timeout(5)
                 ->retry(3)
                 ->get(config('services.api_izin').'/global/izin/list', $this->buildQuery());
 

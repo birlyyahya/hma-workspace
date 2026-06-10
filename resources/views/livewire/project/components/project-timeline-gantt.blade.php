@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
+use Masmerise\Toaster\Toaster;
 
 new class extends Component {
     public $id;
@@ -52,7 +53,7 @@ new class extends Component {
             }
         } catch (\Throwable $e) {
             $this->timelines = [];
-            Toaster::
+            Toaster::error('Gagal memuat timeline: '.$e->getMessage());
             Log::error('Gantt timeline exception', ['message' => $e->getMessage()]);
         }
 
