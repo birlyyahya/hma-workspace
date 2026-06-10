@@ -50,8 +50,8 @@
                 </div>
             </div>
             <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                <livewire:izin.widget.report-izin lazy />
-                <livewire:izin.widget.report-izin-category lazy />
+                <livewire:izin.widget.report-izin defer />
+                <livewire:izin.widget.report-izin-category defer />
             </div>
 
             @if(Auth::user()->level <= 90)
