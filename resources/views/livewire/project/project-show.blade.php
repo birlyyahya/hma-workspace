@@ -262,7 +262,7 @@ new #[Lazy] class extends Component {
             {{-- ============ TAB CONTENT ============ --}}
             <div class="px-4 sm:px-6 py-6">
                 <div x-show="active === 'overview'" wire:key="overview-{{ $this->id }}" x-transition.opacity.duration.150ms>
-                    <livewire:project.components.project-overview-tabs lazy :project="$this->project" :spectech="$this->project['specktech']" />
+                    <livewire:project.components.project-overview-tabs defer :project="$this->project" :spectech="$this->project['specktech']" />
                 </div>
 
                 <div x-show="active === 'spectech'" wire:key="spectech-{{ $this->id }}" x-transition.opacity.duration.150ms>

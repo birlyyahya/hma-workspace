@@ -85,13 +85,13 @@
 
                     <!-- SPD -->
                     <div x-show="tab === 'spd'" x-transition>
-                        <livewire:izin.spd-list lazy />
+                        <livewire:izin.spd-list defer />
                     </div>
 
                 </div>
         </div>
         @else
-        <livewire:izin.spd-list lazy />
+        <livewire:izin.spd-list defer />
         @endif
     </div>
     <livewire:izin.add-izin-modal />
