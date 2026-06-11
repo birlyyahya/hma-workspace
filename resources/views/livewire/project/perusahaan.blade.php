@@ -26,7 +26,7 @@ new #[Lazy(isolate: false)]  class extends Component {
     public string $address = '';
     public string $director_name = '';
     public string $established_date = '';
-    public $director_signature = null;
+    public $letter_head = null;
     public ?string $existing_signature = null;
 
     public ?int $deletingId = null;
@@ -42,7 +42,7 @@ new #[Lazy(isolate: false)]  class extends Component {
             'address'           => ['required', 'string', 'max:1000'],
             'director_name'     => ['required', 'string', 'max:255'],
             'established_date'  => ['required', 'date'],
-            'director_signature' => [$this->isEdit ? 'nullable' : 'required', 'image', 'max:2048'],
+            'letter_head' => [$this->isEdit ? 'nullable' : 'required', 'image', 'max:2048'],
         ];
     }
 
@@ -107,7 +107,7 @@ new #[Lazy(isolate: false)]  class extends Component {
         $this->address            = $company['address'] ?? '';
         $this->director_name      = $company['director_name'] ?? '';
         $this->established_date   = $company['established_date'] ?? '';
-        $this->existing_signature = $company['director_signature'] ?? null;
+        $this->existing_signature = $company['letter_head'] ?? null;
         $this->showForm           = true;
     }
 
@@ -118,11 +118,11 @@ new #[Lazy(isolate: false)]  class extends Component {
         try {
             $request = Http::asMultipart();
 
-            if ($this->director_signature) {
+            if ($this->letter_head) {
                 $request = $request->attach(
-                    'director_signature',
-                    file_get_contents($this->director_signature->getRealPath()),
-                    $this->director_signature->getClientOriginalName()
+                    'letter_head',
+                    file_get_contents($this->letter_head->getRealPath()),
+                    $this->letter_head->getClientOriginalName()
                 );
             }
 
@@ -137,7 +137,7 @@ new #[Lazy(isolate: false)]  class extends Component {
                 . ($this->isEdit ? '/' . $this->editingId : '');
 
             $response = $this->isEdit
-                ? $request->post($url . '?_method=PUT', $payload)
+                ? $request->post($url, $payload)
                 : $request->post($url, $payload);
 
             if (!$response->successful()) {
@@ -208,7 +208,7 @@ new #[Lazy(isolate: false)]  class extends Component {
     {
         $this->reset([
             'isEdit', 'editingId', 'name', 'address', 'director_name',
-            'established_date', 'director_signature', 'existing_signature', 'errorMessage',
+            'established_date', 'letter_head', 'existing_signature', 'errorMessage',
         ]);
         $this->resetValidation();
     }
@@ -280,9 +280,9 @@ new #[Lazy(isolate: false)]  class extends Component {
                             {{ $item['director_name'] ?? '-' }}
                         </td>
                         <td class="px-5 py-4 align-top">
-                            @if(!empty($item['director_signature']))
-                            <a href="{{ config('services.url_project') . $item['director_signature'] }}" target="_blank" class="inline-block w-20 h-12 rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 overflow-hidden hover:ring-2 hover:ring-blue-400 transition">
-                                <img src="{{ config('services.url_project') . $item['director_signature'] }}" alt="ttd" class="w-full h-full object-contain" />
+                            @if(!empty($item['letter_head']))
+                            <a href="{{ config('services.url_project') . $item['letter_head'] }}" target="_blank" class="inline-block w-20 h-12 rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 overflow-hidden hover:ring-2 hover:ring-blue-400 transition">
+                                <img src="{{ config('services.url_project') . $item['letter_head'] }}" alt="ttd" class="w-full h-full object-contain" />
                             </a>
                             @else
                             <span class="text-xs text-zinc-400">—</span>
@@ -332,8 +332,8 @@ new #[Lazy(isolate: false)]  class extends Component {
         <div wire:key="m-company-{{ $item['id'] }}" class="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm p-4 space-y-3">
             <div class="flex items-start gap-3">
                 <div class="w-12 h-12 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0">
-                    @if(!empty($item['director_signature']))
-                    <img src="{{ $item['director_signature'] }}" class="w-full h-full object-contain rounded-lg" />
+                    @if(!empty($item['letter_head']))
+                    <img src="{{ $item['letter_head'] }}" class="w-full h-full object-contain rounded-lg" />
                     @else
                     <flux:icon name="building-office-2" class="w-5 h-5 text-zinc-400" />
                     @endif
@@ -434,8 +434,8 @@ new #[Lazy(isolate: false)]  class extends Component {
                         <flux:label>KOP Surat PT</flux:label>
                         <div class="mt-1.5 flex items-start gap-4">
                             <div class="w-32 h-20 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center overflow-hidden shrink-0">
-                                @if($director_signature)
-                                <img src="{{ config('services.url_project') . $director_signature->temporaryUrl() }}" class="w-full h-full object-contain" />
+                                @if($letter_head)
+                                <img src="{{ $letter_head->temporaryUrl() }}" class="w-full h-full object-contain" />
                                 @elseif($existing_signature)
                                 <img src="{{ config('services.url_project') . $existing_signature }}" class="w-full h-full object-contain" />
                                 @else
@@ -443,16 +443,16 @@ new #[Lazy(isolate: false)]  class extends Component {
                                 @endif
                             </div>
                             <div class="flex-1 space-y-2">
-                                <input type="file" wire:model="director_signature" accept="image/*" class="block w-full text-xs text-zinc-600 dark:text-zinc-400
+                                <input type="file" wire:model="letter_head" accept="image/*" class="block w-full text-xs text-zinc-600 dark:text-zinc-400
                                           file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0
                                           file:text-xs file:font-semibold
                                           file:bg-zinc-100 dark:file:bg-zinc-800 file:text-zinc-700 dark:file:text-zinc-300
                                           hover:file:bg-zinc-200 dark:hover:file:bg-zinc-700 cursor-pointer" />
                                 <p class="text-xs text-zinc-400">PNG/JPG, maks 2 MB. Latar transparan disarankan.</p>
-                                <div wire:loading wire:target="director_signature" class="text-xs text-zinc-500">Mengunggah…</div>
+                                <div wire:loading wire:target="letter_head" class="text-xs text-zinc-500">Mengunggah…</div>
                             </div>
                         </div>
-                        @error('director_signature')
+                        @error('letter_head')
                         <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
                         @enderror
                     </div>

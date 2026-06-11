@@ -32,7 +32,7 @@ class DarCache
                 $url .= '&team_user='.$userId;
             }
 
-            return Http::timeout(120)->retry(3, 200)->get($url)->json() ?? ['data' => []];
+            return Http::timeout(30)->retry(3, 200)->get($url)->json() ?? ['data' => []];
         });
     }
 

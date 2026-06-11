@@ -56,7 +56,7 @@ new class extends Component {
     {
         try {
             $scope = Auth::user()?->viewScopeFor('dar') === 'all' ? 'all' : 'user';
-            $response = app(DarCache::class)->list($scope, Auth::id());
+            $response = app(DarCache::class)->list('all', Auth::id());
             $rows = $response['data'] ?? [];
 
             $projectMap = collect(app(ProjectCache::class)->allProjects())

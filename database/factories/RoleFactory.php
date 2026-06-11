@@ -24,6 +24,8 @@ class RoleFactory extends Factory
             'name' => $name,
             'description' => $this->faker->sentence(),
             'level' => $this->faker->numberBetween(1, 10),
+            'departemend_id' => 1,
+            'is_system' => false,
             'can_approve' => $this->faker->boolean(),
         ];
     }

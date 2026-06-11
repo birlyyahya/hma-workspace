@@ -19,16 +19,16 @@ class SupportPolicyPolicy
 
     public function create(User $user): bool
     {
-        return (int) ($user->level ?? 0) >= 90;
+        return $user->hasPermission('knowledge.create');
     }
 
     public function update(User $user, SupportPolicy $supportPolicy): bool
     {
-        return (int) ($user->level ?? 0) >= 90;
+        return $user->hasPermission('knowledge.update');
     }
 
     public function delete(User $user, SupportPolicy $supportPolicy): bool
     {
-        return (int) ($user->level ?? 0) >= 90;
+        return $user->hasPermission('knowledge.delete');
     }
 }

@@ -386,36 +386,77 @@ new class extends Component {
     </flux:modal>
 
     {{-- VIEW MODAL --}}
-    <flux:modal name="announcement-view-modal" class="md:w-[640px]">
+    @php
+        $viewingIsImage = $this->viewing?->file
+            && in_array(Str::lower(pathinfo($this->viewing->file, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'bmp'], true);
+    @endphp
+    <flux:modal name="announcement-view-modal"
+        class="md:min-w-6xl! min-w-2/3!">
         @if ($this->viewing)
-            <div class="space-y-4">
-                <div class="flex items-start gap-3">
-                    <div class="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center
-                        {{ $this->viewing->priority === 'important' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600' }}">
-                        <flux:icon name="{{ $this->viewing->priority === 'important' ? 'fire' : 'megaphone' }}" class="w-5 h-5" />
+            @if ($viewingIsImage)
+                {{-- Tampilan Instagram: mobile vertikal (gambar atas, konten bawah), desktop horizontal --}}
+                <div class="flex flex-col md:flex-row md:-m-6 md:max-h-[80vh]">
+                    <div class="md:w-2/5 bg-zinc-950 flex items-center justify-center md:rounded-l-xl overflow-hidden">
+                        <img src="{{ Storage::url($this->viewing->file) }}" alt="{{ $this->viewing->title }}"
+                            class="w-full max-h-72 md:max-h-none md:h-full object-contain" />
                     </div>
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2">
-                            <flux:heading size="lg">{{ $this->viewing->title }}</flux:heading>
-                            @if ($this->viewing->priority === 'important')
-                                <flux:badge color="red" size="sm">Important</flux:badge>
-                            @endif
+                    <div class="md:w-3/5 p-6 space-y-4 overflow-y-auto">
+                        <div class="flex items-start gap-3">
+                            <div class="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center
+                                {{ $this->viewing->priority === 'important' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600' }}">
+                                <flux:icon name="{{ $this->viewing->priority === 'important' ? 'fire' : 'megaphone' }}" class="w-5 h-5" />
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <flux:heading size="lg">{{ $this->viewing->title }}</flux:heading>
+                                    @if ($this->viewing->priority === 'important')
+                                        <flux:badge color="red" size="sm">Important</flux:badge>
+                                    @endif
+                                </div>
+                                <p class="text-xs text-zinc-400 mt-1">
+                                    {{ $this->viewing->author?->name ?? 'System' }} • {{ $this->viewing->created_at?->format('d M Y, H:i') }}
+                                </p>
+                            </div>
                         </div>
-                        <p class="text-xs text-zinc-400 mt-1">
-                            {{ $this->viewing->author?->name ?? 'System' }} • {{ $this->viewing->created_at?->format('d M Y, H:i') }}
-                        </p>
+
+                        <div class="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">{{ $this->viewing->content }}</div>
+
+                        <a href="{{ Storage::url($this->viewing->file) }}" target="_blank"
+                            class="inline-flex items-center gap-2 text-sm text-blue-600 hover:underline">
+                            <flux:icon name="arrow-top-right-on-square" class="w-4 h-4" /> Buka gambar ukuran penuh
+                        </a>
                     </div>
                 </div>
+            @else
+                <div class="space-y-4">
+                    <div class="flex items-start gap-3">
+                        <div class="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center
+                            {{ $this->viewing->priority === 'important' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600' }}">
+                            <flux:icon name="{{ $this->viewing->priority === 'important' ? 'fire' : 'megaphone' }}" class="w-5 h-5" />
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <flux:heading size="lg">{{ $this->viewing->title }}</flux:heading>
+                                @if ($this->viewing->priority === 'important')
+                                    <flux:badge color="red" size="sm">Important</flux:badge>
+                                @endif
+                            </div>
+                            <p class="text-xs text-zinc-400 mt-1">
+                                {{ $this->viewing->author?->name ?? 'System' }} • {{ $this->viewing->created_at?->format('d M Y, H:i') }}
+                            </p>
+                        </div>
+                    </div>
 
-                <div class="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">{{ $this->viewing->content }}</div>
+                    <div class="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">{{ $this->viewing->content }}</div>
 
-                @if ($this->viewing->file)
-                    <a href="{{ Storage::url($this->viewing->file) }}" target="_blank"
-                        class="inline-flex items-center gap-2 text-sm text-blue-600 hover:underline">
-                        <flux:icon name="paper-clip" class="w-4 h-4" /> Buka lampiran
-                    </a>
-                @endif
-            </div>
+                    @if ($this->viewing->file)
+                        <a href="{{ Storage::url($this->viewing->file) }}" target="_blank"
+                            class="inline-flex items-center gap-2 text-sm text-blue-600 hover:underline">
+                            <flux:icon name="paper-clip" class="w-4 h-4" /> Buka lampiran
+                        </a>
+                    @endif
+                </div>
+            @endif
         @endif
     </flux:modal>
 </div>

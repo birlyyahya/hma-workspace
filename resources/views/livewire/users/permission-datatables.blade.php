@@ -94,7 +94,7 @@ new class extends Component {
     {
         return [
             'create' => 'Create',
-            'read' => 'Read',
+            'view' => 'View',
             'update' => 'Update',
             'delete' => 'Delete',
             'comment' => 'Comment',
