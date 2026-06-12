@@ -825,6 +825,29 @@ new class extends Component {
         </div>
 
         <div class="space-y-4">
+            {{-- Tipe spektek: Hardware / Software --}}
+            <flux:field>
+                <flux:label badge="Wajib" >Tipe spektek</flux:label>
+                <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-1 grid grid-cols-2 gap-1">
+                    @foreach ([
+                        ['key' => 'hardware', 'label' => 'Barang', 'icon' => 'cube'],
+                        ['key' => 'software', 'label' => 'Aplikasi', 'icon' => 'computer-desktop'],
+                    ] as $typeTab)
+                        <button type="button"
+                            wire:click="$set('form.type', '{{ $typeTab['key'] }}')"
+                            @class([
+                                'flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer',
+                                'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200' => $form->type === $typeTab['key'],
+                                'text-zinc-600 hover:bg-white' => $form->type !== $typeTab['key'],
+                            ])>
+                            <flux:icon name="{{ $typeTab['icon'] }}" class="w-4 h-4" />
+                            <span>{{ $typeTab['label'] }}</span>
+                        </button>
+                    @endforeach
+                </div>
+                <flux:error name="form.type" />
+            </flux:field>
+
             <flux:field>
                 <flux:label badge="Wajib">Nama spektek</flux:label>
                 <flux:input wire:model="form.name" placeholder="cth. Pipa PVC 4 inch" autofocus />

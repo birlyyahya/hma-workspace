@@ -614,7 +614,7 @@ new class extends Component {
     </flux:modal>
 
     {{-- ============ UPLOAD MODAL ============ --}}
-    <flux:modal id="upload-file-modal" name="upload-file-modal" wire:close="resetViewModal" class="overflow-visible w-xl" enctype="multipart/form-data">
+    <flux:modal id="upload-file-modal" name="upload-file-modal" wire:close="resetViewModal" class="overflow-visible max-w-xl w-xl" enctype="multipart/form-data">
         <form
             class="space-y-5"
             x-data="projectFilesChunkUploader({{ (int) $this->id }}, @js(route('project-files.upload-chunk')))"
@@ -656,7 +656,7 @@ new class extends Component {
                 <flux:label badge="Wajib">File</flux:label>
                 <label
                     for="file_input"
-                    class="relative flex flex-col items-center justify-center gap-2 px-6 py-8 rounded-xl border-2 border-dashed cursor-pointer transition"
+                    class="relative flex flex-col items-center justify-center gap-2 px-6 py-8 rounded-xl border-2 border-dashed cursor-pointer transition max-w-full overflow-hidden"
                     :class="selectedFile ? 'border-red-200 bg-red-50/40' : 'border-zinc-200 bg-zinc-50 hover:border-red-200 hover:bg-red-50/30'"
                     @dragover.prevent="$el.classList.add('border-red-300','bg-red-50')"
                     @dragleave.prevent="$el.classList.remove('border-red-300','bg-red-50')"
@@ -690,18 +690,26 @@ new class extends Component {
                     </template>
 
                     <template x-if="selectedFile">
-                        <div class="flex items-center gap-3 w-full">
+                        <div class="flex items-center gap-3 w-full min-w-0 overflow-hidden">
                             <div class="shrink-0 w-10 h-10 rounded-lg bg-red-100 text-red-600 flex items-center justify-center">
                                 <flux:icon.document class="w-5 h-5" />
                             </div>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-sm font-medium text-zinc-900 truncate" x-text="selectedFile.name"></p>
-                                <p class="text-xs text-zinc-500" x-text="(selectedFile.size / 1024 / 1024).toFixed(2) + ' MB'"></p>
+                            <div class="flex-1 min-w-0 overflow-hidden">
+                                <p
+                                    class="block max-w-full truncate text-sm font-medium text-zinc-900"
+                                    x-text="selectedFile.name"
+                                    :title="selectedFile.name"
+                                ></p>
+
+                                <p
+                                    class="text-xs text-zinc-500"
+                                    x-text="(selectedFile.size / 1024 / 1024).toFixed(2) + ' MB'"
+                                ></p>
                             </div>
                             <button
                                 type="button"
                                 @click.prevent.stop="selectedFile = null; $refs.fileInput.value = ''"
-                                class="text-xs text-red-600 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-100"
+                                class="shrink-0 text-xs text-red-600 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-100"
                             >
                                 Ganti
                             </button>
@@ -789,10 +797,14 @@ new class extends Component {
                         <flux:icon.trash variant="micro" />
                         Hapus
                     </span>
-                    <span class="flex items-center justify-center gap-2" wire:loading wire:target="fileDelete">
-                        <flux:icon.loading variant="micro" />
-                        Menghapus...
-                    </span>
+                    <div class="flex justify-center gap-2">
+                        <span class="flex items-center justify-center gap-2" wire:loading wire:target="fileDelete">
+                            <flux:icon.loading variant="micro" />
+                        </span>
+                        <span class="flex items-center justify-center gap-2" wire:loading wire:target="fileDelete">
+                            Menghapus...
+                        </span>
+                    </div>
                 </flux:button>
             </div>
         </div>
@@ -806,16 +818,34 @@ new class extends Component {
     // ── Select2 ───────────────────────────────────────────────────────────────
     const initProjectFilesSelect2 = () => {
         const el = $('#categoryFiles');
+        if (!el.length) return;
+
+        if (el.hasClass('select2-hidden-accessible')) {
+            el.select2('destroy');
+        }
+
         el.select2({
             dropdownParent: $('dialog[data-modal="upload-file-modal"]'),
             width: '100%',
             placeholder: 'Pilih kategori...',
             allowClear: true,
         });
-        el.on('change', function () {
+
+        el.off('change.projectFiles').on('change.projectFiles', function () {
             __wire.set('form.category', $(this).val());
         });
     };
+
+    // Native <dialog> steals focus from the select2 search field; force it back.
+    if (!window._projectFilesSelect2FocusFix) {
+        window._projectFilesSelect2FocusFix = true;
+        $(document).on('select2:open', () => {
+            const search = document.querySelector('.select2-container--open .select2-search__field');
+            if (search) {
+                setTimeout(() => search.focus(), 0);
+            }
+        });
+    }
 
     Livewire.on('initSelect2', () => setTimeout(initProjectFilesSelect2, 0));
     window.addEventListener('init-select2-upload', () => setTimeout(initProjectFilesSelect2, 0));

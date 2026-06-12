@@ -614,9 +614,9 @@ class extends Component {
                     $statusLabel = match ($status) {
                         1 => 'OPEN',
                         2 => 'PENDING',
-                        3 => 'CLOSED',
-                        4 => 'CANCELLED',
-                        default => 'Draft',
+                        3 => 'CANCELLED',
+                        4 => 'CLOSED',
+                        default => 'OPEN',
                     };
 
                     $duration = null;
@@ -661,10 +661,10 @@ class extends Component {
                                         <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</label>
                                         <select wire:model="editStatus"
                                             class="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-800 focus:border-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-200">
-                                            <option value="1">Pending</option>
-                                            <option value="2">On Hold</option>
-                                            <option value="3">In Progress</option>
-                                            <option value="4">Completed</option>
+                                            <option value="1">OPEN</option>
+                                            <option value="2">PENDING</option>
+                                            <option value="3">CANCELLED</option>
+                                            <option value="4">CLOSED</option>
                                         </select>
                                     </div>
                                     <div>

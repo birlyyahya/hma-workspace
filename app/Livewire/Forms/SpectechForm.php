@@ -23,6 +23,9 @@ class SpectechForm extends Form
     #[Validate('nullable|integer|min:0|lte:quantity')]
     public ?int $received_quantity = 0;
 
+    #[Validate('required|in:hardware,software')]
+    public string $type = 'hardware';
+
     public ?int $idUpdate = null;
 
     protected function endpoint(?string $suffix = null): string
@@ -36,6 +39,7 @@ class SpectechForm extends Form
             'name' => $this->name,
             'qty_total' => $this->quantity,
             'total_nominal' => (int) preg_replace('/[^0-9]/', '', (string) $this->price),
+            'type' => $this->type,
             'note' => $this->notes ?? '',
         ];
 
@@ -64,6 +68,7 @@ class SpectechForm extends Form
         $this->price = number_format((float) ($spectech['total_nominal'] ?? 0), 0, ',', '.');
         $this->received_quantity = (int) ($spectech['qty_recived'] ?? 0);
         $this->notes = $spectech['note'] ?? null;
+        $this->type = $spectech['type'] ?? 'hardware';
         $this->idUpdate = (int) $spectech['id'];
     }
 

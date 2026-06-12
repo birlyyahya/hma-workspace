@@ -22,7 +22,7 @@ class ProjectFileChunkUploadController extends Controller
         $chunk = $request->file('file');
         $bytes = file_get_contents($chunk->getRealPath());
 
-        $base = rtrim((string) env('API_PROJECT'), '/').'/';
+        $base = rtrim((string) config('services.api_project'), '/').'/';
         $response = Http::timeout(120)
             ->attach('file', $bytes, $validated['original_name'])
             ->post($base.'upload-chunks', [
