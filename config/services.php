@@ -40,4 +40,5 @@ return [
     'api_project' => env('API_PROJECT'),
     'url_project' => env('URL_PROJECT'),
     'api_ca' => env('API_CA'),
+    'aws_url' => env('AWS_URL'),
 ];

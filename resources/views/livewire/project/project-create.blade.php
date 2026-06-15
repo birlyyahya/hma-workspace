@@ -60,10 +60,10 @@ new class extends Component
             'status'            => ['required', 'string', 'in:WAITING,ON PROGRESS,DONE,CANCELLED,MAINTENANCE'],
             'start_date'        => ['required', 'date'],
             'end_date'          => ['required', 'date', 'after_or_equal:start_date'],
-            'maintenance_date'  => ['required', 'date', 'after_or_equal:end_date'],
+            'maintenance_date'  => ['nullable', 'date', 'after_or_equal:end_date'],
             'project_leader_id' => ['required', 'integer'],
             'company_id'        => ['required', 'integer'],
-            'support_teams'     => ['array', 'required'],
+            'support_teams'     => ['array', 'nullable'],
             'support_teams.*'   => ['string', 'min:2'],
         ];
     }
