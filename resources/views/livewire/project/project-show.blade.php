@@ -44,7 +44,7 @@ new #[Lazy] class extends Component {
             )->json();
 
             // Ambil data dari cache
-        //        $getCacheProject = app(ProjectCache::class)->allProjects();
+        //     $getCacheProject = app(ProjectCache::class)->allProjects();
 
         //    $project = array_filter($getCacheProject, function ($project) {
         //         return $project['id'] == $this->id;

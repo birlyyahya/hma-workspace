@@ -359,7 +359,7 @@ new class extends Component {
     {
         $needle = trim(mb_strtolower($this->search));
 
-        return collect($this->spectech)
+        $response =     collect($this->spectech)
             ->filter(fn ($item) => ($item['type'] ?? 'hardware') === $this->activeType)
             ->when($needle !== '', fn ($items) => $items->filter(
                 fn ($item) => str_contains(mb_strtolower((string) ($item['name'] ?? '')), $needle),
@@ -369,6 +369,7 @@ new class extends Component {
             ))
             ->values()
             ->all();
+
     }
 
     #[Computed]
@@ -445,7 +446,7 @@ new class extends Component {
                             Selesai
                         </flux:button>
                     @else
-                        <flux:button wire:click="toggleBulkMode" variant="ghost" size="sm" icon="check-circle"
+                        <flux:button class="!hidden" wire:click="toggleBulkMode" variant="ghost" size="sm" icon="check-circle"
                             :disabled="$this->totalItems === 0">
                             Pilih
                         </flux:button>
@@ -611,16 +612,10 @@ new class extends Component {
                                     {{-- <span class="text-zinc-400 font-normal"></span> --}}
                                 </p>
                             </div>
-                            {{-- <div class="rounded-lg bg-zinc-50 p-3">
-                                <p class="text-[11px] uppercase tracking-wide text-zinc-500">Nilai Diterima</p>
-                                <p class="mt-1 text-sm font-semibold text-zinc-900 truncate">
-                                    Rp {{ number_format(($data['qty_nominal'] ?? 0) * $qtyRecv, 0, ',', '.') }}
-                                </p>
-                            </div> --}}
                             <div class="rounded-lg bg-zinc-50 p-3">
                                 <p class="text-[11px] uppercase tracking-wide text-zinc-500">Total Nominal</p>
                                 <p class="mt-1 text-sm font-semibold text-zinc-900 truncate">
-                                    Rp {{ number_format($data['total_nominal'] ?? 0, 0, ',', '.') }}
+                                    Rp {{ number_format(($data['total_nominal'] ?? 0), 0, ',', '.') }}
                                 </p>
                             </div>
                         </div>
@@ -902,6 +897,28 @@ new class extends Component {
                 Perbarui detail spektek & jumlah barang yang sudah diterima.
             </flux:text>
         </div>
+
+         <flux:field>
+                <flux:label badge="Wajib" >Tipe spektek</flux:label>
+                <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-1 grid grid-cols-2 gap-1">
+                    @foreach ([
+                        ['key' => 'hardware', 'label' => 'Barang', 'icon' => 'cube'],
+                        ['key' => 'software', 'label' => 'Aplikasi', 'icon' => 'computer-desktop'],
+                    ] as $typeTab)
+                        <button type="button"
+                            wire:click="$set('form.type', '{{ $typeTab['key'] }}')"
+                            @class([
+                                'flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer',
+                                'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200' => $form->type === $typeTab['key'],
+                                'text-zinc-600 hover:bg-white' => $form->type !== $typeTab['key'],
+                            ])>
+                            <flux:icon name="{{ $typeTab['icon'] }}" class="w-4 h-4" />
+                            <span>{{ $typeTab['label'] }}</span>
+                        </button>
+                    @endforeach
+                </div>
+                <flux:error name="form.type" />
+            </flux:field>
 
         <div class="space-y-4">
             <flux:field>

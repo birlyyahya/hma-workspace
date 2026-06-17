@@ -77,4 +77,14 @@ Route::middleware('auth')->group(function () {
 
 });
 
+Route::get('/debug-host', function () {
+    return [
+        'host' => request()->getHost(),
+        'port' => request()->getPort(),
+        'root' => request()->root(),
+        'url' => url('/'),
+        'full' => request()->fullUrl(),
+    ];
+});
+
 require __DIR__.'/settings.php';
