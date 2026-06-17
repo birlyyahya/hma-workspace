@@ -1154,6 +1154,9 @@ class extends Component {
 
                             {{-- File previews --}}
                             @if (! empty($newFiles))
+                                 @foreach ($newFiles as $upload)
+                                    <div>{{ $upload->temporaryUrl() }}</div>
+                                @endforeach
                                 <div class="mx-4 mt-2 flex flex-wrap gap-2 rounded-xl bg-zinc-50 p-2">
                                     @foreach ($newFiles as $i => $upload)
                                         @php
