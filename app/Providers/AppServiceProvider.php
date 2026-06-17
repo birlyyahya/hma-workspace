@@ -7,13 +7,14 @@ use App\Services\IzinCache;
 use App\Services\ProjectCache;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
     /**
      * Register any application services.
-     */
+    */
     public function register(): void
     {
         $this->app->singleton(ProjectCache::class, fn () => new ProjectCache(
@@ -34,6 +35,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        URL::forceRootUrl(config('app.url'));
+
         Gate::before(function ($user, string $ability) {
             if ($user->hasRole('super-admin')) {
                 return true;

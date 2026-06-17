@@ -86,5 +86,8 @@ Route::get('/debug-host', function () {
         'full' => request()->fullUrl(),
     ];
 });
+Route::get('/headers', function () {
+    return request()->headers->all();
+});
 
 require __DIR__.'/settings.php';
