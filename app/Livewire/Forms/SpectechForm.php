@@ -42,10 +42,6 @@ class SpectechForm extends Form
             'type' => $this->type,
         ];
 
-        if (filled($this->notes)) {
-            $payload['note'] = $this->notes;
-        }
-
         if ($projectId !== null) {
             $payload['project_id'] = $projectId;
         }

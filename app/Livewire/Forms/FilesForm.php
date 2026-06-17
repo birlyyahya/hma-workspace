@@ -38,7 +38,7 @@ class FilesForm extends Form
             ]);
         }
 
-        $base = rtrim((string) env('API_PROJECT'), '/').'/';
+        $base = rtrim((string) config('services.api_project'), '/').'/';
         $adminDocsEndpoint = $base.'admin-docs';
 
         // If the file already got uploaded (chunked) elsewhere, only finalize document creation here.
@@ -60,7 +60,7 @@ class FilesForm extends Form
 
     public function delete($id)
     {
-        $response = Http::delete(env('API_PROJECT').'admin-docs/'.$id);
+        $response = Http::delete(config('services.api_project').'admin-docs/'.$id);
 
         return $response;
     }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Services\ProjectCache;
 use Carbon\Carbon;
 use Livewire\Attributes\Computed;
 use Livewire\Volt\Component;
@@ -12,6 +13,11 @@ new class extends Component {
     public $documents;
     public $loadingDocuments = false;
     public $loadingSpectech = false;
+
+    public function mount(): void
+    {
+        $this->spectech = app(ProjectCache::class)->spectechFor((int) ($this->project['id'] ?? 0));
+    }
 
     public function getUserProperty()
     {

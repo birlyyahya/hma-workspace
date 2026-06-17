@@ -1,8 +1,8 @@
 <?php
 
 use App\Livewire\Forms\SpectechForm;
+use App\Services\ProjectCache;
 use Flux\Flux;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
@@ -41,6 +41,21 @@ new class extends Component {
         return view('components.placeholder.ph_project_spectech_tabs');
     }
 
+    public function mount(): void
+    {
+        $this->loadSpectech();
+    }
+
+    public function loadSpectech(): void
+    {
+        $this->loadingSpectech = true;
+        $data = app(ProjectCache::class)->spectechFor((int) $this->id);
+
+        $this->spectech = array_map(fn (array $item): array => $this->mapItem($item), $data);
+
+        $this->loadingSpectech = false;
+    }
+
     /**
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
@@ -64,7 +79,7 @@ new class extends Component {
 
     protected function afterMutation(): void
     {
-        Cache::forget('project_data_show_'.$this->id);
+        app(ProjectCache::class)->flushSpectech((int) $this->id);
         $this->dispatch('projectLoad');
     }
 
@@ -102,12 +117,8 @@ new class extends Component {
         try {
             Http::delete(rtrim((string) config('services.api_project'), '/').'/activity-categories/'.$id);
 
-            $this->spectech = collect($this->spectech)
-                ->reject(fn ($item) => (int) $item['id'] === $id)
-                ->values()
-                ->all();
-
             $this->afterMutation();
+            $this->loadSpectech();
             Toaster::success('Spectech berhasil dihapus');
         } catch (\Throwable $e) {
             Toaster::error('Gagal menghapus spectech');
@@ -128,9 +139,9 @@ new class extends Component {
             return;
         }
 
-        $this->spectech[] = $this->mapItem($response['data']);
         $this->form->reset();
         $this->afterMutation();
+        $this->loadSpectech();
 
         Toaster::success('Spectech berhasil ditambahkan');
         Flux::modal('addSpectech')->close();
@@ -159,13 +170,9 @@ new class extends Component {
             return;
         }
 
-        $updated = $this->mapItem($response['data']);
-        $this->spectech = collect($this->spectech)
-            ->map(fn ($item) => (int) $item['id'] === (int) $updated['id'] ? $updated : $item)
-            ->all();
-
         $this->form->reset();
         $this->afterMutation();
+        $this->loadSpectech();
 
         Toaster::success('Spectech berhasil diperbarui');
         Flux::modal('editSpectech')->close();
@@ -358,7 +365,6 @@ new class extends Component {
     public function filteredSpectech(): array
     {
         $needle = trim(mb_strtolower($this->search));
-
         return collect($this->spectech)
             ->filter(fn ($item) => ($item['type'] ?? 'hardware') === $this->activeType)
             ->when($needle !== '', fn ($items) => $items->filter(
@@ -369,6 +375,7 @@ new class extends Component {
             ))
             ->values()
             ->all();
+
 
     }
 
@@ -822,7 +829,7 @@ new class extends Component {
         <div class="space-y-4">
             {{-- Tipe spektek: Hardware / Software --}}
             <flux:field>
-                <flux:label badge="Wajib" >Tipe spektek</flux:label>
+                <flux:label>Tipe spektek</flux:label>
                 <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-1 grid grid-cols-2 gap-1">
                     @foreach ([
                         ['key' => 'hardware', 'label' => 'Barang', 'icon' => 'cube'],

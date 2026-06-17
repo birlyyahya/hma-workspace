@@ -15,6 +15,8 @@ class ProjectCache
 
     private const TAG_COMPANIES = 'companies';
 
+    private const TAG_SPECTECH = 'spectech';
+
     public function __construct(private string $apiBase) {}
 
     /**
@@ -66,9 +68,33 @@ class ProjectCache
             });
     }
 
+    /**
+     * Daftar spektek (activity categories) milik satu project — sumber kanonik
+     * untuk tab Spektek & ringkasan Overview. Endpoint terpaginasi, jadi ambil
+     * semua sekaligus dengan limit besar.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function spectechFor(int $projectId): array
+    {
+        return Cache::tags([self::TAG_SPECTECH, "spectech:project:{$projectId}"])
+            ->remember("spectech:project:{$projectId}", self::TTL_USER, function () use ($projectId) {
+                return Http::timeout(120)->retry(3, 200)
+                    ->get($this->apiBase.'/activity-categories/search', [
+                        'project_id' => $projectId,
+                        'limit' => 99999,
+                    ])->json()['data'] ?? [];
+            });
+    }
+
     public function flushProjects(): void
     {
         Cache::tags([self::TAG_PROJECTS])->flush();
+    }
+
+    public function flushSpectech(int $projectId): void
+    {
+        Cache::tags(["spectech:project:{$projectId}"])->flush();
     }
 
     public function flushCompanies(): void
