@@ -359,7 +359,7 @@ new class extends Component {
     {
         $needle = trim(mb_strtolower($this->search));
 
-        $response =     collect($this->spectech)
+        return collect($this->spectech)
             ->filter(fn ($item) => ($item['type'] ?? 'hardware') === $this->activeType)
             ->when($needle !== '', fn ($items) => $items->filter(
                 fn ($item) => str_contains(mb_strtolower((string) ($item['name'] ?? '')), $needle),

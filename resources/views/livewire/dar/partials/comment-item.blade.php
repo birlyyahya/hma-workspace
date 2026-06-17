@@ -89,7 +89,7 @@
         @endif
     </div>
 
-    @if (! $isEditing && $isOwn)
+    @if (! $isEditing && $isOwn && ! empty($c['id']))
         <div x-data="{ open: false }" class="relative shrink-0 opacity-0 transition group-hover:opacity-100">
             <button
                 type="button"

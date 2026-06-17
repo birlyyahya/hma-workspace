@@ -15,37 +15,54 @@ use Livewire\WithFileUploads;
 use Masmerise\Toaster\Toaster;
 
 new #[Layout('components.layouts.app', ['title' => 'DAR - Task Detail'])]
-class extends Component {
+class extends Component
+{
     use WithFileUploads;
 
     public $id;
 
     public array $task = [];
+
     public array $comments = [];
+
     public array $commentUsers = [];
+
     public array $logs = [];
 
     public string $comment = '';
+
     public array $newFiles = [];
 
     // Edit task
     public bool $editing = false;
+
     public string $editActivity = '';
+
     public string $editDescription = '';
+
     public int|string $editStatus = 1;
+
     public string $editStartDate = '';
+
     public string $editEndDate = '';
+
     public array $editTeamUser = [];
+
     public bool $editIsProject = false;
+
     public ?int $editProjectId = null;
+
     public ?int $editProjectCategoryId = null;
 
     public array $availableUsers = [];
+
     public array $projectData = [];
+
     public array $editTimelines = [];
 
     // Edit comment
     public ?int $editingCommentId = null;
+
     public string $editingCommentBody = '';
 
     // Delete comment
@@ -79,7 +96,7 @@ class extends Component {
 
         try {
             $apiProject = rtrim(config('services.api_project'), '/');
-            $response = Http::get($apiProject . '/timelines/search?project_id=' . $projectId . '&user_id=' . Auth::id())->json();
+            $response = Http::get($apiProject.'/timelines/search?project_id='.$projectId.'&user_id='.Auth::id())->json();
             $this->editTimelines = $response['data'] ?? [];
         } catch (\Throwable $e) {
             $this->editTimelines = [];
@@ -104,7 +121,7 @@ class extends Component {
 
     protected function loadTask(): void
     {
-        $response = Http::get(config('services.api_izin') . "/global/dar/activity?id={$this->id}")->json();
+        $response = Http::get(config('services.api_izin')."/global/dar/activity?id={$this->id}")->json();
 
         $this->task = $response['data'] ?? [];
         $this->comments = $this->task['comments'] ?? [];
@@ -125,7 +142,7 @@ class extends Component {
     {
         try {
             $response = Http::timeout(30)
-                ->get(config('services.api_izin') . '/global/dar/log-activity', [
+                ->get(config('services.api_izin').'/global/dar/log-activity', [
                     'activity_id' => $this->id,
                     'perPage' => 99999,
                 ])->json();
@@ -223,7 +240,7 @@ class extends Component {
             $projectId = $this->editIsProject && $this->editProjectId ? (int) $this->editProjectId : null;
             $categoryId = $this->editIsProject && $this->editProjectCategoryId ? (int) $this->editProjectCategoryId : null;
 
-            $response = Http::post(config('services.api_izin') . "/global/dar/update/{$this->id}", [
+            $response = Http::post(config('services.api_izin')."/global/dar/update/{$this->id}", [
                 '_method' => 'PUT',
                 'user_id' => $this->task['user_id'] ?? null,
                 'activity' => $this->editActivity,
@@ -274,7 +291,7 @@ class extends Component {
         $response = null;
 
         try {
-            $response = Http::post(config('services.api_izin') . "/global/dar/activity/{$this->id}/status", [
+            $response = Http::post(config('services.api_izin')."/global/dar/activity/{$this->id}/status", [
                 '_method' => 'PUT',
                 'status' => 4,
             ]);
@@ -325,7 +342,7 @@ class extends Component {
                 );
             }
 
-            $response = $request->post(config('services.api_izin') . '/global/dar/activity/create-comment', [
+            $response = $request->post(config('services.api_izin').'/global/dar/activity/create-comment', [
                 'activity_id' => $this->id,
                 'user_id' => Auth::id(),
                 'body' => $this->comment,
@@ -337,24 +354,8 @@ class extends Component {
                 app(DarCache::class)->flush();
                 $userId = Auth::id();
 
-                if (! isset($this->commentUsers[$userId])) {
-                    $user = Auth::user();
-                    $this->commentUsers[$userId] = [
-                        'name' => $user->name,
-                        'role_name' => $user->role?->name,
-                    ];
-                }
-
                 $newComment = $payload['data'] ?? [];
 
-                $this->comments[] = [
-                    'id' => $newComment['id'] ?? null,
-                    'activity_id' => $this->id,
-                    'user_id' => $userId,
-                    'body' => $this->comment,
-                    'created_at' => $newComment['created_at'] ?? now()->toDateTimeString(),
-                    'files' => $newComment['files'] ?? [],
-                ];
                 $taskOwnerId = (int) ($this->task['user_id'] ?? 0);
                 $teamUserIds = collect($this->task['team_user'] ?? [])
                     ->pluck('user_id')
@@ -386,12 +387,14 @@ class extends Component {
 
                 $this->comment = '';
                 $this->newFiles = [];
+                $this->loadTask();
                 $this->dispatch('comment-added');
                 Toaster::success('Comment added successfully!');
+
                 return;
             }
             Toaster::error(getErrorMessages($response['message'] ?? []));
-            } catch (Exception $e) {
+        } catch (Exception $e) {
             Toaster::error('Ada serror pada server!');
             Log::error('Failed to add comment', [
                 'body' => $response['message'] ?? 'No message',
@@ -422,7 +425,7 @@ class extends Component {
         $response = null;
 
         try {
-            $response = Http::post(config('services.api_izin') . "/global/dar/activity/update-comment/{$this->editingCommentId}", [
+            $response = Http::post(config('services.api_izin')."/global/dar/activity/update-comment/{$this->editingCommentId}", [
                 '_method' => 'PUT',
                 'body' => $this->editingCommentBody,
             ]);
@@ -476,7 +479,7 @@ class extends Component {
         $response = null;
 
         try {
-            $response = Http::delete(config('services.api_izin') . "/global/dar/activity/delete-comment/{$commentId}");
+            $response = Http::delete(config('services.api_izin')."/global/dar/activity/delete-comment/{$commentId}");
 
             if ($response['success']) {
                 app(DarCache::class)->flush();
