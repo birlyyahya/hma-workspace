@@ -184,6 +184,14 @@ new class extends Component {
         $this->progress = $progress;
     }
 
+    #[On('spectechSaved')]
+    public function refreshAfterManage(): void
+    {
+        app(ProjectCache::class)->flushSpectech((int) $this->id);
+        $this->loadSpectech();
+        $this->dispatch('projectLoad');
+    }
+
     public function resetForm(): void
     {
         $this->form->reset();
@@ -453,9 +461,12 @@ new class extends Component {
                             Selesai
                         </flux:button>
                     @else
-                        <flux:button class="!hidden" wire:click="toggleBulkMode" variant="ghost" size="sm" icon="check-circle"
+                        <flux:button class="" wire:click="toggleBulkMode" variant="ghost" size="sm" icon="check-circle"
                             :disabled="$this->totalItems === 0">
                             Pilih
+                        </flux:button>
+                        <flux:button wire:click="$dispatch('openManageSpectech')" variant="filled" icon="squares-plus" size="sm">
+                            Bulk Tambah
                         </flux:button>
                         <flux:modal.trigger name="addSpectech">
                             <flux:button variant="primary" icon="plus" size="sm">Tambah</flux:button>
@@ -1128,4 +1139,7 @@ new class extends Component {
         </div>
     </div>
 </flux:modal>
+
+{{-- ============ KELOLA SPEKTEK (child component) ============ --}}
+<livewire:project.components.project-spectech-manage :id="(int) $id" />
 </div>
