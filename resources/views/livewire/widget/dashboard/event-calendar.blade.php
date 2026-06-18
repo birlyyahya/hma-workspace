@@ -159,7 +159,7 @@ new class extends Component {
     <div class="grid lg:grid-cols-5 divide-y lg:divide-y-0 lg:divide-x divide-zinc-100">
 
         {{-- Calendar --}}
-        <div class="p-5 lg:col-span-3">
+        <div class="!min-w-0 p-5 lg:col-span-3">
             @php
             $startOfMonth = $currentMonth->copy()->startOfMonth();
             $startDay = $startOfMonth->dayOfWeek;
@@ -234,17 +234,17 @@ new class extends Component {
     </div>
 
     {{-- Event List --}}
-    <div class="p-5 lg:col-span-2 bg-zinc-50/40">
+    <div class="min-w-0 p-5 lg:col-span-2 bg-zinc-50/40">
         @php
         $selected = Carbon::parse($selectedDate);
         @endphp
 
-        <div class="flex items-center justify-between mb-4">
-            <div>
+        <div class="flex items-center justify-between gap-3 mb-4">
+            <div class="min-w-0">
                 <p class="text-[11px] font-medium uppercase tracking-wide text-zinc-400">Event pada</p>
-                <p class="text-sm font-semibold text-zinc-900">{{ $selected->translatedFormat('l, d F Y') }}</p>
+                <p class="text-sm font-semibold text-zinc-900 truncate">{{ $selected->translatedFormat('l, d F Y') }}</p>
             </div>
-            <flux:badge size="sm" color="violet" variant="pill">
+            <flux:badge size="sm" color="violet" variant="pill" class="shrink-0">
                 {{ count($this->selectedEvents) }} event
             </flux:badge>
         </div>
@@ -270,7 +270,7 @@ new class extends Component {
                         <div class="mt-0.5 w-1 self-stretch rounded-full bg-{{ $accent }}-500"></div>
                         <div class="min-w-0 flex-1">
                             <div class="flex items-start justify-between gap-2">
-                                <p class="text-sm font-semibold text-zinc-900 truncate group-hover:text-zinc-950">{{ $event['title'] }}</p>
+                                <p class="min-w-0 flex-1 text-sm font-semibold text-zinc-900 truncate group-hover:text-zinc-950">{{ $event['title'] }}</p>
                                 <div class="flex gap-2 items-center">
                                     <span class="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $sourceClass }}">
                                         {{ $event['source'] }}
