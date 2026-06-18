@@ -36,7 +36,14 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         if (app()->environment('production')) {
-            URL::forceRootUrl(config('app.url'));
+            if (config('app.url')) {
+                URL::forceRootUrl(config('app.url'));
+
+                // Paksa https jika APP_URL https (perbaiki mixed-content di balik proxy)
+                if (str_starts_with(config('app.url'), 'https')) {
+                    URL::forceScheme('https');
+                }
+            }
         }
 
         Gate::before(function ($user, string $ability) {

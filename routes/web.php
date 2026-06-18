@@ -50,8 +50,8 @@ Route::middleware('auth')->group(function () {
 
     // Event
     Route::prefix('event')->group(function () {
-        // Route::view('/', 'events')->name('events');
-        Volt::route('/', 'maintenance/comingsoon')->name('events');
+        Route::view('/', 'events')->name('events');
+        // Volt::route('/', 'maintenance/comingsoon')->name('events');
         Route::get('/{event}', EventShow::class)->name('events.show');
         Route::view('/{event}/scan', 'events-scan')->name('event.scan');
         Route::view('/{event}/registration', 'events-registration')->name('event.registration');
@@ -77,17 +77,5 @@ Route::middleware('auth')->group(function () {
 
 });
 
-Route::get('/debug-host', function () {
-    return [
-        'host' => request()->getHost(),
-        'port' => request()->getPort(),
-        'root' => request()->root(),
-        'url' => url('/'),
-        'full' => request()->fullUrl(),
-    ];
-});
-Route::get('/headers', function () {
-    return request()->headers->all();
-});
 
 require __DIR__.'/settings.php';
