@@ -66,10 +66,8 @@ new class extends Component {
             ->filter(function ($item) use ($dayStart, $dayEnd) {
                 $start = Carbon::parse($item['start_date']);
                 $end = Carbon::parse($item['end_date']);
-                $inDateRange = $start <= $dayEnd && $end >= $dayStart;
-                $inProgress = in_array($item['status'] ?? null, [1, 2, 3], true);
 
-                return $inDateRange || $inProgress;
+                return $start <= $dayEnd && $end >= $dayStart;
             })
             ->values();
 
