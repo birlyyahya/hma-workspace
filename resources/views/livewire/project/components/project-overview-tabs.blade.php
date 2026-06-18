@@ -160,14 +160,7 @@ new class extends Component {
                     </div>
 
                     {{-- QUICK STATS GRID --}}
-                    <div class="grid grid-cols-2 md:grid-cols-4 divide-x divide-zinc-200">
-                        <div class="px-5 py-4">
-                            <p class="text-[11px] uppercase tracking-wide text-zinc-500 font-medium">Nilai Kontrak</p>
-                            <p class="mt-1 text-base font-bold text-zinc-900 truncate" title="Rp {{ number_format($project['value'], 0, ',', '.') }}">
-                                Rp {{ number_format($project['value'] / 1_000_000_000, 2, ',', '.') }}
-                                <span class="text-xs font-normal text-zinc-500">M</span>
-                            </p>
-                        </div>
+                    <div class="grid grid-cols-2 md:grid-cols-3 divide-x divide-zinc-200">
                         <div class="px-5 py-4">
                             <p class="text-[11px] uppercase tracking-wide text-zinc-500 font-medium">Progress</p>
                             <div class="mt-1 flex items-center gap-2">
@@ -247,44 +240,6 @@ new class extends Component {
                             </div>
                         @endif
                     </div>
-                </div>
-
-                {{-- INFORMASI KONTRAK --}}
-                <div class="bg-white rounded-2xl border border-zinc-200 p-6">
-                    <flux:heading size="sm" class="font-semibold text-zinc-900 mb-4">Informasi Kontrak</flux:heading>
-
-                    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-                        <div class="flex items-start gap-3">
-                            <flux:icon.document-text class="w-4 h-4 text-zinc-400 mt-0.5 shrink-0" />
-                            <div class="min-w-0">
-                                <dt class="text-xs text-zinc-500">Nomor Kontrak</dt>
-                                <dd class="text-sm font-medium text-zinc-900 mt-0.5">{{ $project['contract_number'] ?? '-' }}</dd>
-                            </div>
-                        </div>
-                        <div class="flex items-start gap-3">
-                            <flux:icon.calendar class="w-4 h-4 text-zinc-400 mt-0.5 shrink-0" />
-                            <div class="min-w-0">
-                                <dt class="text-xs text-zinc-500">Tanggal Kontrak</dt>
-                                <dd class="text-sm font-medium text-zinc-900 mt-0.5">
-                                    {{ !empty($project['contract_date']) ? Carbon::parse($project['contract_date'])->locale('id')->translatedFormat('d F Y') : '-' }}
-                                </dd>
-                            </div>
-                        </div>
-                        <div class="flex items-start gap-3">
-                            <flux:icon.building-office class="w-4 h-4 text-zinc-400 mt-0.5 shrink-0" />
-                            <div class="min-w-0">
-                                <dt class="text-xs text-zinc-500">Client</dt>
-                                <dd class="text-sm font-medium text-zinc-900 mt-0.5">{{ $project['client'] }}</dd>
-                            </div>
-                        </div>
-                        <div class="flex items-start gap-3">
-                            <flux:icon.user-circle class="w-4 h-4 text-zinc-400 mt-0.5 shrink-0" />
-                            <div class="min-w-0">
-                                <dt class="text-xs text-zinc-500">PPK</dt>
-                                <dd class="text-sm font-medium text-zinc-900 mt-0.5">{{ $project['ppk'] }}</dd>
-                            </div>
-                        </div>
-                    </dl>
                 </div>
 
                 {{-- COMPANY INFO --}}

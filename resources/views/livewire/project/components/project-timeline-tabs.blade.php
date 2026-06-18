@@ -188,7 +188,7 @@ new class extends Component {
             $response = Http::patch(
                 config('services.api_project') . 'timelines/' . $this->editingTimelineId,
                 [
-                    'user_id' => Auth::user()->id,
+                    'user_id' => $this->user_id,
                     'project_id' => $this->id,
                     'title' => $this->form_title,
                     'start_date' => $this->form_start_date,
@@ -220,7 +220,7 @@ new class extends Component {
 
         } else {
             $response = Http::post(config('services.api_project').'timelines', [
-                'user_id' => Auth::user()->id,
+                'user_id' => $this->user_id,
                 'project_id' => $this->id,
                 'title' => $this->form_title,
                 'start_date' => $this->form_start_date,
@@ -367,29 +367,25 @@ new class extends Component {
                     $monthStart = Carbon::parse($month['value'].'-01')->startOfMonth();
                     $monthEnd = (clone $monthStart)->endOfMonth();
                     $count = collect($activities)
-                        ->filter(function ($a) use ($monthStart, $monthEnd) {
-                            $s = Carbon::parse($a['start_date']);
-                            $e = Carbon::parse($a['end_date']);
+                    ->filter(function ($a) use ($monthStart, $monthEnd) {
+                    $s = Carbon::parse($a['start_date']);
+                    $e = Carbon::parse($a['end_date']);
 
-                            return $s <= $monthEnd && $e >= $monthStart;
+                    return $s <= $monthEnd && $e>= $monthStart;
                         })
                         ->count();
-                    @endphp
-                    <button
-                        type="button"
-                        wire:click="selectMonth('{{ $month['value'] }}')"
-                        wire:key="month-{{ $month['value'] }}"
-                        class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap
+                        @endphp
+                        <button type="button" wire:click="selectMonth('{{ $month['value'] }}')" wire:key="month-{{ $month['value'] }}" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap
                         {{ $isActive ? 'bg-zinc-900 text-white shadow' : 'text-gray-600 hover:bg-gray-200' }}">
-                        <span>{{ $month['label'] }}</span>
-                        @if($count > 0)
-                        <span class="text-xs px-1.5 py-0.5 rounded-full
+                            <span>{{ $month['label'] }}</span>
+                            @if($count > 0)
+                            <span class="text-xs px-1.5 py-0.5 rounded-full
                             {{ $isActive ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700' }}">
-                            {{ $count }}
-                        </span>
-                        @endif
-                    </button>
-                    @endforeach
+                                {{ $count }}
+                            </span>
+                            @endif
+                        </button>
+                        @endforeach
                 </div>
             </div>
         </div>
@@ -400,10 +396,10 @@ new class extends Component {
         $monthTimelines = $this->getTimelinesForMonth($selectedMonth);
         $monthActivities = $this->getActivitiesForSelectedMonth();
         $statusMap = [
-            1 => ['label' => 'Open', 'class' => 'bg-blue-100 text-blue-700', 'dot' => 'bg-blue-500'],
-            2 => ['label' => 'Pending', 'class' => 'bg-amber-100 text-amber-700', 'dot' => 'bg-amber-500'],
-            3 => ['label' => 'Cancelled', 'class' => 'bg-red-100 text-red-700', 'dot' => 'bg-red-500'],
-            4 => ['label' => 'Closed', 'class' => 'bg-emerald-100 text-emerald-700', 'dot' => 'bg-emerald-500'],
+        1 => ['label' => 'Open', 'class' => 'bg-blue-100 text-blue-700', 'dot' => 'bg-blue-500'],
+        2 => ['label' => 'Pending', 'class' => 'bg-amber-100 text-amber-700', 'dot' => 'bg-amber-500'],
+        3 => ['label' => 'Cancelled', 'class' => 'bg-red-100 text-red-700', 'dot' => 'bg-red-500'],
+        4 => ['label' => 'Closed', 'class' => 'bg-emerald-100 text-emerald-700', 'dot' => 'bg-emerald-500'],
         ];
         @endphp
 
@@ -412,8 +408,7 @@ new class extends Component {
             <p class="text-xs uppercase tracking-wide text-gray-400 mb-2">Timeline aktif</p>
             <div class="flex flex-wrap gap-2">
                 @foreach($monthTimelines as $tl)
-                <div wire:key="tl-chip-{{ $tl['id'] }}"
-                     class="group inline-flex items-center gap-2 pl-3 pr-1 py-1 rounded-full bg-gray-50 border text-xs text-gray-700 hover:border-gray-300 transition">
+                <div wire:key="tl-chip-{{ $tl['id'] }}" class="group inline-flex items-center gap-2 pl-3 pr-1 py-1 rounded-full bg-gray-50 border text-xs text-gray-700 hover:border-gray-300 transition">
                     <flux:icon name="flag" class="size-3 text-gray-400" />
                     <span class="font-medium">{{ $tl['title'] }}</span>
                     <span class="text-gray-400">
@@ -423,14 +418,12 @@ new class extends Component {
                     </span>
                     <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition">
                         <flux:tooltip content="Edit">
-                            <button type="button" wire:click="openEditTimeline({{ $tl['id'] }})"
-                                class="p-1 rounded-full hover:bg-gray-200 text-gray-500">
+                            <button type="button" wire:click="openEditTimeline({{ $tl['id'] }})" class="p-1 rounded-full hover:bg-gray-200 text-gray-500">
                                 <flux:icon name="pencil-square" class="size-3.5" />
                             </button>
                         </flux:tooltip>
                         <flux:tooltip content="Hapus">
-                            <button type="button" wire:click="confirmDeleteTimeline({{ $tl['id'] }})"
-                                class="p-1 rounded-full hover:bg-red-100 text-gray-500 hover:text-red-600">
+                            <button type="button" wire:click="confirmDeleteTimeline({{ $tl['id'] }})" class="p-1 rounded-full hover:bg-red-100 text-gray-500 hover:text-red-600">
                                 <flux:icon name="trash" class="size-3.5" />
                             </button>
                         </flux:tooltip>
@@ -451,45 +444,49 @@ new class extends Component {
                 $status = $statusMap[(int) ($activity['status'] ?? 0)] ?? $statusMap[1];
                 @endphp
                 <li wire:key="act-{{ $activity['id'] }}" class="ml-6">
-                    <span class="absolute -left-[7px] flex items-center justify-center w-3.5 h-3.5 rounded-full ring-4 ring-white {{ $status['dot'] }}"></span>
+                    <a href="{{ route('dar.dar-show', $activity['id']) }}" class="">
+                        <flux:icon name="check" class="size-3" />
 
-                    <div class="flex flex-wrap items-start justify-between gap-3 mb-1">
-                        <div class="flex items-center gap-2">
-                            <time class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                                {{ Carbon::parse($activity['start_date'])->locale('id')->translatedFormat('D, d M Y') }}
-                            </time>
-                            @if($tl)
-                            <span class="text-xs px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600">
-                                {{ $tl['title'] }}
-                            </span>
-                            @endif
-                        </div>
-                        <span class="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full {{ $status['class'] }}">
-                            <span class="w-1.5 h-1.5 rounded-full {{ $status['dot'] }}"></span>
-                            {{ $status['label'] }}
-                        </span>
-                    </div>
+                        <span class="absolute -left-[7px] flex items-center justify-center w-3.5 h-3.5 rounded-full ring-4 ring-white {{ $status['dot'] }}"></span>
 
-                    <div class="p-4 rounded-xl border border-gray-100 bg-gray-50 hover:bg-white hover:shadow-sm transition">
-                        <h3 class="text-sm font-semibold text-gray-900">{{ $activity['activity'] }}</h3>
-                        @if(!empty($activity['description']))
-                        <p class="mt-1 text-xs text-gray-500 leading-relaxed">{{ strip_tags($activity['description']) }}</p>
-                        @endif
-                        <div class="mt-2 flex items-center gap-4 text-xs text-gray-500">
-                            <span class="inline-flex items-center gap-1">
-                                <flux:icon name="clock" class="size-3.5" />
-                                {{ Carbon::parse($activity['start_date'])->format('H:i') }}
-                                –
-                                {{ Carbon::parse($activity['end_date'])->format('H:i') }}
+                        <div class="flex flex-wrap items-start justify-between gap-3 mb-1">
+                            <div class="flex items-center gap-2">
+                                <time class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                    {{ Carbon::parse($activity['start_date'])->locale('id')->translatedFormat('D, d M Y') }}
+                                </time>
+                                @if($tl)
+                                <span class="text-xs px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600">
+                                    {{ $tl['title'] }}
+                                </span>
+                                @endif
+                            </div>
+                            <span class="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full {{ $status['class'] }}">
+                                <span class="w-1.5 h-1.5 rounded-full {{ $status['dot'] }}"></span>
+                                {{ $status['label'] }}
                             </span>
-                            @if(Carbon::parse($activity['start_date'])->format('Y-m-d') !== Carbon::parse($activity['end_date'])->format('Y-m-d'))
-                            <span class="inline-flex items-center gap-1">
-                                <flux:icon name="calendar" class="size-3.5" />
-                                s/d {{ Carbon::parse($activity['end_date'])->locale('id')->translatedFormat('d M Y') }}
-                            </span>
-                            @endif
                         </div>
-                    </div>
+
+                        <div class="p-4 rounded-xl border border-gray-100 bg-gray-50 hover:bg-white hover:shadow-sm transition">
+                            <h3 class="text-sm font-semibold text-gray-900">{{ $activity['activity'] }}</h3>
+                            @if(!empty($activity['description']))
+                            <p class="mt-1 text-xs text-gray-500 leading-relaxed">{{ strip_tags($activity['description']) }}</p>
+                            @endif
+                            <div class="mt-2 flex items-center gap-4 text-xs text-gray-500">
+                                <span class="inline-flex items-center gap-1">
+                                    <flux:icon name="clock" class="size-3.5" />
+                                    {{ Carbon::parse($activity['start_date'])->format('H:i') }}
+                                    –
+                                    {{ Carbon::parse($activity['end_date'])->format('H:i') }}
+                                </span>
+                                @if(Carbon::parse($activity['start_date'])->format('Y-m-d') !== Carbon::parse($activity['end_date'])->format('Y-m-d'))
+                                <span class="inline-flex items-center gap-1">
+                                    <flux:icon name="calendar" class="size-3.5" />
+                                    s/d {{ Carbon::parse($activity['end_date'])->locale('id')->translatedFormat('d M Y') }}
+                                </span>
+                                @endif
+                            </div>
+                        </div>
+                    </a>
                 </li>
                 @endforeach
             </ol>
@@ -557,8 +554,8 @@ new class extends Component {
         @php
         $deletingTl = collect($timelines)->firstWhere('id', $deletingTimelineId);
         $linkedActivities = $deletingTimelineId
-            ? collect($activities)->where('project_category_id', $deletingTimelineId)->count()
-            : 0;
+        ? collect($activities)->where('project_category_id', $deletingTimelineId)->count()
+        : 0;
         @endphp
 
         <div class="space-y-4">
@@ -610,8 +607,7 @@ new class extends Component {
             @if(count($timelines))
             <div class="border rounded-xl divide-y max-h-100 overflow-y-auto">
                 @foreach($timelines as $tl)
-                <div wire:key="manage-tl-{{ $tl['id'] }}"
-                    class="flex items-center justify-between gap-3 px-4 py-3 hover:bg-gray-50 transition">
+                <div wire:key="manage-tl-{{ $tl['id'] }}" class="flex items-center justify-between gap-3 px-4 py-3 hover:bg-gray-50 transition">
                     <div class="flex items-center gap-3 min-w-0">
                         <div class="p-2 rounded-lg bg-zinc-100">
                             <flux:icon name="flag" class="w-4 h-4 text-zinc-500" />
@@ -628,12 +624,10 @@ new class extends Component {
 
                     <div class="flex items-center gap-1 shrink-0">
                         <flux:tooltip content="Edit">
-                            <flux:button size="xs" variant="ghost" icon="pencil-square"
-                                wire:click="openEditTimeline({{ $tl['id'] }})" />
+                            <flux:button size="xs" variant="ghost" icon="pencil-square" wire:click="openEditTimeline({{ $tl['id'] }})" />
                         </flux:tooltip>
                         <flux:tooltip content="Hapus">
-                            <flux:button size="xs" variant="ghost" icon="trash"
-                                wire:click="confirmDeleteTimeline({{ $tl['id'] }})" />
+                            <flux:button size="xs" variant="ghost" icon="trash" wire:click="confirmDeleteTimeline({{ $tl['id'] }})" />
                         </flux:tooltip>
                     </div>
                 </div>

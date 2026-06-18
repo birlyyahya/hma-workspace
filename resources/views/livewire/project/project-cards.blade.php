@@ -223,7 +223,6 @@ new class extends Component
                 $status     = $statusConfig[$item['status']] ?? $defaultStatus;
                 $progress   = (int) ($item['progress'] ?? 0);
                 $teamCount  = count($item['support_teams'] ?? []) + count($item['support_team_internals'] ?? []);
-                $value      = 'Rp ' . number_format($item['value'] ?? 0, 0, ',', '.');
                 $startDate  = $item['start_date'] ? \Carbon\Carbon::parse($item['start_date'])->translatedFormat('d M Y') : '-';
                 $endDate    = $item['end_date']   ? \Carbon\Carbon::parse($item['end_date'])->translatedFormat('d M Y')   : '-';
                 $leaderName = $item['project_leader_name'] ?? 'Unknown';
@@ -301,10 +300,6 @@ new class extends Component
                         <div class="flex items-center gap-2">
                             <flux:icon name="calendar-days" class="w-3.5 h-3.5 shrink-0"/>
                             <span class="truncate">{{ $startDate }} &rarr; {{ $endDate }}</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <flux:icon name="banknotes" class="w-3.5 h-3.5 shrink-0"/>
-                            <span class="font-semibold text-zinc-700 dark:text-zinc-300 truncate">{{ $value }}</span>
                         </div>
                     </div>
                 </div>
