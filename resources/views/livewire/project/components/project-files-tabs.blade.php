@@ -246,7 +246,6 @@ new class extends Component {
             'file'                  => $data['filename'],
             'original_name'         => $data['original_name'],
         ])->json();
-
         if (($response['status'] ?? null) === 201) {
             Toaster::success('File berhasil diupload');
             try {
@@ -255,7 +254,10 @@ new class extends Component {
                 // non-blocking
             }
         } else {
-            Toaster::error('Upload file gagal');
+           Toaster::error(collect($response['errors'] ?? [])
+                    ->flatten()
+                    ->join("\n")
+            );
         }
 
         return $response;
@@ -980,7 +982,7 @@ new class extends Component {
                     const blob  = file.slice(start, Math.min(file.size, start + chunkSize));
 
                     Alpine.store('projectFileUploads')?.update(taskId, {
-                        statusText: `Chunk ${i + 1} / ${totalChunks}`,
+                        statusText: `Uploading ${i + 1} / ${totalChunks}`,
                     });
 
                     const formData = new FormData();
@@ -1040,7 +1042,16 @@ new class extends Component {
                 });
 
                 if (!finalizeResponse || finalizeResponse.status !== 201) {
-                    throw new Error(finalizeResponse?.message || 'Gagal menyimpan data dokumen.');
+
+                    let message = finalizeResponse?.message || 'Gagal menyimpan data dokumen.';
+
+                    if (finalizeResponse?.errors) {
+                        message = Object.values(finalizeResponse.errors)
+                            .flat()
+                            .join('\n');
+                    }
+
+                    throw new Error(message);
                 }
 
                 Alpine.store('projectFileUploads')?.update(taskId, {
