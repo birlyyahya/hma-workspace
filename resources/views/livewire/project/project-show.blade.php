@@ -10,7 +10,8 @@ use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 use Masmerise\Toaster\Toaster;
 
-new #[Lazy] class extends Component {
+new
+class extends Component {
     public $id;
     public $project;
     public $document;

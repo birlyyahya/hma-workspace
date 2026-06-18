@@ -4,7 +4,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
-test('the custom 403 page renders without a sidebar for authenticated users', function () {
+test('the custom 403 page renders inside the sidebar layout for authenticated users', function () {
     Http::fake();
 
     $this->actingAs(User::factory()->create());
@@ -18,7 +18,7 @@ test('the custom 403 page renders without a sidebar for authenticated users', fu
         ->toContain('Error 403')
         ->toContain('Pesan khusus akses ditolak')
         ->toContain('Ke Dashboard')
-        ->not->toContain('Knowledge Hub'); // no sidebar
+        ->toContain('Knowledge Hub'); // sidebar present
 });
 
 test('the custom 403 page shows the default message when none is given', function () {
@@ -33,7 +33,7 @@ test('the custom 403 page shows the default message when none is given', functio
     expect($html)->toContain('tidak memiliki izin');
 });
 
-test('the custom 403 page shows a sign-in action for guests', function () {
+test('the custom 403 page shows a sign-in action for guests without a sidebar', function () {
     $html = view('errors.403', [
         'exception' => new AccessDeniedHttpException('Silakan masuk'),
     ])->render();
