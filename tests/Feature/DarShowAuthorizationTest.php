@@ -3,6 +3,10 @@
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
+use Livewire\Livewire;
+use Livewire\Volt\Volt;
+
+beforeEach(fn () => Livewire::withoutLazyLoading());
 
 function fakeDarTask(?int $ownerId = null, array $teamUserIds = []): void
 {
@@ -57,22 +61,43 @@ test('a user with dar view-all scope can open any dar detail', function () {
         ->assertSee('Secret Task');
 });
 
-test('an unrelated user is forbidden from opening the dar detail', function () {
+test('an unrelated user sees the forbidden state instead of the dar detail', function () {
     $owner = User::factory()->create();
     $intruder = User::factory()->create();
     fakeDarTask(ownerId: $owner->id);
 
-    $this->actingAs($intruder)
-        ->get(route('dar.dar-show', ['id' => 1]))
-        ->assertForbidden()
+    Volt::actingAs($intruder)
+        ->test('dar.dar-show', ['id' => 1])
+        ->assertOk()
+        ->assertSet('forbidden', true)
+        ->assertSet('task', [])
+        ->assertSee('Akses Ditolak')
         ->assertDontSee('Secret Task');
 });
 
-test('a missing dar task returns a 404 not found', function () {
+test('a missing dar task shows the not found state', function () {
     $user = User::factory()->create();
     fakeDarTask(ownerId: null);
 
-    $this->actingAs($user)
-        ->get(route('dar.dar-show', ['id' => 999]))
-        ->assertNotFound();
+    Volt::actingAs($user)
+        ->test('dar.dar-show', ['id' => 999])
+        ->assertOk()
+        ->assertSet('notFound', true)
+        ->assertSee('Tidak Ditemukan');
+});
+
+test('team picker users and project list load only when editing starts, not at mount', function () {
+    Role::factory()->count(2)->create();
+    $role = Role::factory()->create();
+    $owner = User::factory()->create(['role_id' => $role->id]);
+    fakeDarTask(ownerId: $owner->id);
+
+    $component = Volt::actingAs($owner)
+        ->test('dar.dar-show', ['id' => 1])
+        ->assertSet('availableUsers', [])
+        ->assertSet('projectData', []);
+
+    $component->call('startEditing')->assertSet('editing', true);
+
+    expect($component->get('availableUsers'))->not->toBeEmpty();
 });

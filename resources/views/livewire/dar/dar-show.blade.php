@@ -22,6 +22,10 @@ class extends Component
 
     public $id;
 
+    public bool $notFound = false;
+
+    public bool $forbidden = false;
+
     public array $task = [];
 
     public array $comments = [];
@@ -74,24 +78,45 @@ class extends Component
         $this->loadTask();
 
         if (empty($this->task)) {
-            abort(404, 'Task DAR tidak ditemukan.');
+            $this->notFound = true;
+
+            return;
         }
 
         if (! $this->canViewTask()) {
-            abort(403, 'Kamu tidak memiliki akses untuk membuka detail DAR ini.');
+            $this->forbidden = true;
+            $this->task = [];
+
+            return;
+        }
+    }
+
+    public function placeholder()
+    {
+        return view('components.placeholder.ph_dar_show');
+    }
+
+    /**
+     * Data form edit (daftar user untuk team picker & daftar project) dimuat saat
+     * tombol edit ditekan agar render awal halaman detail tetap ringan.
+     */
+    protected function loadEditFormData(): void
+    {
+        if (empty($this->availableUsers)) {
+            $this->availableUsers = User::whereNotIn('role_id', [1, 2])
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
+                ->toArray();
         }
 
-        $this->availableUsers = User::whereNotIn('role_id', [1, 2])
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
-            ->toArray();
-
-        try {
-            $this->projectData = app(ProjectCache::class)->leaderProjects(Auth::id());
-        } catch (\Throwable $e) {
-            $this->projectData = [];
-            Log::warning('Failed to load project list for DAR edit', ['message' => $e->getMessage()]);
+        if (empty($this->projectData)) {
+            try {
+                $this->projectData = app(ProjectCache::class)->leaderProjects(Auth::id());
+            } catch (\Throwable $e) {
+                $this->projectData = [];
+                Log::warning('Failed to load project list for DAR edit', ['message' => $e->getMessage()]);
+            }
         }
     }
 
@@ -171,11 +196,9 @@ class extends Component
             ->keyBy('id')
             ->map(fn ($u) => ['name' => $u->name, 'role_name' => $u->role?->name])
             ->toArray();
-
-        $this->loadLogs();
     }
 
-    protected function loadLogs(): void
+    public function loadLogs(): void
     {
         try {
             $response = Http::timeout(30)
@@ -213,13 +236,15 @@ class extends Component
 
     public function startEditing(): void
     {
+        $this->loadEditFormData();
+
         $this->editActivity = $this->task['activity'] ?? '';
         $this->editDescription = $this->task['description'] ?? '';
         $this->editStatus = $this->task['status'] ?? 1;
-        $this->editStartDate = $this->task['start_date']
+        $this->editStartDate = ! empty($this->task['start_date'])
             ? Carbon::parse($this->task['start_date'])->format('Y-m-d\TH:i')
             : '';
-        $this->editEndDate = $this->task['end_date']
+        $this->editEndDate = ! empty($this->task['end_date'])
             ? Carbon::parse($this->task['end_date'])->format('Y-m-d\TH:i')
             : '';
         $this->editTeamUser = collect($this->task['team_user'] ?? [])
@@ -541,6 +566,15 @@ class extends Component
 }; ?>
 
 <div>
+    @if ($notFound)
+        <div class="min-h-[60vh] flex items-center justify-center px-4 py-10">
+            <x-errors.404 />
+        </div>
+    @elseif ($forbidden)
+        <div class="min-h-[60vh] flex items-center justify-center px-4 py-10">
+            <x-errors.403 />
+        </div>
+    @else
     <style>
         [x-cloak] { display: none !important; }
 
@@ -576,7 +610,7 @@ class extends Component
                     <span class="text-zinc-300">/</span>
                     <span class="font-medium text-zinc-500">DAR</span>
                     <span class="text-zinc-300">/</span>
-                    <span class="font-semibold text-zinc-800">Task #{{ $task['id'] }}</span>
+                    <span class="font-semibold text-zinc-800">Task #{{ $task['id'] ?? $id }}</span>
                 </div>
 
                 @if (! empty($task))
@@ -1021,7 +1055,7 @@ class extends Component
                 </div>
 
                 {{-- ── Comments + Activity Logs section ── --}}
-                <section class="mt-5 rounded-2xl bg-white shadow-sm ring-1 ring-zinc-200/70">
+                <section wire:init="loadLogs" class="mt-5 rounded-2xl bg-white shadow-sm ring-1 ring-zinc-200/70">
                     <header class="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
                         <div class="flex items-center gap-2">
                             <flux:icon name="chat-bubble-left-right" class="h-4 w-4 text-zinc-500" />
@@ -1334,6 +1368,7 @@ class extends Component
         </div>
     </div>
 
+    @assets
     <script src="https://cdn.ckeditor.com/ckeditor5/35.1.0/classic/ckeditor.js"></script>
     <script>
         function teamPicker() {
@@ -1391,4 +1426,6 @@ class extends Component
             };
         }
     </script>
+    @endassets
+    @endif
 </div>
