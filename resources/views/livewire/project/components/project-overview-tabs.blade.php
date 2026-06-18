@@ -337,18 +337,32 @@ new class extends Component {
             <div class="col-span-12 lg:col-span-4 space-y-6">
 
                 {{-- PROJECT LEADER --}}
-                <div class="bg-white rounded-2xl border border-zinc-200 p-6">
+                <div class="bg-white rounded-2xl border border-zinc-200 p-6 space-y-3">
                     <div class="flex items-center justify-between mb-4">
                         <flux:heading size="sm" class="font-semibold text-zinc-900">Project Leader</flux:heading>
-                        <flux:icon.star class="w-4 h-4 text-amber-400" />
                     </div>
 
                     @if($this->user)
                         <div class="flex items-center gap-3">
-                            <flux:avatar name="{{ $this->user->name }}" size="lg" color="red" circle />
+                            <flux:avatar name="{{ $this->user->name }}" size="md" color="red" circle />
                             <div class="min-w-0 flex-1">
                                 <p class="font-semibold text-zinc-900 truncate">{{ $this->user->name }}</p>
                                 <p class="text-xs text-zinc-500 truncate">{{ $this->user->role->name ?? 'Project Lead' }}</p>
+                            </div>
+                        </div>
+                    @else
+                        <p class="text-sm text-zinc-500">Belum ditugaskan</p>
+                    @endif
+                    <flux:separator class="my-4" />
+                    <div class="flex items-center justify-between mb-4">
+                        <flux:heading size="sm" class="font-semibold text-zinc-900">PPK</flux:heading>
+                    </div>
+                    @if($this->project['ppk'])
+                        <div class="flex items-center gap-3">
+                            <flux:avatar name="{{ $this->project['ppk'] }}" size="md" color="green" circle />
+                            <div class="min-w-0 flex-1">
+                                <p class="font-semibold text-zinc-900 truncate">{{ $this->project['ppk'] }}</p>
+                                <p class="text-xs text-zinc-500 truncate">Pejabat Pembuat Keputusan</p>
                             </div>
                         </div>
                     @else

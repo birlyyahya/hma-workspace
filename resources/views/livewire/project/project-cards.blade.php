@@ -41,37 +41,58 @@ new class extends Component
 
     public function fetchProjects(): void
     {
-        $isDefaultView = $this->search === '' && $this->year === '' && $this->currentPage === 1;
+        $search = trim($this->search);
+        $hasSearch = $search !== '';
+        $hasYear = $this->year !== '';
 
-        if ($isDefaultView) {
+        if (! $hasSearch && ! $hasYear && $this->currentPage === 1) {
             $response = app(ProjectCache::class)->defaultProjectsList($this->limit);
-        } else {
-            $params = [
-                'limit' => $this->limit,
-                'page' => $this->currentPage,
-                'name' => $this->search,
-            ];
 
-            if ($this->year !== '') {
-                $params['year'] = $this->year;
-            }
+            $this->projects = $response['data'] ?? [];
+            $this->pagination = $response['pagination'] ?? [];
+            $this->dispatch('fetchProject', $this->projects);
 
-            $response = Http::timeout(120)->retry(3, 200)->get(config('services.api_project').'projects/search', $params)->json();
+            return;
         }
 
-        $data = $response['data'] ?? [];
+        $projects = collect(app(ProjectCache::class)->allProjects());
 
-        if ($this->year !== '') {
-            $data = array_values(array_filter(
-                $data,
-                fn ($p) => ! empty($p['start_date']) && (int) \Carbon\Carbon::parse($p['start_date'])->year === (int) $this->year
-            ));
+        if ($hasSearch) {
+            $term = mb_strtolower($search);
+
+            $projects = $projects->filter(
+                fn (array $project): bool => str_contains(mb_strtolower((string) ($project['name'] ?? '')), $term)
+                    || str_contains(mb_strtolower((string) ($project['ppk'] ?? '')), $term)
+                    || str_contains(mb_strtolower((string) ($project['code'] ?? '')), $term)
+            );
         }
 
-        $this->dispatch('fetchProject', $data);
+        if ($hasYear) {
+            $projects = $projects->filter(
+                fn (array $project): bool => ! empty($project['start_date'])
+                    && (int) \Carbon\Carbon::parse($project['start_date'])->year === (int) $this->year
+            );
+        }
 
-        $this->projects = $data;
-        $this->pagination = $response['pagination'] ?? [];
+        $projects = $projects->values();
+        $total = $projects->count();
+        $lastPage = max(1, (int) ceil($total / $this->limit));
+
+        if ($this->currentPage > $lastPage) {
+            $this->currentPage = $lastPage;
+        }
+
+        $paged = $projects->forPage($this->currentPage, $this->limit)->values()->all();
+
+        $this->dispatch('fetchProject', $paged);
+
+        $this->projects = $paged;
+        $this->pagination = [
+            'total' => $total,
+            'last_page' => $lastPage,
+            'current_page' => $this->currentPage,
+            'per_page' => $this->limit,
+        ];
     }
 
     public function applyFilters(): void
@@ -173,7 +194,7 @@ new class extends Component
                 wire:model="search"
                 wire:keydown.enter="applyFilters"
                 wire:loading.attr="disabled"
-                placeholder="Cari proyek berdasarkan nama..."
+                placeholder="Cari proyek berdasarkan nama, kode, atau PPK..."
                 class="w-full"
             />
             <div wire:loading wire:target="applyFilters,goToPage,updatedYear" class="absolute right-3 top-1/2 -translate-y-1/2">

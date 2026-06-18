@@ -24,57 +24,33 @@ function fakeCreateProject(): void
     ]);
 }
 
-test('empty optional fields are omitted from the payload', function () {
-    $admin = User::factory()->create(['role_id' => Role::factory()->superAdmin()]);
-    $leader = User::factory()->create();
-    fakeCreateProject();
-
-    Volt::actingAs($admin)
-        ->test('project.project-create')
+function fillRequiredProjectFields($component, int $leaderId)
+{
+    return $component
         ->set('name', 'Proyek Pengujian')
         ->set('code', 'P99')
-        ->set('company_id', '1')
-        ->set('project_leader_id', (string) $leader->id)
-        ->call('store')
-        ->assertHasNoErrors();
-
-    Http::assertSent(function ($request) {
-        if (! str_ends_with($request->url(), 'projects')) {
-            return false;
-        }
-
-        $data = $request->data();
-
-        return ! array_key_exists('contract_date', $data)
-            && ! array_key_exists('contract_number', $data)
-            && ! array_key_exists('client', $data)
-            && ! array_key_exists('ppk', $data)
-            && ! array_key_exists('value', $data)
-            && ! array_key_exists('start_date', $data)
-            && ! array_key_exists('end_date', $data)
-            && ! array_key_exists('maintenance_date', $data)
-            && $data['name'] === 'Proyek Pengujian'
-            && $data['code'] === 'P99';
-    });
-});
-
-test('filled optional fields are forwarded to the api', function () {
-    $admin = User::factory()->create(['role_id' => Role::factory()->superAdmin()]);
-    $leader = User::factory()->create();
-    fakeCreateProject();
-
-    Volt::actingAs($admin)
-        ->test('project.project-create')
-        ->set('name', 'Proyek Pengujian')
-        ->set('code', 'P99')
-        ->set('company_id', '1')
-        ->set('project_leader_id', (string) $leader->id)
+        ->set('contract_number', '008')
         ->set('contract_date', '2026-01-01')
+        ->set('client', 'Kejaksaan Agung')
+        ->set('ppk', 'Nanang Suherman')
         ->set('value', '8000000000')
         ->set('start_date', '2026-02-01')
         ->set('end_date', '2026-03-01')
-        ->call('store')
-        ->assertHasNoErrors();
+        ->set('company_id', '1')
+        ->set('project_leader_id', (string) $leaderId);
+}
+
+test('empty maintenance date is omitted from the payload', function () {
+    $admin = User::factory()->create(['role_id' => Role::factory()->superAdmin()]);
+    $leader = User::factory()->create();
+    fakeCreateProject();
+
+    $component = fillRequiredProjectFields(
+        Volt::actingAs($admin)->test('project.project-create'),
+        $leader->id
+    );
+
+    $component->call('store')->assertHasNoErrors();
 
     Http::assertSent(function ($request) {
         if (! str_ends_with($request->url(), 'projects')) {
@@ -83,9 +59,41 @@ test('filled optional fields are forwarded to the api', function () {
 
         $data = $request->data();
 
-        return $data['contract_date'] === '2026-01-01'
+        return ! array_key_exists('maintenance_date', $data)
+            && $data['contract_date'] === '2026-01-01'
             && $data['value'] === 8000000000
             && $data['start_date'] === '2026-02-01'
             && $data['end_date'] === '2026-03-01';
     });
+});
+
+test('filled maintenance date is forwarded to the api', function () {
+    $admin = User::factory()->create(['role_id' => Role::factory()->superAdmin()]);
+    $leader = User::factory()->create();
+    fakeCreateProject();
+
+    $component = fillRequiredProjectFields(
+        Volt::actingAs($admin)->test('project.project-create'),
+        $leader->id
+    )->set('maintenance_date', '2026-04-01');
+
+    $component->call('store')->assertHasNoErrors();
+
+    Http::assertSent(function ($request) {
+        if (! str_ends_with($request->url(), 'projects')) {
+            return false;
+        }
+
+        return $request->data()['maintenance_date'] === '2026-04-01';
+    });
+});
+
+test('required fields are validated', function () {
+    $admin = User::factory()->create(['role_id' => Role::factory()->superAdmin()]);
+    fakeCreateProject();
+
+    Volt::actingAs($admin)
+        ->test('project.project-create')
+        ->call('store')
+        ->assertHasErrors(['name', 'code', 'contract_date', 'client', 'ppk', 'value', 'start_date', 'end_date']);
 });

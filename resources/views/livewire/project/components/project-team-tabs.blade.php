@@ -464,7 +464,7 @@ new class extends Component {
                     <flux:icon name="briefcase" class="w-5 h-5 text-white" />
                 </div>
                 <div class="min-w-0">
-                    <h3 class="text-sm font-semibold text-zinc-900 dark:text-white">Tim Pendukung (PPK)</h3>
+                    <h3 class="text-sm font-semibold text-zinc-900 dark:text-white">Tim Pendukung</h3>
                     <p class="text-xs text-zinc-500 dark:text-zinc-400">
                         {{ count($this->searchResults['timduk']) }} tim aktif
                     </p>
@@ -473,7 +473,7 @@ new class extends Component {
             @if ($this->canManage())
             <flux:modal.trigger name="invite-ppk-modal">
                 <flux:button size="sm" icon="plus" variant="primary">
-                    <span class="hidden sm:inline">Tambah PPK</span>
+                    <span class="hidden sm:inline">Tambah Timduk</span>
                     <span class="sm:hidden">Tambah</span>
                 </flux:button>
             </flux:modal.trigger>
@@ -561,7 +561,7 @@ new class extends Component {
                         @endif
                     </p>
                     <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                        Tambahkan PPK / tim pendukung untuk project ini
+                        Tambahkan tim pendukung untuk project ini
                     </p>
                 </div>
             @endif
@@ -713,7 +713,7 @@ new class extends Component {
                 <div>
                     <flux:heading size="lg">Tambah Tim Pendukung</flux:heading>
                     <flux:text size="sm" class="text-zinc-500 dark:text-zinc-400">
-                        Tambahkan PPK atau tim pendukung lainnya
+                        Tambahkan tim pendukung lainnya
                     </flux:text>
                 </div>
             </div>
