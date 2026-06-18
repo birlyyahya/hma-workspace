@@ -69,6 +69,63 @@ class ProjectCache
     }
 
     /**
+     * Project di mana user tergabung sebagai anggota tim (bukan leader).
+     * Endpoint hanya mengembalikan project_id & project_name, tanpa code.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function teamProjects(int $userId): array
+    {
+        return Cache::tags([self::TAG_PROJECTS, "projects:user:{$userId}"])
+            ->remember("projects:team:{$userId}", self::TTL_USER, function () use ($userId) {
+                return Http::get($this->apiBase.'/project-teams/search?user_id='.$userId)->json('data') ?? [];
+            });
+    }
+
+    /**
+     * Semua project yang melibatkan user — sebagai leader maupun anggota tim —
+     * terdeduplikasi per id. Dipakai untuk daftar project di sidebar.
+     *
+     * @return array<int, array{id: int, code: ?string, name: ?string}>
+     */
+    public function involvedProjects(int $userId): array
+    {
+        $byId = [];
+
+        foreach ($this->leaderProjects($userId) as $project) {
+            $byId[$project['id']] = [
+                'id' => $project['id'],
+                'code' => $project['code'] ?? null,
+                'name' => $project['name'] ?? null,
+            ];
+        }
+
+        $teams = $this->teamProjects($userId);
+
+        if (! empty($teams)) {
+            $catalog = collect($this->allProjects())->keyBy('id');
+
+            foreach ($teams as $team) {
+                $projectId = $team['project_id'] ?? null;
+
+                if ($projectId === null || isset($byId[$projectId])) {
+                    continue;
+                }
+
+                $full = $catalog->get($projectId);
+
+                $byId[$projectId] = [
+                    'id' => $projectId,
+                    'code' => $full['code'] ?? null,
+                    'name' => $team['project_name'] ?? $full['name'] ?? null,
+                ];
+            }
+        }
+
+        return array_values($byId);
+    }
+
+    /**
      * Daftar spektek (activity categories) milik satu project — sumber kanonik
      * untuk tab Spektek & ringkasan Overview. Endpoint terpaginasi, jadi ambil
      * semua sekaligus dengan limit besar.
@@ -90,6 +147,15 @@ class ProjectCache
     public function flushProjects(): void
     {
         Cache::tags([self::TAG_PROJECTS])->flush();
+    }
+
+    /**
+     * Buang cache project milik satu user (leader & team) — dipanggil saat
+     * keanggotaan tim berubah agar sidebar user tersebut langsung diperbarui.
+     */
+    public function flushUser(int $userId): void
+    {
+        Cache::tags(["projects:user:{$userId}"])->flush();
     }
 
     public function flushSpectech(int $projectId): void

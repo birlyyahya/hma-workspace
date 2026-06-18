@@ -2,6 +2,7 @@
 
 use App\Services\ProjectCache;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Lazy;
@@ -61,9 +62,36 @@ new #[Lazy] class extends Component {
         }
     }
 
+    /**
+     * Detail project hanya boleh dibuka oleh pemilik project (leader), user yang
+     * tergabung di tim internal, atau role dengan scope project 'all'.
+     */
+    protected function authorizeView(): void
+    {
+        $user = Auth::user();
+
+        abort_if($user === null, 403);
+
+        if ($user->viewScopeFor('project') === 'all') {
+            return;
+        }
+
+        if (empty($this->project)) {
+            return;
+        }
+
+        $isLeader = (int) ($this->project['project_leader_id'] ?? 0) === (int) $user->id;
+
+        $isMember = collect($this->project['support_team_internals'] ?? [])
+            ->contains(fn ($member) => (int) ($member['user_id'] ?? 0) === (int) $user->id);
+
+        abort_unless($isLeader || $isMember, 403);
+    }
+
     public function mount(): void
     {
         $this->fetchProject();
+        $this->authorizeView();
         $this->dispatch('timelineLoad');
         $this->dispatch('documentLoad');
     }
@@ -281,6 +309,7 @@ new #[Lazy] class extends Component {
                 <div x-show="active === 'team'" wire:key="team-{{ $this->id }}" x-transition.opacity.duration.150ms>
                     <livewire:project.components.project-team-tabs lazy
                         :id="$this->id"
+                        :leader-id="$this->project['project_leader_id']"
                         :internal="$this->project['support_team_internals']"
                         :timduk="$this->project['support_teams']" />
                 </div>

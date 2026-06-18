@@ -9,7 +9,7 @@ new class extends Component {
     public function getProjectsProperty(): array
     {
         try {
-            return app(ProjectCache::class)->leaderProjects(Auth::id());
+            return app(ProjectCache::class)->involvedProjects(Auth::id());
         } catch (\Throwable $e) {
             Log::warning('Sidebar projects load failed', [
                 'user_id' => Auth::id(),

@@ -1,7 +1,9 @@
 <?php
 
 use App\Models\User;
+use App\Services\ProjectCache;
 use Flux\Flux;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -10,6 +12,7 @@ use Masmerise\Toaster\Toaster;
 
 new class extends Component {
     public int $id;
+    public ?int $leaderId = null;
     public mixed $internal = [];
     public mixed $internals = [];
     public array $timduk = [];
@@ -33,6 +36,23 @@ new class extends Component {
         $ids = collect($this->internal)->pluck('user_id');
         $this->internals = $this->internal;
         $this->internal = User::whereIn('id', $ids)->with('role')->get();
+    }
+
+    /**
+     * Hanya pemilik project (project leader) atau pengelola dengan scope penuh
+     * yang boleh mengubah anggota tim internal & tim pendukung. Anggota yang
+     * hanya tergabung di tim internal tidak diizinkan.
+     */
+    public function canManage(): bool
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return false;
+        }
+
+        return (int) $user->id === (int) $this->leaderId
+            || $user->viewScopeFor('project') === 'all';
     }
 
     public function getSearchResultsProperty(): array
@@ -86,6 +106,11 @@ new class extends Component {
 
     public function inviteInternal(int $userId): void
     {
+        if (! $this->canManage()) {
+            Toaster::error('Hanya pemilik project yang dapat menambahkan anggota');
+            return;
+        }
+
         if (collect($this->internal)->pluck('id')->contains($userId)) {
             Toaster::error('Anggota sudah ditambahkan');
             return;
@@ -106,6 +131,8 @@ new class extends Component {
                         ->push($response->json('data'))
                         ->all();
 
+                    app(ProjectCache::class)->flushUser($userId);
+
                     $this->dispatch('projectLoad');
                     Toaster::success('Anggota berhasil ditambahkan');
                     return;
@@ -121,6 +148,11 @@ new class extends Component {
 
     public function confirmDeleteInternal(int $id): void
     {
+        if (! $this->canManage()) {
+            Toaster::error('Hanya pemilik project yang dapat menghapus anggota');
+            return;
+        }
+
         $user = collect($this->internal)->firstWhere('id', $id);
 
         if (! $user) {
@@ -135,6 +167,11 @@ new class extends Component {
 
     public function removeInternal(): void
     {
+        if (! $this->canManage()) {
+            Toaster::error('Hanya pemilik project yang dapat menghapus anggota');
+            return;
+        }
+
         if ($this->deletingInternalId === null) {
             return;
         }
@@ -164,6 +201,8 @@ new class extends Component {
                     ->values()
                     ->all();
 
+                app(ProjectCache::class)->flushUser($id);
+
                 $this->dispatch('projectLoad');
                 Toaster::success('Anggota berhasil dihapus');
             } else {
@@ -180,6 +219,11 @@ new class extends Component {
 
     public function addTimduk(): void
     {
+        if (! $this->canManage()) {
+            Toaster::error('Hanya pemilik project yang dapat menambahkan tim pendukung');
+            return;
+        }
+
         if (! $this->nameTimduk || trim($this->nameTimduk) === '') {
             Toaster::error('Nama tim pendukung tidak boleh kosong');
             return;
@@ -212,6 +256,11 @@ new class extends Component {
 
     public function confirmDeleteTimduk(string $name): void
     {
+        if (! $this->canManage()) {
+            Toaster::error('Hanya pemilik project yang dapat menghapus tim pendukung');
+            return;
+        }
+
         if (! collect($this->timduk)->contains($name)) {
             Toaster::error('Tim pendukung tidak ditemukan');
             return;
@@ -223,6 +272,11 @@ new class extends Component {
 
     public function removeTimduk(): void
     {
+        if (! $this->canManage()) {
+            Toaster::error('Hanya pemilik project yang dapat menghapus tim pendukung');
+            return;
+        }
+
         if ($this->deletingTimdukName === null) {
             return;
         }
@@ -296,12 +350,14 @@ new class extends Component {
                     </p>
                 </div>
             </div>
+            @if ($this->canManage())
             <flux:modal.trigger name="invite-internal-modal">
                 <flux:button size="sm" icon="user-plus" variant="primary">
                     <span class="hidden sm:inline">Tambah Anggota</span>
                     <span class="sm:hidden">Tambah</span>
                 </flux:button>
             </flux:modal.trigger>
+            @endif
         </header>
 
         <div class="p-5">
@@ -320,6 +376,7 @@ new class extends Component {
 
                             <div class="relative p-4">
                                 {{-- Action menu (top-right) --}}
+                                @if ($this->canManage())
                                 <div class="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <flux:dropdown align="end">
                                         <flux:button size="xs" variant="ghost" icon="ellipsis-horizontal" inset />
@@ -334,6 +391,7 @@ new class extends Component {
                                         </flux:menu>
                                     </flux:dropdown>
                                 </div>
+                                @endif
 
                                 {{-- Avatar with ring + status --}}
                                 <div class="relative inline-flex">
@@ -412,12 +470,14 @@ new class extends Component {
                     </p>
                 </div>
             </div>
+            @if ($this->canManage())
             <flux:modal.trigger name="invite-ppk-modal">
                 <flux:button size="sm" icon="plus" variant="primary">
                     <span class="hidden sm:inline">Tambah PPK</span>
                     <span class="sm:hidden">Tambah</span>
                 </flux:button>
             </flux:modal.trigger>
+            @endif
         </header>
 
         <div class="p-5">
@@ -433,6 +493,7 @@ new class extends Component {
                             <div class="h-1 w-full bg-linear-to-r from-amber-500 via-orange-500 to-amber-500"></div>
 
                             <div class="relative p-4">
+                                @if ($this->canManage())
                                 <div class="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <flux:dropdown align="end">
                                         <flux:button size="xs" variant="ghost" icon="ellipsis-horizontal" inset />
@@ -447,6 +508,7 @@ new class extends Component {
                                         </flux:menu>
                                     </flux:dropdown>
                                 </div>
+                                @endif
 
                                 <div class="relative inline-flex">
                                     <div class="p-0.5 rounded-full bg-linear-to-br from-amber-400 to-orange-500">
