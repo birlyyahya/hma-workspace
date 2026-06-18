@@ -312,7 +312,7 @@ new class extends Component {
         @endforelse
     </div>
 
-    <a href="{{ route('events') }}" wire:navigate class="mt-4 inline-flex items-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-700">
+    <a href="{{ route('events') }}" wire:navigate class="!hidden mt-4 inline-flex items-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-700">
         Lihat semua event
         <flux:icon name="arrow-right" class="size-3.5" />
     </a>

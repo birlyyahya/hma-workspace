@@ -16,7 +16,7 @@ new class extends Component {
     }
 }; ?>
 
-<div>
+<div class="{{ $this->items->isEmpty() ? 'hidden' : 'visible' }}">
     @if ($this->items->isEmpty())
         <div class="rounded-xl border border-dashed border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-5 text-center">
             <flux:icon name="megaphone" class="w-6 h-6 mx-auto text-zinc-300" />
