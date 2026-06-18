@@ -88,12 +88,16 @@ test('a user with project view-all scope can open any project detail', function 
         ->assertSee('Secret Project');
 });
 
-test('an unrelated user cannot open the project detail', function () {
+test('an unrelated user sees the forbidden state instead of the project', function () {
     $leader = User::factory()->create();
     $intruder = User::factory()->create();
     fakeProject(leaderId: $leader->id);
 
     Volt::actingAs($intruder)
         ->test('project.project-show', ['id' => 1])
-        ->assertForbidden();
+        ->assertOk()
+        ->assertSet('forbidden', true)
+        ->assertSet('project', null)
+        ->assertSee('Akses Ditolak')
+        ->assertDontSee('Secret Project');
 });

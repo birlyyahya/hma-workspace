@@ -10,11 +10,12 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
 use Masmerise\Toaster\Toaster;
 
-new #[Layout('components.layouts.app', ['title' => 'DAR - Task Detail'])]
+new #[Lazy] #[Layout('components.layouts.app', ['title' => 'DAR - Task Detail'])]
 class extends Component
 {
     use WithFileUploads;
@@ -70,6 +71,16 @@ class extends Component
 
     public function mount(): void
     {
+        $this->loadTask();
+
+        if (empty($this->task)) {
+            abort(404, 'Task DAR tidak ditemukan.');
+        }
+
+        if (! $this->canViewTask()) {
+            abort(403, 'Kamu tidak memiliki akses untuk membuka detail DAR ini.');
+        }
+
         $this->availableUsers = User::whereNotIn('role_id', [1, 2])
             ->orderBy('name')
             ->get(['id', 'name'])
@@ -82,8 +93,34 @@ class extends Component
             $this->projectData = [];
             Log::warning('Failed to load project list for DAR edit', ['message' => $e->getMessage()]);
         }
+    }
 
-        $this->loadTask();
+    /**
+     * Detail DAR hanya boleh dibuka oleh pemilik task, user yang tergabung di
+     * team_user, atau role dengan scope dar 'all'.
+     */
+    protected function canViewTask(): bool
+    {
+        $user = Auth::user();
+
+        if ($user === null) {
+            return false;
+        }
+
+        if ($user->viewScopeFor('dar') === 'all') {
+            return true;
+        }
+
+        if (empty($this->task)) {
+            return false;
+        }
+
+        $isOwner = (int) ($this->task['user_id'] ?? 0) === (int) $user->id;
+
+        $isMember = collect($this->task['team_user'] ?? [])
+            ->contains(fn ($member) => (int) ($member['user_id'] ?? 0) === (int) $user->id);
+
+        return $isOwner || $isMember;
     }
 
     protected function loadTimelines(?int $projectId): void

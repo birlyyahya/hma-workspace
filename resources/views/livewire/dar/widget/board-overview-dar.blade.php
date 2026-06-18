@@ -146,11 +146,13 @@ new class extends Component {
         $user = Auth::user();
 
         if ($user) {
-            $user->unreadNotifications()
+            $user->notifications()
                 ->where('type', DarCommentReceived::class)
                 ->get()
                 ->filter(fn ($n) => (int) ($n->data['activity_id'] ?? 0) === $activityId)
-                ->each->markAsRead();
+                ->each->delete();
+
+            $this->messages = $this->loadMessages();
         }
 
         $this->redirectRoute('dar.dar-show', ['id' => $activityId], navigate: true);

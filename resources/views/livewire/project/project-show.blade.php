@@ -10,11 +10,11 @@ use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 use Masmerise\Toaster\Toaster;
 
-new
-class extends Component {
+new #[Lazy] class extends Component {
     public $id;
     public $project;
     public $document;
+    public bool $forbidden = false;
 
     public function deleteProject(): void
     {
@@ -67,18 +67,20 @@ class extends Component {
      * Detail project hanya boleh dibuka oleh pemilik project (leader), user yang
      * tergabung di tim internal, atau role dengan scope project 'all'.
      */
-    protected function authorizeView(): void
+    protected function canViewProject(): bool
     {
         $user = Auth::user();
 
-        abort_if($user === null, 403);
+        if ($user === null) {
+            return false;
+        }
 
         if ($user->viewScopeFor('project') === 'all') {
-            return;
+            return true;
         }
 
         if (empty($this->project)) {
-            return;
+            return false;
         }
 
         $isLeader = (int) ($this->project['project_leader_id'] ?? 0) === (int) $user->id;
@@ -86,13 +88,23 @@ class extends Component {
         $isMember = collect($this->project['support_team_internals'] ?? [])
             ->contains(fn ($member) => (int) ($member['user_id'] ?? 0) === (int) $user->id);
 
-        abort_unless($isLeader || $isMember, 403);
+        return $isLeader || $isMember;
     }
 
     public function mount(): void
     {
         $this->fetchProject();
-        $this->authorizeView();
+
+        if (! $this->canViewProject()) {
+            // Render state error tanpa melempar exception, supaya saat lazy load
+            // tampil sebagai kartu 403 di dalam layout (bukan modal overlay).
+            // Kosongkan project agar datanya tidak ikut ter-serialisasi ke client.
+            $this->forbidden = true;
+            $this->project = null;
+
+            return;
+        }
+
         $this->dispatch('timelineLoad');
         $this->dispatch('documentLoad');
     }
@@ -139,6 +151,11 @@ class extends Component {
 @endphp
 
 <div>
+    @if ($forbidden)
+        <div class="min-h-[60vh] flex items-center justify-center px-4 py-10">
+            <x-errors.403 />
+        </div>
+    @else
     <div class="max-h-screen overflow-auto">
         <div
             x-data="{
@@ -321,4 +338,5 @@ class extends Component {
             </div>
         </div>
     </div>
+    @endif
 </div>

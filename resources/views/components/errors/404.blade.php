@@ -1,0 +1,42 @@
+@props(['message' => null])
+
+<div class="max-w-md w-full text-center mt-16 md:mt-30">
+    {{-- Icon --}}
+    <div class="flex justify-center mb-6">
+        <div class="relative flex items-center justify-center w-20 h-20 rounded-3xl bg-zinc-100 ring-8 ring-zinc-100/60">
+            <flux:icon name="magnifying-glass" class="w-9 h-9 text-zinc-500" />
+        </div>
+    </div>
+
+    {{-- Code --}}
+    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 mb-2">
+        Error 404
+    </p>
+
+    {{-- Title --}}
+    <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900">
+        Tidak Ditemukan
+    </h1>
+
+    {{-- Message --}}
+    <p class="mt-3 text-sm md:text-base text-zinc-600">
+        {{ $message ?: 'Halaman atau data yang kamu cari tidak ditemukan atau mungkin telah dihapus.' }}
+    </p>
+
+    {{-- Divider --}}
+    <div class="mt-6 flex items-center justify-center gap-2">
+        <span class="h-px w-10 bg-zinc-200"></span>
+        <span class="text-xs text-zinc-400 uppercase tracking-wide">HMA Workspace</span>
+        <span class="h-px w-10 bg-zinc-200"></span>
+    </div>
+
+    {{-- Actions --}}
+    <div class="mt-8 flex flex-wrap justify-center gap-3">
+        <flux:button :href="route('dashboard')" icon="home" variant="primary" wire:navigate>
+            Ke Dashboard
+        </flux:button>
+        <flux:button x-on:click="window.history.back()" icon="arrow-left" variant="ghost">
+            Kembali
+        </flux:button>
+    </div>
+</div>
