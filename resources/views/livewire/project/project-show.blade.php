@@ -328,8 +328,8 @@ new #[Lazy] class extends Component {
                     <livewire:project.components.project-team-tabs lazy
                         :id="$this->id"
                         :leader-id="$this->project['project_leader_id']"
-                        :internal="$this->project['support_team_internals']"
-                        :timduk="$this->project['support_teams']" />
+                        :internal="$this->project['support_team_internals'] ?? []"
+                        :timduk="$this->project['support_teams'] ?? []" />
                 </div>
 
                 <div x-show="active === 'file'" wire:key="files-{{ $this->id }}" x-transition.opacity.duration.150ms>

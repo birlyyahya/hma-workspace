@@ -203,9 +203,9 @@ new class extends Component {
                 @endforeach
             </div>
 
-            <div class="grid grid-cols-7 gap-y-1 text-sm">
+            <div class="grid grid-cols-7 gap-y-1 auto-rows-fr min-h-82 text-sm">
                 @for ($i = $startDay - 1; $i >= 0; $i--)
-                <div class="size-9 mx-auto flex items-center justify-center text-zinc-300">
+                <div class="size-11 m-auto flex items-center justify-center text-zinc-300">
                     {{ $daysInPrevMonth - $i }}
                 </div>
                 @endfor
@@ -217,18 +217,18 @@ new class extends Component {
                     $hasEvent = isset($this->eventDates[$dateString]);
                     @endphp
 
-                    <button type="button" wire:click="selectDate('{{ $dateString }}')" wire:key="d-{{ $dateString }}" class="relative size-9 mx-auto flex items-center justify-center rounded-full transition
+                    <button type="button" wire:click="selectDate('{{ $dateString }}')" wire:key="d-{{ $dateString }}" class="relative size-11 m-auto flex items-center justify-center rounded-full transition
                             {{ $isSelected ? 'bg-violet-600 text-white font-semibold shadow-sm shadow-violet-200'
                                 : ($isToday ? 'ring-1 ring-violet-400 text-violet-700 font-semibold'
                                 : 'text-zinc-700 hover:bg-zinc-100') }}">
                         {{ $day }}
                         @if ($hasEvent && ! $isSelected)
-                        <span class="absolute bottom-1 size-1 rounded-full bg-violet-500"></span>
+                        <span class="absolute bottom-1 size-1 w-5 rounded-sm bg-violet-500"></span>
                         @endif
                     </button>
                     @endfor
 
-                    @for ($i = 1; $i <= $nextDays; $i++) <div class="size-9 mx-auto flex items-center justify-center text-zinc-300">{{ $i }}</div>
+                    @for ($i = 1; $i <= $nextDays; $i++) <div class="size-11 m-auto flex items-center justify-center text-zinc-300">{{ $i }}</div>
             @endfor
         </div>
     </div>

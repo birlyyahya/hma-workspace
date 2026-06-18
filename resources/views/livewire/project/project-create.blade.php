@@ -8,22 +8,22 @@ use Masmerise\Toaster\Toaster;
 
 new class extends Component
 {
-    public string $name             = '';
-    public string $code             = '';
-    public string $contract_number  = '';
-    public string $contract_date    = '';
-    public string $client           = '';
-    public string $ppk              = '';
-    public string $value            = '';
-    public string $status           = 'WAITING';
-    public string $start_date       = '';
-    public string $end_date         = '';
-    public string $maintenance_date = '';
-    public string $project_leader_id = '';
-    public string $company_id       = '';
+    public $name             = null;
+    public $code             = null;
+    public $contract_number  = null;
+    public $contract_date    = null;
+    public $client           = null;
+    public $ppk              = null;
+    public $value            = null;
+    public $status           = 'WAITING';
+    public $start_date       = null;
+    public $end_date         = null;
+    public $maintenance_date = null;
+    public $project_leader_id = null;
+    public $company_id       = null;
 
     public array $support_teams = [];
-    public string $newSupportTeam = '';
+    public $newSupportTeam = '';
 
     // Display labels for selected items (shown in the trigger field)
     public string $company_label = '';
@@ -52,14 +52,14 @@ new class extends Component
         return [
             'name'              => ['required', 'string', 'min:5'],
             'code'              => ['required', 'string'],
-            'contract_number'   => ['nullable', 'string'],
-            'contract_date'     => ['nullable', 'date'],
-            'client'            => ['nullable', 'string'],
-            'ppk'               => ['nullable', 'string'],
-            'value'             => ['nullable', 'numeric', 'min:0'],
-            'status'            => ['nullable', 'string', 'in:WAITING,ON PROGRESS,DONE,CANCELLED,MAINTENANCE'],
-            'start_date'        => ['nullable', 'date'],
-            'end_date'          => ['nullable', 'date', 'after_or_equal:start_date'],
+            'contract_number'   => ['required', 'string'],
+            'contract_date'     => ['required', 'date'],
+            'client'            => ['required', 'string'],
+            'ppk'               => ['required', 'string'],
+            'value'             => ['required', 'numeric', 'min:0'],
+            'status'            => ['required', 'string', 'in:WAITING,ON PROGRESS,DONE,CANCELLED,MAINTENANCE'],
+            'start_date'        => ['required', 'date'],
+            'end_date'          => ['required', 'date', 'after_or_equal:start_date'],
             'maintenance_date'  => ['nullable', 'date', 'after_or_equal:end_date'],
             'project_leader_id' => ['required', 'integer'],
             'company_id'        => ['required', 'integer'],
@@ -124,22 +124,25 @@ new class extends Component
         try {
             $this->validate();
 
-            $response = Http::post(config('services.api_project').'projects', [
+            $payload = array_filter([
                 'name'              => $this->name,
                 'code'              => $this->code,
-                'contract_number'   => $this->contract_number,
-                'contract_date'     => $this->contract_date,
-                'client'            => $this->client,
-                'ppk'               => $this->ppk,
-                'value'             => (int) $this->value,
+                'contract_number'   => $this->contract_number ?: null,
+                'contract_date'     => $this->contract_date ?: null,
+                'client'            => $this->client ?: null,
+                'ppk'               => $this->ppk ?: null,
+                'value'             => $this->value !== '' && $this->value !== null ? (int) $this->value : null,
                 'status'            => $this->status,
-                'start_date'        => $this->start_date,
-                'end_date'          => $this->end_date,
+                'start_date'        => $this->start_date ?: null,
+                'end_date'          => $this->end_date ?: null,
                 'maintenance_date'  => $this->maintenance_date ?: null,
                 'project_leader_id' => (int) $this->project_leader_id,
                 'company_id'        => (int) $this->company_id,
-                'support_teams'     => $this->support_teams,
-            ]);
+            ], fn ($value) => $value !== null);
+
+            $payload['support_teams'] = $this->support_teams;
+
+            $response = Http::post(config('services.api_project').'projects', $payload);
 
             if ($response->json()['status'] === 201) {
                 app(ProjectCache::class)->flushProjects();
