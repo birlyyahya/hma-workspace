@@ -112,7 +112,7 @@ class extends Component
 
         if (empty($this->projectData)) {
             try {
-                $this->projectData = app(ProjectCache::class)->leaderProjects(Auth::id());
+                $this->projectData = app(ProjectCache::class)->involvedProjects(Auth::id());
             } catch (\Throwable $e) {
                 $this->projectData = [];
                 Log::warning('Failed to load project list for DAR edit', ['message' => $e->getMessage()]);

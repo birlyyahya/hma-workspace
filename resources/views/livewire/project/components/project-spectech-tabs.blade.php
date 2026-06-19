@@ -659,21 +659,6 @@ new class extends Component {
                                 <p class="text-xs text-amber-900 leading-relaxed">{{ $data['note'] }}</p>
                             </div>
                         @endif
-
-                        {{-- Images --}}
-                        @if(!empty($data['images']) && is_array($data['images']))
-                            <div class="mt-4 flex gap-2 flex-wrap">
-                                @foreach (array_slice($data['images'], 0, 4) as $img)
-                                    <img src="{{ is_array($img) ? ($img['url'] ?? '') : $img }}"
-                                         class="w-14 h-14 rounded-lg object-cover ring-1 ring-zinc-200" alt="" />
-                                @endforeach
-                                @if(count($data['images']) > 4)
-                                    <div class="w-14 h-14 rounded-lg bg-zinc-100 ring-1 ring-zinc-200 flex items-center justify-center text-xs text-zinc-600 font-medium">
-                                        +{{ count($data['images']) - 4 }}
-                                    </div>
-                                @endif
-                            </div>
-                        @endif
                     </div>
                 @empty
                     @if($this->hasActiveFilters)

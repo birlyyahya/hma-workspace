@@ -97,3 +97,34 @@ test('required fields are validated', function () {
         ->call('store')
         ->assertHasErrors(['name', 'code', 'contract_date', 'client', 'ppk', 'value', 'start_date', 'end_date']);
 });
+
+test('selecting a company id resolves its display label', function () {
+    \Illuminate\Support\Facades\Cache::flush();
+    $admin = User::factory()->create(['role_id' => Role::factory()->superAdmin()]);
+
+    Http::fake([
+        '*companies*' => Http::response([
+            'data' => [
+                ['id' => 7, 'name' => 'PT Hana Tekindo'],
+                ['id' => 8, 'name' => 'CV Mitra Karya'],
+            ],
+        ], 200),
+        '*' => Http::response(['status' => 200, 'data' => []], 200),
+    ]);
+
+    Volt::actingAs($admin)
+        ->test('project.project-create')
+        ->set('company_id', '7')
+        ->assertSet('company_label', 'PT Hana Tekindo');
+});
+
+test('selecting a project leader id resolves its display label', function () {
+    $admin = User::factory()->create(['role_id' => Role::factory()->superAdmin()]);
+    $leader = User::factory()->create(['name' => 'Siti Aminah', 'role_id' => Role::factory()->create(['id' => 5])->id]);
+    fakeCreateProject();
+
+    Volt::actingAs($admin)
+        ->test('project.project-create')
+        ->set('project_leader_id', (string) $leader->id)
+        ->assertSet('leader_label', 'Siti Aminah');
+});

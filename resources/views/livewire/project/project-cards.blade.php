@@ -25,6 +25,9 @@ new class extends Component
     public int $limit = 12;
     public int $currentPage = 1;
 
+    public ?int $pendingDeleteId = null;
+    public string $pendingDeleteName = '';
+
     public function mount(): void
     {
         $this->fetchProjects();
@@ -117,8 +120,21 @@ new class extends Component
         $this->fetchProjects();
     }
 
-    public function deleteProject(int $id): void
+    public function confirmDelete(int $id): void
     {
+        $this->pendingDeleteId = $id;
+        $this->pendingDeleteName = collect($this->projects)->firstWhere('id', $id)['name'] ?? '';
+        \Flux\Flux::modal('delete-project-modal')->show();
+    }
+
+    public function deleteProject(): void
+    {
+        $id = $this->pendingDeleteId;
+
+        if (! $id) {
+            return;
+        }
+
         try {
             $response = Http::delete(config('services.api_project') . 'projects/' . $id);
 
@@ -129,6 +145,10 @@ new class extends Component
                     $this->projects,
                     fn ($p) => (int) ($p['id'] ?? 0) !== $id
                 ));
+
+                $this->pendingDeleteId = null;
+                $this->pendingDeleteName = '';
+                \Flux\Flux::modal('delete-project-modal')->close();
 
                 Toaster::success('Proyek berhasil dihapus');
 
@@ -268,8 +288,7 @@ new class extends Component
                             <flux:menu.item
                                 icon="trash"
                                 variant="danger"
-                                wire:click="deleteProject({{ $item['id'] }})"
-                                wire:confirm="Yakin ingin menghapus proyek &quot;{{ addslashes($item['name'] ?? '') }}&quot;? Tindakan ini tidak bisa dibatalkan."
+                                wire:click="confirmDelete({{ $item['id'] }})"
                             >
                                 Hapus Proyek
                             </flux:menu.item>
@@ -503,8 +522,7 @@ new class extends Component
                                     <flux:menu.item
                                         icon="trash"
                                         variant="danger"
-                                        wire:click="deleteProject({{ $item['id'] }})"
-                                        wire:confirm="Yakin ingin menghapus proyek &quot;{{ addslashes($item['name'] ?? '') }}&quot;? Tindakan ini tidak bisa dibatalkan."
+                                        wire:click="confirmDelete({{ $item['id'] }})"
                                     >
                                         Hapus Proyek
                                     </flux:menu.item>
@@ -597,5 +615,35 @@ new class extends Component
             &middot; Total {{ $pagination['total'] }} proyek
         </p>
     @endif
+
+    {{-- Delete confirmation modal --}}
+    <flux:modal name="delete-project-modal" class="min-w-md" :dismissible="false">
+        <div class="space-y-5">
+            <div class="flex items-start gap-4">
+                <div class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-red-100 text-red-600">
+                    <flux:icon name="trash" class="h-5 w-5" />
+                </div>
+                <div class="min-w-0 flex-1">
+                    <flux:heading size="lg">Hapus proyek ini?</flux:heading>
+                    <flux:text class="mt-1 text-sm text-zinc-600">
+                        Proyek <span class="font-semibold text-zinc-800">{{ $pendingDeleteName ?: 'ini' }}</span>
+                        akan dihapus secara permanen. Tindakan ini tidak dapat dibatalkan.
+                    </flux:text>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2">
+                <flux:button variant="ghost" x-on:click="$flux.modal('delete-project-modal').close()">Batal</flux:button>
+                <flux:button
+                    variant="danger"
+                    wire:click="deleteProject"
+                    wire:loading.attr="disabled"
+                    wire:target="deleteProject"
+                >
+                    <span wire:loading.remove wire:target="deleteProject">Hapus Proyek</span>
+                    <span wire:loading wire:target="deleteProject">Menghapus...</span>
+                </flux:button>
+            </div>
+        </div>
+    </flux:modal>
 
 </div>

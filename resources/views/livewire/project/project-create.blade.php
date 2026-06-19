@@ -33,8 +33,7 @@ new class extends Component
 
     public function mount(): void
     {
-         $this->authorize('project.create');
-        $this->dispatch('initSelects2');
+        $this->authorize('project.create');
     }
 
     public function getCompaniesProperty(): array
@@ -45,6 +44,17 @@ new class extends Component
     public function getUsersProperty(): \Illuminate\Database\Eloquent\Collection
     {
         return User::whereNotIn('role_id', [1, 2])->orderBy('name')->get();
+    }
+
+    public function updatedCompanyId($value): void
+    {
+        $company = collect($this->companies)->firstWhere('id', (int) $value);
+        $this->company_label = $company['name'] ?? '';
+    }
+
+    public function updatedProjectLeaderId($value): void
+    {
+        $this->leader_label = $this->users->firstWhere('id', (int) $value)?->name ?? '';
     }
 
     protected function rules(): array
@@ -266,10 +276,17 @@ new class extends Component
                 <div class="sm:col-span-2">
                     <flux:field>
                         <flux:label>Nilai Kontrak (Rupiah) <flux:badge size="sm" color="red" class="ml-1">Wajib</flux:badge></flux:label>
-                        <flux:input wire:model="value" type="number" min="0" step="1000" placeholder="Contoh: 8000000000"/>
-                        @if($value && is_numeric($value) && (int) $value > 0)
-                            <flux:description>Rp {{ number_format((int) $value, 0, ',', '.') }}</flux:description>
-                        @endif
+                        <div x-data="rupiahInput(@js((string) ($value ?? '')))" class="relative">
+                            <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-zinc-500">Rp</span>
+                            <input
+                                type="text"
+                                inputmode="numeric"
+                                x-model="display"
+                                @input="format()"
+                                placeholder="8.000.000.000"
+                                class="w-full rounded-lg border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm text-zinc-900 placeholder:text-zinc-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                            />
+                        </div>
                         <flux:error name="value"/>
                     </flux:field>
                 </div>
@@ -309,7 +326,7 @@ new class extends Component
         </div>
 
         {{-- Section 4: Perusahaan & Tim --}}
-        <div class="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
+        <div class="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-visible">
             <div class="px-6 py-4 border-b border-zinc-100 flex items-center gap-3">
                 <div class="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
                     <flux:icon name="users" class="w-4 h-4 text-purple-600"/>
@@ -319,41 +336,132 @@ new class extends Component
                     <p class="text-xs text-zinc-500">Pilih perusahaan dan project leader</p>
                 </div>
             </div>
-            <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5 ">
 
                 {{-- Company Select Search --}}
-                <div>
+                <div
+                    x-data="searchSelect(@js(collect($this->companies)->pluck('name')->map(fn ($n) => strtolower((string) $n))->values()->all()))"
+                    @click.away="open = false"
+                    @keydown.escape.window="open = false"
+                    class="relative overflow-visible"
+                >
                     <label class="block text-sm font-medium text-zinc-700 mb-1.5">
                         Perusahaan
                         <span class="ml-1 inline-flex items-center rounded-md bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-700">Wajib</span>
                     </label>
-                    <div wire:ignore>
-                        <select id="select-company" class="select2-field w-full">
-                            <option value="">-- Pilih Perusahaan --</option>
+
+                    <button
+                        type="button"
+                        @click="open = !open; if (open) $nextTick(() => $refs.search.focus())"
+                        class="flex w-full items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-left text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    >
+                        <span class="{{ $company_label ? 'text-zinc-900' : 'text-zinc-400' }} truncate">
+                            {{ $company_label ?: 'Cari perusahaan...' }}
+                        </span>
+                        <flux:icon name="chevron-up-down" class="h-4 w-4 shrink-0 text-zinc-400" />
+                    </button>
+
+                    <div
+                        x-show="open"
+                        x-cloak
+                        x-transition.origin.top
+                        class="absolute left-0 right-0 z-30 mt-1 rounded-xl bg-white p-1 shadow-lg ring-1 ring-zinc-200/70"
+                    >
+                        <div class="p-1">
+                            <input
+                                x-ref="search"
+                                x-model="query"
+                                type="text"
+                                placeholder="Ketik untuk mencari..."
+                                class="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                            />
+                        </div>
+                        <div class="max-h-60 overflow-y-auto">
                             @foreach($this->companies as $company)
-                                <option value="{{ $company['id'] }}">{{ $company['name'] }}</option>
+                                <button
+                                    wire:key="company-opt-{{ $company['id'] }}"
+                                    type="button"
+                                    x-show="matches('{{ addslashes(strtolower($company['name'])) }}')"
+                                    wire:click="$set('company_id', {{ $company['id'] }})"
+                                    @click="open = false; query = ''"
+                                    class="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-zinc-50 {{ (int) $company_id === (int) $company['id'] ? 'bg-zinc-50' : '' }}"
+                                >
+                                    <span class="truncate text-zinc-800">{{ $company['name'] }}</span>
+                                    @if((int) $company_id === (int) $company['id'])
+                                        <flux:icon name="check" class="h-4 w-4 shrink-0 text-emerald-600" />
+                                    @endif
+                                </button>
                             @endforeach
-                        </select>
+                            <p x-show="noResults()" class="px-3 py-2 text-xs text-zinc-500">Tidak ada hasil.</p>
+                        </div>
                     </div>
+
                     @error('company_id')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
 
                 {{-- Project Leader Select Search --}}
-                <div>
+                <div
+                    x-data="searchSelect(@js($this->users->pluck('name')->map(fn ($n) => strtolower((string) $n))->values()->all()))"
+                    @click.away="open = false"
+                    @keydown.escape.window="open = false"
+                    class="relative"
+                >
                     <label class="block text-sm font-medium text-zinc-700 mb-1.5">
                         Project Leader
                         <span class="ml-1 inline-flex items-center rounded-md bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-700">Wajib</span>
                     </label>
-                    <div wire:ignore>
-                        <select id="select-leader" class="select2-field w-full">
-                            <option value="">-- Pilih Project Leader --</option>
+
+                    <button
+                        type="button"
+                        @click="open = !open; if (open) $nextTick(() => $refs.search.focus())"
+                        class="flex w-full items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-left text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    >
+                        <span class="{{ $leader_label ? 'text-zinc-900' : 'text-zinc-400' }} truncate">
+                            {{ $leader_label ?: 'Cari project leader...' }}
+                        </span>
+                        <flux:icon name="chevron-up-down" class="h-4 w-4 shrink-0 text-zinc-400" />
+                    </button>
+
+                    <div
+                        x-show="open"
+                        x-cloak
+                        x-transition.origin.top
+                        class="absolute left-0 right-0 z-30 mt-1 rounded-xl bg-white p-1 shadow-lg ring-1 ring-zinc-200/70"
+                    >
+                        <div class="p-1">
+                            <input
+                                x-ref="search"
+                                x-model="query"
+                                type="text"
+                                placeholder="Ketik untuk mencari..."
+                                class="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                            />
+                        </div>
+                        <div class="max-h-60 overflow-y-auto">
                             @foreach($this->users as $user)
-                                <option value="{{ $user->id }}">{{ $user->name }}</option>
+                                <button
+                                    wire:key="leader-opt-{{ $user->id }}"
+                                    type="button"
+                                    x-show="matches('{{ addslashes(strtolower($user->name)) }}')"
+                                    wire:click="$set('project_leader_id', {{ $user->id }})"
+                                    @click="open = false; query = ''"
+                                    class="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-zinc-50 {{ (int) $project_leader_id === (int) $user->id ? 'bg-zinc-50' : '' }}"
+                                >
+                                    <span class="inline-flex items-center gap-2 min-w-0">
+                                        <flux:avatar circle name="{{ $user->name }}" size="xs" />
+                                        <span class="truncate text-zinc-800">{{ $user->name }}</span>
+                                    </span>
+                                    @if((int) $project_leader_id === (int) $user->id)
+                                        <flux:icon name="check" class="h-4 w-4 shrink-0 text-emerald-600" />
+                                    @endif
+                                </button>
                             @endforeach
-                        </select>
+                            <p x-show="noResults()" class="px-3 py-2 text-xs text-zinc-500">Tidak ada hasil.</p>
+                        </div>
                     </div>
+
                     @error('project_leader_id')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
@@ -434,80 +542,42 @@ new class extends Component
 
 @push('styles')
 <style>
-    .select2-container--default .select2-selection--single {
-        height: 38px;
-        border-radius: 8px;
-        border: 1px solid #e4e4e7;
-        padding: 4px 8px;
-        display: flex;
-        align-items: center;
-        background: #fff;
-    }
-    .select2-container--default .select2-selection--single .select2-selection__arrow {
-        top: 6px;
-        right: 8px;
-    }
-    .select2-container--default .select2-selection--single .select2-selection__rendered {
-        color: #18181b;
-        font-size: 0.875rem;
-        padding-left: 0;
-        line-height: 1.5;
-    }
-    .select2-container--default .select2-selection--single .select2-selection__placeholder {
-        color: #a1a1aa;
-    }
-    .select2-container--default .select2-results__option--highlighted {
-        background-color: #2563eb;
-    }
-    .select2-dropdown {
-        border-radius: 8px;
-        border: 1px solid #e4e4e7;
-        box-shadow: 0 4px 16px 0 rgba(0,0,0,0.08);
-        font-size: 0.875rem;
-    }
-    .select2-container--default .select2-search--dropdown .select2-search__field {
-        border-radius: 6px;
-        border: 1px solid #e4e4e7;
-        padding: 6px 10px;
-        font-size: 0.875rem;
-        outline: none;
-    }
-    .select2-container--default .select2-search--dropdown .select2-search__field:focus {
-        border-color: #2563eb;
-        box-shadow: 0 0 0 2px rgba(37,99,235,0.15);
-    }
-    .select2-field { width: 100% !important; }
+    [x-cloak] { display: none !important; }
 </style>
 @endpush
 
-@script
+@assets
 <script>
-    Livewire.on('initSelects', () => {
-        setTimeout(initSelects2, 0);
-    });
+    function searchSelect(options = []) {
+        return {
+            open: false,
+            query: '',
+            options,
+            matches(name) {
+                if (!this.query) {
+                    return true;
+                }
+                return name.includes(this.query.toLowerCase());
+            },
+            noResults() {
+                if (!this.query) {
+                    return false;
+                }
+                const q = this.query.toLowerCase();
+                return !this.options.some((name) => name.includes(q));
+            },
+        };
+    }
 
-    document.addEventListener('livewire:navigated', () => {
-        setTimeout(initSelects2, 0);
-    });
-    document.addEventListener('livewire:init', () => {
-        setTimeout(initSelects2, 0);
-    });
-    const initSelects2 = () => {
-        $('#select-company').select2({
-            placeholder: 'Cari perusahaan...',
-            allowClear: true,
-            width: '100%',
-        }).on('change', function () {
-            @this.set('company_id', $(this).val() ?? '');
-        });
-
-        $('#select-leader').select2({
-            placeholder: 'Cari project leader...',
-            allowClear: true,
-            width: '100%',
-        }).on('change', function () {
-            @this.set('project_leader_id', $(this).val() ?? '');
-        });
-    };
+    function rupiahInput(initial = '') {
+        return {
+            display: initial ? new Intl.NumberFormat('id-ID').format(initial) : '',
+            format() {
+                const digits = this.display.replace(/\D/g, '');
+                this.display = digits ? new Intl.NumberFormat('id-ID').format(digits) : '';
+                this.$wire.set('value', digits, false);
+            },
+        };
+    }
 </script>
-@endscript
+@endassets

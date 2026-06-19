@@ -78,3 +78,37 @@ test('search matches by project code', function () {
         ->assertSee('Sistem Informasi Keuangan')
         ->assertDontSee('Pembangunan Jembatan');
 });
+
+test('confirming delete stages the pending project for the modal', function () {
+    $user = User::factory()->create();
+
+    Volt::actingAs($user)
+        ->test('project.project-cards')
+        ->call('confirmDelete', 1)
+        ->assertSet('pendingDeleteId', 1)
+        ->assertSet('pendingDeleteName', 'Pembangunan Jembatan');
+});
+
+test('deleting without a pending project is a no-op', function () {
+    $user = User::factory()->create();
+
+    Volt::actingAs($user)
+        ->test('project.project-cards')
+        ->call('deleteProject');
+
+    Http::assertNotSent(fn ($request) => $request->method() === 'DELETE');
+});
+
+test('deleting the pending project sends the delete request and clears the pending state', function () {
+    $user = User::factory()->create();
+
+    Volt::actingAs($user)
+        ->test('project.project-cards')
+        ->call('confirmDelete', 1)
+        ->call('deleteProject')
+        ->assertSet('pendingDeleteId', null)
+        ->assertSet('pendingDeleteName', '');
+
+    Http::assertSent(fn ($request) => $request->method() === 'DELETE'
+        && str_contains($request->url(), 'projects/1'));
+});
