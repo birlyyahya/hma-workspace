@@ -855,10 +855,7 @@ new class extends Component {
             <div class="grid grid-cols-3 gap-3">
                 <flux:field class="col-span-2">
                     <flux:label badge="Wajib">Total Harga</flux:label>
-                    <flux:input.group>
-                        <flux:input.group.prefix>Rp</flux:input.group.prefix>
-                        <flux:input mask:dynamic="$money($input, ',', '.', 3)" wire:model="form.price" placeholder="0" />
-                    </flux:input.group>
+                    <x-rupiah-input model="form.price" placeholder="0" />
                     <flux:error name="form.price" />
                 </flux:field>
 
@@ -933,10 +930,7 @@ new class extends Component {
             <div class="grid grid-cols-3 gap-3">
                 <flux:field class="col-span-2">
                     <flux:label badge="Wajib">Total Harga</flux:label>
-                    <flux:input.group>
-                        <flux:input.group.prefix>Rp</flux:input.group.prefix>
-                        <flux:input mask:dynamic="$money($input, ',', '.', 3)" wire:model="form.price" placeholder="0" />
-                    </flux:input.group>
+                    <x-rupiah-input model="form.price" placeholder="0" />
                     <flux:error name="form.price" />
                 </flux:field>
 
@@ -1097,33 +1091,10 @@ new class extends Component {
 </flux:modal>
 
 {{-- ============ DELETE CONFIRMATION MODAL ============ --}}
-<flux:modal name="deleteSpectech" class="md:w-110">
-    <div class="space-y-5">
-        <div class="flex items-start gap-4">
-            <div class="shrink-0 w-11 h-11 rounded-full bg-red-50 flex items-center justify-center ring-4 ring-red-50/50">
-                <flux:icon.exclamation-triangle class="w-5 h-5 text-red-600" />
-            </div>
-            <div class="space-y-1 flex-1 min-w-0">
-                <flux:heading size="lg">Hapus Spectech?</flux:heading>
-                <flux:text class="text-sm text-zinc-500">
-                    Item <span class="font-medium text-zinc-800">"{{ $deletingName }}"</span>
-                    akan dihapus permanen beserta seluruh datanya. Tindakan ini tidak dapat dibatalkan.
-                </flux:text>
-            </div>
-        </div>
-
-        <div class="flex gap-2">
-            <flux:modal.close>
-                <flux:button variant="ghost" class="flex-1">Batal</flux:button>
-            </flux:modal.close>
-            <flux:button wire:click="deleteSpectech" variant="danger" icon="trash" class="flex-1"
-                wire:loading.attr="disabled" wire:target="deleteSpectech">
-                <span wire:loading.remove wire:target="deleteSpectech">Hapus</span>
-                <span wire:loading wire:target="deleteSpectech">Menghapus...</span>
-            </flux:button>
-        </div>
-    </div>
-</flux:modal>
+<x-confirm-modal name="deleteSpectech" confirm="deleteSpectech" title="Hapus Spectech?">
+    Item <span class="font-medium text-zinc-800">"{{ $deletingName }}"</span>
+    akan dihapus permanen beserta seluruh datanya. Tindakan ini tidak dapat dibatalkan.
+</x-confirm-modal>
 
 {{-- ============ KELOLA SPEKTEK (child component) ============ --}}
 <livewire:project.components.project-spectech-manage :id="(int) $id" />

@@ -288,10 +288,7 @@ new class extends Component {
                     <div class="grid grid-cols-3 gap-3">
                         <flux:field class="col-span-2">
                             <flux:label badge="Wajib">Total Harga</flux:label>
-                            <flux:input.group>
-                                <flux:input.group.prefix>Rp</flux:input.group.prefix>
-                                <flux:input mask:dynamic="$money($input, ',', '.', 3)" wire:model="draftPrice" placeholder="0" />
-                            </flux:input.group>
+                            <x-rupiah-input model="draftPrice" placeholder="0" />
                             <flux:error name="draftPrice" />
                         </flux:field>
 

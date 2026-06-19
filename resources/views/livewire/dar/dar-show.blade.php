@@ -1315,33 +1315,9 @@ class extends Component
         </div>
 
         {{-- ── Delete comment confirmation modal ── --}}
-        <flux:modal name="delete-comment-modal" class="min-w-md" :dismissible="false">
-            <div class="space-y-5">
-                <div class="flex items-start gap-4">
-                    <div class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-red-100 text-red-600">
-                        <flux:icon name="trash" class="h-5 w-5" />
-                    </div>
-                    <div class="min-w-0 flex-1">
-                        <flux:heading size="lg">Hapus komentar ini?</flux:heading>
-                        <flux:text class="mt-1 text-sm text-zinc-600">
-                            Komentar dan seluruh lampiran terkait akan dihapus secara permanen. Tindakan ini tidak dapat dibatalkan.
-                        </flux:text>
-                    </div>
-                </div>
-                <div class="flex justify-end gap-2">
-                    <flux:button variant="ghost" wire:click="cancelDeleteComment">Batal</flux:button>
-                    <flux:button
-                        variant="danger"
-                        wire:click="deleteComment"
-                        wire:loading.attr="disabled"
-                        wire:target="deleteComment"
-                    >
-                        <span wire:loading.remove wire:target="deleteComment">Hapus komentar</span>
-                        <span wire:loading wire:target="deleteComment">Menghapus...</span>
-                    </flux:button>
-                </div>
-            </div>
-        </flux:modal>
+        <x-confirm-modal name="delete-comment-modal" confirm="deleteComment" title="Hapus komentar ini?"
+            confirm-label="Hapus komentar"
+            description="Komentar dan seluruh lampiran terkait akan dihapus secara permanen. Tindakan ini tidak dapat dibatalkan." />
 
         {{-- ── Image lightbox ── --}}
         <div

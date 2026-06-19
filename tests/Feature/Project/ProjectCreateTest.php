@@ -98,7 +98,7 @@ test('required fields are validated', function () {
         ->assertHasErrors(['name', 'code', 'contract_date', 'client', 'ppk', 'value', 'start_date', 'end_date']);
 });
 
-test('selecting a company id resolves its display label', function () {
+test('company options are shaped as value/label pairs for the search-select', function () {
     \Illuminate\Support\Facades\Cache::flush();
     $admin = User::factory()->create(['role_id' => Role::factory()->superAdmin()]);
 
@@ -112,19 +112,29 @@ test('selecting a company id resolves its display label', function () {
         '*' => Http::response(['status' => 200, 'data' => []], 200),
     ]);
 
-    Volt::actingAs($admin)
+    $options = Volt::actingAs($admin)
         ->test('project.project-create')
-        ->set('company_id', '7')
-        ->assertSet('company_label', 'PT Hana Tekindo');
+        ->instance()
+        ->companyOptions;
+
+    expect($options)->toBe([
+        ['value' => 7, 'label' => 'PT Hana Tekindo'],
+        ['value' => 8, 'label' => 'CV Mitra Karya'],
+    ]);
 });
 
-test('selecting a project leader id resolves its display label', function () {
+test('leader options exclude restricted roles and are shaped for the search-select', function () {
     $admin = User::factory()->create(['role_id' => Role::factory()->superAdmin()]);
     $leader = User::factory()->create(['name' => 'Siti Aminah', 'role_id' => Role::factory()->create(['id' => 5])->id]);
+    $restricted = User::factory()->create(['name' => 'Admin Tersembunyi', 'role_id' => Role::factory()->create(['id' => 2])->id]);
     fakeCreateProject();
 
-    Volt::actingAs($admin)
+    $options = Volt::actingAs($admin)
         ->test('project.project-create')
-        ->set('project_leader_id', (string) $leader->id)
-        ->assertSet('leader_label', 'Siti Aminah');
+        ->instance()
+        ->leaderOptions;
+
+    expect(collect($options)->pluck('value'))->toContain($leader->id)
+        ->and(collect($options)->pluck('value'))->not->toContain($restricted->id)
+        ->and(collect($options)->firstWhere('value', $leader->id)['label'])->toBe('Siti Aminah');
 });

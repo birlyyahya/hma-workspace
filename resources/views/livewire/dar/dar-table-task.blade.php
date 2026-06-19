@@ -24,6 +24,8 @@ new class extends Component {
     public $projectSelected;
     public $spectech;
 
+    public ?int $pendingDeleteId = null;
+
     public function mount(){
 
         try {
@@ -42,7 +44,6 @@ new class extends Component {
                 return $activity;
             });
 
-            $this->dispatch('initSelect2');
             // $this->dispatch('darList', $activities->toArray());
             $this->tasks = $response;
             foreach ($this->tasks['data'] as $task) {
@@ -154,10 +155,21 @@ new class extends Component {
         $this->spectech = collect($this->projectData)->where('id', $this->projectSelected)->first()['specktech'];
     }
 
-    public function deleteTask($id){
-        $response = Http::delete(config('services.api_izin').'global/dar/activity/'.$id);
+    public function confirmDelete($id){
+        $this->pendingDeleteId = (int) $id;
+        \Flux\Flux::modal('delete-task-modal')->show();
+    }
+
+    public function deleteTask(){
+        if(! $this->pendingDeleteId){
+            return;
+        }
+
+        $response = Http::delete(config('services.api_izin').'global/dar/activity/'.$this->pendingDeleteId);
         if($response['success']){
             app(DarCache::class)->flush();
+            $this->pendingDeleteId = null;
+            \Flux\Flux::modal('delete-task-modal')->close();
             Toaster::success('Delete Activity successfully');
             $this->dispatch('updatedTimeline');
             return $this->fetch();
@@ -277,13 +289,8 @@ new class extends Component {
                                         <button class="w-full flex justify-between cursor-pointer text-left px-4 py-2 text-sm hover:bg-gray-100">
                                             Share Link <flux:icon name="link" class="w-4 h-4"/>
                                         </button>
-                                        <button wire:click="deleteTask({{ $task['id'] }})" wire:loading.attr="disabled" class="w-full cursor-pointer text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
-                                            <span wire:loading.remove wire:target="deleteTask({{ $task['id'] }})">
-                                                Delete
-                                            </span>
-                                            <span class="animate-pulse" wire:loading wire:target="deleteTask({{ $task['id'] }})">
-                                                Deleting...
-                                            </span>
+                                        <button wire:click="confirmDelete({{ $task['id'] }})" @click="open = false" class="w-full cursor-pointer text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                                            Delete
                                         </button>
                                     </div>
                                 </div>
@@ -451,12 +458,16 @@ new class extends Component {
                     <flux:input wire:model='form.end_date' label="Tanggal Berakhir" type="datetime-local" />
                 </div>
             </div>
-            <div wire:ignore>
-                <select id="teamUser" multiple="multiple" class="select2 form-select" placeholder="select a team">
-                    @foreach ($this->user as $item)
-                    <option value="{{ $item['id'] }}">{{ $item['name'] }}</option>
-                    @endforeach
-                </select>
+            <div>
+                <flux:label>Team</flux:label>
+                <x-search-select
+                    model="form.team"
+                    multiple
+                    :avatar="true"
+                    :options="$this->user->map(fn ($u) => ['value' => $u->id, 'label' => $u->name])->all()"
+                    placeholder="Pilih anggota tim..."
+                    search-placeholder="Cari anggota tim..."
+                />
             </div>
             @error('form.team')
             <flux:error message="{{ $message }}" />
@@ -476,30 +487,8 @@ new class extends Component {
         </form>
     </flux:modal>
     @endif
+
+    {{-- Delete confirmation modal --}}
+    <x-confirm-modal name="delete-task-modal" confirm="deleteTask" title="Hapus aktivitas ini?"
+        description="Aktivitas DAR akan dihapus secara permanen. Tindakan ini tidak dapat dibatalkan." />
 </div>
-@script
-<script>
-    const initProjectFilesSelect2 = () => {
-        const el = $('#teamUser');
-        el.select2({
-            dropdownParent: $('dialog[data-modal="create-activity"]')
-            , width: '100%'
-            , placeholder: "Select a team"
-            , allowClear: true
-        , });
-
-        el.on('change', function() {
-            @this.set('form.team', $(this).val());
-        });
-    };
-
-    Livewire.on('initSelect2', () => {
-        setTimeout(initProjectFilesSelect2, 0);
-    });
-
-    window.addEventListener('init-select2', () => {
-        setTimeout(initProjectFilesSelect2, 0);
-    });
-
-</script>
-@endscript

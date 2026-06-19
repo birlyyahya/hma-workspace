@@ -25,10 +25,6 @@ new class extends Component
     public array $support_teams = [];
     public $newSupportTeam = '';
 
-    // Display labels for selected items (shown in the trigger field)
-    public string $company_label = '';
-    public string $leader_label  = '';
-
     public bool $submitting = false;
 
     public function mount(): void
@@ -46,15 +42,24 @@ new class extends Component
         return User::whereNotIn('role_id', [1, 2])->orderBy('name')->get();
     }
 
-    public function updatedCompanyId($value): void
+    /**
+     * @return array<int, array{value: int, label: string}>
+     */
+    public function getCompanyOptionsProperty(): array
     {
-        $company = collect($this->companies)->firstWhere('id', (int) $value);
-        $this->company_label = $company['name'] ?? '';
+        return collect($this->companies)
+            ->map(fn ($c) => ['value' => (int) $c['id'], 'label' => (string) $c['name']])
+            ->all();
     }
 
-    public function updatedProjectLeaderId($value): void
+    /**
+     * @return array<int, array{value: int, label: string}>
+     */
+    public function getLeaderOptionsProperty(): array
     {
-        $this->leader_label = $this->users->firstWhere('id', (int) $value)?->name ?? '';
+        return $this->users
+            ->map(fn ($u) => ['value' => $u->id, 'label' => $u->name])
+            ->all();
     }
 
     protected function rules(): array
@@ -276,17 +281,7 @@ new class extends Component
                 <div class="sm:col-span-2">
                     <flux:field>
                         <flux:label>Nilai Kontrak (Rupiah) <flux:badge size="sm" color="red" class="ml-1">Wajib</flux:badge></flux:label>
-                        <div x-data="rupiahInput(@js((string) ($value ?? '')))" class="relative">
-                            <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-zinc-500">Rp</span>
-                            <input
-                                type="text"
-                                inputmode="numeric"
-                                x-model="display"
-                                @input="format()"
-                                placeholder="8.000.000.000"
-                                class="w-full rounded-lg border border-zinc-200 bg-white py-2 pl-9 pr-3 text-sm text-zinc-900 placeholder:text-zinc-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                            />
-                        </div>
+                        <x-rupiah-input model="value" placeholder="8.000.000.000" />
                         <flux:error name="value"/>
                     </flux:field>
                 </div>
@@ -339,129 +334,35 @@ new class extends Component
             <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5 ">
 
                 {{-- Company Select Search --}}
-                <div
-                    x-data="searchSelect(@js(collect($this->companies)->pluck('name')->map(fn ($n) => strtolower((string) $n))->values()->all()))"
-                    @click.away="open = false"
-                    @keydown.escape.window="open = false"
-                    class="relative overflow-visible"
-                >
+                <div>
                     <label class="block text-sm font-medium text-zinc-700 mb-1.5">
                         Perusahaan
                         <span class="ml-1 inline-flex items-center rounded-md bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-700">Wajib</span>
                     </label>
-
-                    <button
-                        type="button"
-                        @click="open = !open; if (open) $nextTick(() => $refs.search.focus())"
-                        class="flex w-full items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-left text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    >
-                        <span class="{{ $company_label ? 'text-zinc-900' : 'text-zinc-400' }} truncate">
-                            {{ $company_label ?: 'Cari perusahaan...' }}
-                        </span>
-                        <flux:icon name="chevron-up-down" class="h-4 w-4 shrink-0 text-zinc-400" />
-                    </button>
-
-                    <div
-                        x-show="open"
-                        x-cloak
-                        x-transition.origin.top
-                        class="absolute left-0 right-0 z-30 mt-1 rounded-xl bg-white p-1 shadow-lg ring-1 ring-zinc-200/70"
-                    >
-                        <div class="p-1">
-                            <input
-                                x-ref="search"
-                                x-model="query"
-                                type="text"
-                                placeholder="Ketik untuk mencari..."
-                                class="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                            />
-                        </div>
-                        <div class="max-h-60 overflow-y-auto">
-                            @foreach($this->companies as $company)
-                                <button
-                                    wire:key="company-opt-{{ $company['id'] }}"
-                                    type="button"
-                                    x-show="matches('{{ addslashes(strtolower($company['name'])) }}')"
-                                    wire:click="$set('company_id', {{ $company['id'] }})"
-                                    @click="open = false; query = ''"
-                                    class="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-zinc-50 {{ (int) $company_id === (int) $company['id'] ? 'bg-zinc-50' : '' }}"
-                                >
-                                    <span class="truncate text-zinc-800">{{ $company['name'] }}</span>
-                                    @if((int) $company_id === (int) $company['id'])
-                                        <flux:icon name="check" class="h-4 w-4 shrink-0 text-emerald-600" />
-                                    @endif
-                                </button>
-                            @endforeach
-                            <p x-show="noResults()" class="px-3 py-2 text-xs text-zinc-500">Tidak ada hasil.</p>
-                        </div>
-                    </div>
-
+                    <x-search-select
+                        model="company_id"
+                        :options="$this->companyOptions"
+                        placeholder="Cari perusahaan..."
+                        search-placeholder="Ketik untuk mencari..."
+                    />
                     @error('company_id')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
 
                 {{-- Project Leader Select Search --}}
-                <div
-                    x-data="searchSelect(@js($this->users->pluck('name')->map(fn ($n) => strtolower((string) $n))->values()->all()))"
-                    @click.away="open = false"
-                    @keydown.escape.window="open = false"
-                    class="relative"
-                >
+                <div>
                     <label class="block text-sm font-medium text-zinc-700 mb-1.5">
                         Project Leader
                         <span class="ml-1 inline-flex items-center rounded-md bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-700">Wajib</span>
                     </label>
-
-                    <button
-                        type="button"
-                        @click="open = !open; if (open) $nextTick(() => $refs.search.focus())"
-                        class="flex w-full items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-left text-sm shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    >
-                        <span class="{{ $leader_label ? 'text-zinc-900' : 'text-zinc-400' }} truncate">
-                            {{ $leader_label ?: 'Cari project leader...' }}
-                        </span>
-                        <flux:icon name="chevron-up-down" class="h-4 w-4 shrink-0 text-zinc-400" />
-                    </button>
-
-                    <div
-                        x-show="open"
-                        x-cloak
-                        x-transition.origin.top
-                        class="absolute left-0 right-0 z-30 mt-1 rounded-xl bg-white p-1 shadow-lg ring-1 ring-zinc-200/70"
-                    >
-                        <div class="p-1">
-                            <input
-                                x-ref="search"
-                                x-model="query"
-                                type="text"
-                                placeholder="Ketik untuk mencari..."
-                                class="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800 placeholder:text-zinc-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                            />
-                        </div>
-                        <div class="max-h-60 overflow-y-auto">
-                            @foreach($this->users as $user)
-                                <button
-                                    wire:key="leader-opt-{{ $user->id }}"
-                                    type="button"
-                                    x-show="matches('{{ addslashes(strtolower($user->name)) }}')"
-                                    wire:click="$set('project_leader_id', {{ $user->id }})"
-                                    @click="open = false; query = ''"
-                                    class="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-zinc-50 {{ (int) $project_leader_id === (int) $user->id ? 'bg-zinc-50' : '' }}"
-                                >
-                                    <span class="inline-flex items-center gap-2 min-w-0">
-                                        <flux:avatar circle name="{{ $user->name }}" size="xs" />
-                                        <span class="truncate text-zinc-800">{{ $user->name }}</span>
-                                    </span>
-                                    @if((int) $project_leader_id === (int) $user->id)
-                                        <flux:icon name="check" class="h-4 w-4 shrink-0 text-emerald-600" />
-                                    @endif
-                                </button>
-                            @endforeach
-                            <p x-show="noResults()" class="px-3 py-2 text-xs text-zinc-500">Tidak ada hasil.</p>
-                        </div>
-                    </div>
-
+                    <x-search-select
+                        model="project_leader_id"
+                        :options="$this->leaderOptions"
+                        :avatar="true"
+                        placeholder="Cari project leader..."
+                        search-placeholder="Ketik untuk mencari..."
+                    />
                     @error('project_leader_id')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
@@ -525,16 +426,19 @@ new class extends Component
             <flux:button variant="ghost" :href="route('projects')" wire:navigate>
                 Batal
             </flux:button>
-            <flux:button type="submit" variant="primary" icon="plus-circle" :disabled="$submitting">
-                <span wire:loading.remove wire:target="store">Simpan Proyek</span>
-                <span wire:loading wire:target="store" class="flex items-center gap-2">
-                    <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" class="opacity-25"/>
-                        <path fill="currentColor" class="opacity-75" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a10 10 0 00-10 10h4z"/>
-                    </svg>
-                    Menyimpan...
-                </span>
-            </flux:button>
+            <flux:button type="submit" variant="primary" :disabled="$submitting">
+                    <flux:icon wire:loading.remove wire:target="store" name="plus-circle" variant="solid" class="size-5"/>
+                    <span wire:loading.remove wire:target="store">Simpan Proyek</span>
+                    <span wire:loading wire:target="store" class="flex items-center gap-2">
+                        <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" class="opacity-25"/>
+                            <path fill="currentColor" class="opacity-75" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a10 10 0 00-10 10h4z"/>
+                        </svg>
+                    </span>
+                    <span wire:loading wire:target="store" class="flex items-center gap-2">
+                        Menyimpan...
+                    </span>
+                </flux:button>
         </div>
 
     </form>
@@ -545,39 +449,3 @@ new class extends Component
     [x-cloak] { display: none !important; }
 </style>
 @endpush
-
-@assets
-<script>
-    function searchSelect(options = []) {
-        return {
-            open: false,
-            query: '',
-            options,
-            matches(name) {
-                if (!this.query) {
-                    return true;
-                }
-                return name.includes(this.query.toLowerCase());
-            },
-            noResults() {
-                if (!this.query) {
-                    return false;
-                }
-                const q = this.query.toLowerCase();
-                return !this.options.some((name) => name.includes(q));
-            },
-        };
-    }
-
-    function rupiahInput(initial = '') {
-        return {
-            display: initial ? new Intl.NumberFormat('id-ID').format(initial) : '',
-            format() {
-                const digits = this.display.replace(/\D/g, '');
-                this.display = digits ? new Intl.NumberFormat('id-ID').format(digits) : '';
-                this.$wire.set('value', digits, false);
-            },
-        };
-    }
-</script>
-@endassets

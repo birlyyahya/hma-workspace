@@ -337,10 +337,7 @@ new class extends Component {
                     <flux:button
                         icon="cloud-arrow-up"
                         variant="primary"
-                        x-on:click="
-                            window.dispatchEvent(new CustomEvent('init-select2-upload'));
-                            window.dispatchEvent(new CustomEvent('upload-modal-opened'));
-                        "
+                        x-on:click="window.dispatchEvent(new CustomEvent('upload-modal-opened'));"
                     >
                         Upload File
                     </flux:button>
@@ -516,10 +513,7 @@ new class extends Component {
                                 @unless($search)
                                     <flux:modal.trigger name="upload-file-modal">
                                         <flux:button variant="primary" icon="cloud-arrow-up" size="sm" class="mt-4"
-                                            x-on:click="
-                                                window.dispatchEvent(new CustomEvent('init-select2-upload'));
-                                                window.dispatchEvent(new CustomEvent('upload-modal-opened'));
-                                            ">
+                                            x-on:click="window.dispatchEvent(new CustomEvent('upload-modal-opened'));">
                                             Upload File
                                         </flux:button>
                                     </flux:modal.trigger>
@@ -640,14 +634,12 @@ new class extends Component {
 
             <flux:field>
                 <flux:label badge="Wajib">Kategori</flux:label>
-                <div wire:ignore>
-                    <select id="categoryFiles" class="select2 form-select">
-                        <option value="">Pilih kategori...</option>
-                        @foreach ($this->category as $item)
-                            <option value="{{ $item['id'] }}">{{ $item['name'] }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                <x-search-select
+                    model="form.category"
+                    :options="collect($this->category)->map(fn ($c) => ['value' => $c['id'], 'label' => $c['name']])->all()"
+                    placeholder="Pilih kategori..."
+                    search-placeholder="Cari kategori..."
+                />
                 @error('form.category')
                     <flux:error message="{{ $message }}" />
                 @enderror
@@ -774,83 +766,15 @@ new class extends Component {
     </div>
 
     {{-- ============ DELETE CONFIRMATION MODAL ============ --}}
-    <flux:modal name="delete-file-modal" class="md:w-110" :dismissible="false">
-        <div class="space-y-5">
-            <div class="flex items-start gap-4">
-                <div class="shrink-0 w-11 h-11 rounded-full bg-red-50 flex items-center justify-center ring-4 ring-red-50/50">
-                    <flux:icon.exclamation-triangle class="w-5 h-5 text-red-600" />
-                </div>
-                <div class="space-y-1 flex-1 min-w-0">
-                    <flux:heading size="lg">Hapus File?</flux:heading>
-                    <flux:text class="text-sm text-zinc-500">
-                        File <span class="font-medium text-zinc-800">"{{ $deletingName }}"</span>
-                        akan dihapus permanen beserta seluruh datanya. Tindakan ini tidak dapat dibatalkan.
-                    </flux:text>
-                </div>
-            </div>
-
-            <div class="flex gap-2">
-                <flux:modal.close>
-                    <flux:button variant="ghost" class="flex-1">Batal</flux:button>
-                </flux:modal.close>
-                <flux:button wire:click="fileDelete" variant="danger" class="flex-1"
-                    wire:loading.attr="disabled" wire:target="fileDelete">
-                    <span class="flex items-center justify-center gap-2" wire:loading.remove wire:target="fileDelete">
-                        <flux:icon.trash variant="micro" />
-                        Hapus
-                    </span>
-                    <div class="flex justify-center gap-2">
-                        <span class="flex items-center justify-center gap-2" wire:loading wire:target="fileDelete">
-                            <flux:icon.loading variant="micro" />
-                        </span>
-                        <span class="flex items-center justify-center gap-2" wire:loading wire:target="fileDelete">
-                            Menghapus...
-                        </span>
-                    </div>
-                </flux:button>
-            </div>
-        </div>
-    </flux:modal>
+    <x-confirm-modal name="delete-file-modal" confirm="fileDelete" title="Hapus File?">
+        File <span class="font-medium text-zinc-800">"{{ $deletingName }}"</span>
+        akan dihapus permanen beserta seluruh datanya. Tindakan ini tidak dapat dibatalkan.
+    </x-confirm-modal>
 </div>
 
 @script
 <script>
     const __wire = $wire;
-
-    // ── Select2 ───────────────────────────────────────────────────────────────
-    const initProjectFilesSelect2 = () => {
-        const el = $('#categoryFiles');
-        if (!el.length) return;
-
-        if (el.hasClass('select2-hidden-accessible')) {
-            el.select2('destroy');
-        }
-
-        el.select2({
-            dropdownParent: $('dialog[data-modal="upload-file-modal"]'),
-            width: '100%',
-            placeholder: 'Pilih kategori...',
-            allowClear: true,
-        });
-
-        el.off('change.projectFiles').on('change.projectFiles', function () {
-            __wire.set('form.category', $(this).val());
-        });
-    };
-
-    // Native <dialog> steals focus from the select2 search field; force it back.
-    if (!window._projectFilesSelect2FocusFix) {
-        window._projectFilesSelect2FocusFix = true;
-        $(document).on('select2:open', () => {
-            const search = document.querySelector('.select2-container--open .select2-search__field');
-            if (search) {
-                setTimeout(() => search.focus(), 0);
-            }
-        });
-    }
-
-    Livewire.on('initSelect2', () => setTimeout(initProjectFilesSelect2, 0));
-    window.addEventListener('init-select2-upload', () => setTimeout(initProjectFilesSelect2, 0));
 
     // ── Upload store (persistent across modal open/close) ─────────────────────
     const initProjectFileUploadsStore = () => {
@@ -960,9 +884,6 @@ new class extends Component {
                 __wire.set('form.file', null);
                 __wire.set('form.uploadedFilename', null);
                 __wire.set('form.originalName', null);
-            } catch (_) {}
-            try {
-                if (window.$) $('#categoryFiles').val(null).trigger('change');
             } catch (_) {}
             try { this.$refs.fileInput.value = ''; this.selectedFile = null; } catch (_) {}
 

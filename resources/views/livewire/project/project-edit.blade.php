@@ -37,7 +37,6 @@ new class extends Component
         $this->authorize('project.update');
         $this->id = $id;
         $this->fetchProject();
-        $this->dispatch('initSelects');
     }
 
     public function fetchProject(): void
@@ -99,6 +98,26 @@ new class extends Component
     public function getUsersProperty(): \Illuminate\Database\Eloquent\Collection
     {
         return User::whereNotIn('role_id', [1, 2])->orderBy('name')->get();
+    }
+
+    /**
+     * @return array<int, array{value: int, label: string}>
+     */
+    public function getCompanyOptionsProperty(): array
+    {
+        return collect($this->companies)
+            ->map(fn ($c) => ['value' => (int) $c['id'], 'label' => (string) $c['name']])
+            ->all();
+    }
+
+    /**
+     * @return array<int, array{value: int, label: string}>
+     */
+    public function getLeaderOptionsProperty(): array
+    {
+        return $this->users
+            ->map(fn ($u) => ['value' => $u->id, 'label' => $u->name])
+            ->all();
     }
 
     protected function rules(): array
@@ -326,10 +345,7 @@ new class extends Component
                     <div class="sm:col-span-2">
                         <flux:field>
                             <flux:label>Nilai Kontrak (Rupiah) <flux:badge size="sm" color="red" class="ml-1">Wajib</flux:badge></flux:label>
-                            <flux:input wire:model="value" type="number" min="0" step="1000" placeholder="Contoh: 8000000000"/>
-                            @if($value && is_numeric($value) && (int) $value > 0)
-                                <flux:description>Rp {{ number_format((int) $value, 0, ',', '.') }}</flux:description>
-                            @endif
+                            <x-rupiah-input model="value" placeholder="8.000.000.000" />
                             <flux:error name="value"/>
                         </flux:field>
                     </div>
@@ -369,7 +385,7 @@ new class extends Component
             </div>
 
             {{-- Section 4: Perusahaan & Tim --}}
-            <div class="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
+            <div class="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-visible">
                 <div class="px-6 py-4 border-b border-zinc-100 flex items-center gap-3">
                     <div class="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
                         <flux:icon name="users" class="w-4 h-4 text-purple-600"/>
@@ -386,14 +402,12 @@ new class extends Component
                             Perusahaan
                             <span class="ml-1 inline-flex items-center rounded-md bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-700">Wajib</span>
                         </label>
-                        <div wire:ignore>
-                            <select id="select-company" class="select2-field w-full" data-initial="{{ $company_id }}">
-                                <option value="">-- Pilih Perusahaan --</option>
-                                @foreach($this->companies as $company)
-                                    <option value="{{ $company['id'] }}" @selected((string) $company['id'] === $company_id)>{{ $company['name'] }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                        <x-search-select
+                            model="company_id"
+                            :options="$this->companyOptions"
+                            placeholder="Cari perusahaan..."
+                            search-placeholder="Ketik untuk mencari..."
+                        />
                         @error('company_id')
                             <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                         @enderror
@@ -404,14 +418,13 @@ new class extends Component
                             Project Leader
                             <span class="ml-1 inline-flex items-center rounded-md bg-red-50 px-1.5 py-0.5 text-xs font-medium text-red-700">Wajib</span>
                         </label>
-                        <div wire:ignore>
-                            <select id="select-leader" class="select2-field w-full" data-initial="{{ $project_leader_id }}">
-                                <option value="">-- Pilih Project Leader --</option>
-                                @foreach($this->users as $user)
-                                    <option value="{{ $user->id }}" @selected((string) $user->id === $project_leader_id)>{{ $user->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                        <x-search-select
+                            model="project_leader_id"
+                            :options="$this->leaderOptions"
+                            :avatar="true"
+                            placeholder="Cari project leader..."
+                            search-placeholder="Ketik untuk mencari..."
+                        />
                         @error('project_leader_id')
                             <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                         @enderror
@@ -475,13 +488,16 @@ new class extends Component
                 <flux:button variant="ghost" :href="route('projects.show', $id)" wire:navigate>
                     Batal
                 </flux:button>
-                <flux:button type="submit" variant="primary" icon="check-circle" :disabled="$submitting">
+                <flux:button type="submit" variant="primary" :disabled="$submitting">
+                    <flux:icon wire:loading.remove wire:target="update" name="check-circle" variant="solid" class="size-5"/>
                     <span wire:loading.remove wire:target="update">Simpan Perubahan</span>
                     <span wire:loading wire:target="update" class="flex items-center gap-2">
                         <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
                             <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" class="opacity-25"/>
                             <path fill="currentColor" class="opacity-75" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a10 10 0 00-10 10h4z"/>
                         </svg>
+                    </span>
+                    <span wire:loading wire:target="update" class="flex items-center gap-2">
                         Menyimpan...
                     </span>
                 </flux:button>
@@ -493,85 +509,6 @@ new class extends Component
 
 @push('styles')
 <style>
-    .select2-container--default .select2-selection--single {
-        height: 38px;
-        border-radius: 8px;
-        border: 1px solid #e4e4e7;
-        padding: 4px 8px;
-        display: flex;
-        align-items: center;
-        background: #fff;
-    }
-    .select2-container--default .select2-selection--single .select2-selection__arrow {
-        top: 6px;
-        right: 8px;
-    }
-    .select2-container--default .select2-selection--single .select2-selection__rendered {
-        color: #18181b;
-        font-size: 0.875rem;
-        padding-left: 0;
-        line-height: 1.5;
-    }
-    .select2-container--default .select2-selection--single .select2-selection__placeholder {
-        color: #a1a1aa;
-    }
-    .select2-container--default .select2-results__option--highlighted {
-        background-color: #2563eb;
-    }
-    .select2-dropdown {
-        border-radius: 8px;
-        border: 1px solid #e4e4e7;
-        box-shadow: 0 4px 16px 0 rgba(0,0,0,0.08);
-        font-size: 0.875rem;
-    }
-    .select2-container--default .select2-search--dropdown .select2-search__field {
-        border-radius: 6px;
-        border: 1px solid #e4e4e7;
-        padding: 6px 10px;
-        font-size: 0.875rem;
-        outline: none;
-    }
-    .select2-container--default .select2-search--dropdown .select2-search__field:focus {
-        border-color: #2563eb;
-        box-shadow: 0 0 0 2px rgba(37,99,235,0.15);
-    }
-    .select2-field { width: 100% !important; }
+    [x-cloak] { display: none !important; }
 </style>
 @endpush
-
-@script
-<script>
-    Livewire.on('initSelects', () => setTimeout(initSelects2, 0));
-    document.addEventListener('livewire:navigated', () => setTimeout(initSelects2, 0));
-    document.addEventListener('livewire:init', () => setTimeout(initSelects2, 0));
-
-    const initSelects2 = () => {
-        const $company = $('#select-company');
-        const $leader  = $('#select-leader');
-
-        if ($company.length && !$company.hasClass('select2-hidden-accessible')) {
-            $company.select2({
-                placeholder: 'Cari perusahaan...',
-                allowClear: true,
-                width: '100%',
-            }).on('change', function () {
-                $wire.set('company_id', $(this).val() ?? '');
-            });
-            const initialCompany = $company.data('initial');
-            if (initialCompany) $company.val(String(initialCompany)).trigger('change.select2');
-        }
-
-        if ($leader.length && !$leader.hasClass('select2-hidden-accessible')) {
-            $leader.select2({
-                placeholder: 'Cari project leader...',
-                allowClear: true,
-                width: '100%',
-            }).on('change', function () {
-                $wire.set('project_leader_id', $(this).val() ?? '');
-            });
-            const initialLeader = $leader.data('initial');
-            if (initialLeader) $leader.val(String(initialLeader)).trigger('change.select2');
-        }
-    };
-</script>
-@endscript

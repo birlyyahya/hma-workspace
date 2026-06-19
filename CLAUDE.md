@@ -633,7 +633,3 @@ Portal internal perusahaan (Hana Tekindo). Laravel 12 + Livewire 3/Volt + Flux U
 - Pakai Flux UI Free; fallback Blade. Mode gelap pakai `dark:`.
 - Otorisasi: `Role->level` + permission many-to-many, `Gate::before` (super-admin bypass). Scope view: `all`/`department`/`own` via `User::viewScopeFor()`.
 - Bahasa domain Indonesia: "izin" = cuti/perizinan, "perusahaan" = company, "spektek" = spesifikasi teknis, "SPD" = surat perjalanan dinas.
-
-### Modul
-
-Dashboard, Projects, DAR, Izin, Knowledge Hub, User Management (aktif); Events (hidden); Inventaris & Cash Advance (coming soon — route ke `maintenance/comingsoon`).
