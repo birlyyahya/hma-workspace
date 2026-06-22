@@ -16,6 +16,8 @@ class Profile extends Component
 
     public string $username = '';
 
+    public string $no_telp = '';
+
     /**
      * Mount the component.
      */
@@ -24,6 +26,7 @@ class Profile extends Component
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
         $this->username = Auth::user()->username;
+        $this->no_telp = Auth::user()->no_telp ?? '';
     }
 
     /**
@@ -44,6 +47,7 @@ class Profile extends Component
                 'max:255',
                 Rule::unique(User::class)->ignore($user->id),
             ],
+            'no_telp' => ['required', 'string', 'max:20'],
         ]);
 
         $user->fill($validated);

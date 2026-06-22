@@ -8,6 +8,7 @@
             <form wire:submit="updateProfileInformation" class="my-6 w-full space-y-6 px-1">
                 <flux:input wire:model="name" :label="__('Name')" type="text" required autofocus autocomplete="name" />
                 <flux:input wire:model="username" :label="__('Username')" type="text" required autofocus autocomplete="username" disabled/>
+                <flux:input wire:model="no_telp" :label="__('No. Telepon')" type="text" required autofocus autocomplete="no_telp"/>
 
                 <div>
                     <flux:input wire:model="email" :label="__('Email')" type="email" required autocomplete="email" />

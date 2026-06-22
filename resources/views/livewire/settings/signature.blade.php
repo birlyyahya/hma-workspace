@@ -30,12 +30,13 @@ class extends Component {
                     return $response['data']['signature'];
                 }
             );
-                return $response['data']['signature'];
+            return $response['data']['signature'];
             }else {
                 Toaster::error('Failed to fetch user data from API.');
             }
-        }catch(Exception $e){
-            Toaster::error('Failed to fetch user data from API.');
+
+            }catch(Exception $e){
+            Toaster::error($e->getMessage() ?? '');
             \Log::error('User API failed', [
                 'body'   => $e->getMessage(),
             ]);
