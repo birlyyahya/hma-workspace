@@ -92,7 +92,7 @@ new class extends Component {
 @endphp
 
 <div>
-    <div class="bg-white rounded-2xl border border-zinc-200 p-5 sm:p-6 h-full md:max-h-76 flex flex-col">
+    <div class="bg-white rounded-2xl border border-zinc-200 p-5 sm:p-6 h-full md:max-h-92 flex flex-col">
         {{-- Header --}}
         <div class="flex items-start justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0">
@@ -146,7 +146,7 @@ new class extends Component {
 
         {{-- Content --}}
         @php($activeT = $tonePalette[$this->activeTone] ?? $tonePalette['red'])
-        <div class="mt-4 space-y-2 flex-1 max-h-64 overflow-y-auto pr-1">
+        <div class="mt-4 space-y-2 flex-1 max-h-74 overflow-y-auto pr-1">
             @forelse ($this->data[$this->activeTab] ?? [] as $item)
                 <div class="group relative rounded-xl border border-zinc-200 bg-white p-3 pl-4 transition hover:border-zinc-300 hover:shadow-xs">
                     <span class="absolute left-0 top-3 bottom-3 w-1 rounded-r-full {{ $activeT['accent'] }}"></span>

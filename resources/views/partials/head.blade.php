@@ -13,15 +13,15 @@
 <meta property="og:title" content="{{ $title ?? config('app.name') }}" />
 <meta property="og:description" content="Portal internal Hana Tekindo — kelola proyek, DAR, perizinan, dan knowledge dalam satu tempat." />
 <meta property="og:url" content="{{ url()->current() }}" />
-<meta property="og:image" content="{{ asset('img/logo/logo-hma2.png') }}" />
-<meta property="og:image:width" content="1227" />
-<meta property="og:image:height" content="1106" />
+<meta property="og:image" content="{{ asset('img/logo/og-image.png') }}" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
 
 {{-- Twitter Card --}}
-<meta name="twitter:card" content="summary" />
+<meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="{{ $title ?? config('app.name') }}" />
 <meta name="twitter:description" content="Portal internal Hana Tekindo — kelola proyek, DAR, perizinan, dan knowledge dalam satu tempat." />
-<meta name="twitter:image" content="{{ asset('img/logo/logo-hma2.png') }}" />
+<meta name="twitter:image" content="{{ asset('img/logo/og-image.png') }}" />
 
 <link rel="preconnect" href="https://fonts.bunny.net">
 <link href="https://fonts.bunny.net/css?family=Poppins:400,500,600" rel="stylesheet" />

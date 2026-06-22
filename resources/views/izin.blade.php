@@ -55,8 +55,7 @@
                 <livewire:izin.widget.report-izin defer />
                 <livewire:izin.widget.report-izin-category defer />
             </div>
-
-            @if(!Auth::user()->hasPermission('izin.view.all') && !Auth::user()->isInDepartment('it'))
+            @if(Auth::user()->isInDepartment('it'))
             <div x-data="{ tab: 'izin' }" class="space-y-4">
                 <div class="flex justify-center">
                     <div class="inline-flex w-full rounded-xl bg-zinc-100 p-1 shadow-sm">

@@ -6,15 +6,44 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 
-new class extends Component {
-    public int $approvedCount = 0;
-    public int $rejectedCount = 0;
-    public int $waitingCount = 0;
-    public int $totalCount = 0;
+new class extends Component
+{
+    public string $tab = 'izin';
+
+    // Ringkasan Izin
+    public int $izinApproved = 0;
+
+    public int $izinRejected = 0;
+
+    public int $izinTotal = 0;
+
+    public array $izinGroup = [];
+
+    // Ringkasan SPD
+    public int $spdApproved = 0;
+
+    public int $spdWaiting = 0;
+
+    public int $spdTotal = 0;
+
+    public array $spdGroup = [];
 
     public function mount(): void
     {
+        if (! $this->canViewIzin) {
+            $this->tab = 'spd';
+        }
+
         $this->loadData();
+    }
+
+    /**
+     * Hanya departemen IT yang punya akses ke ringkasan izin; selain itu cuma SPD.
+     */
+    #[Computed]
+    public function canViewIzin(): bool
+    {
+        return (bool) Auth::user()?->isInDepartment('it');
     }
 
     #[On('izinAdded')]
@@ -26,82 +55,107 @@ new class extends Component {
         $this->loadData();
     }
 
+    public function setTab(string $tab): void
+    {
+        if (! $this->canViewIzin) {
+            $tab = 'spd';
+        }
+
+        $this->tab = in_array($tab, ['izin', 'spd'], true) ? $tab : 'izin';
+        $this->dispatchGroup();
+    }
+
+    #[Computed]
+    public function totalCount(): int
+    {
+        return $this->tab === 'izin' ? $this->izinTotal : $this->spdTotal;
+    }
+
     #[Computed]
     public function pendingCount(): int
     {
-        if (Auth::user()->hasPermission('izin.view.all') && Auth::user()->isInDepartment('it')) {
-            return max(0, $this->totalCount - $this->approvedCount - $this->rejectedCount);
-        }else {
-            return max(0, $this->totalCount - $this->approvedCount - $this->waitingCount);
-        }
+        return $this->tab === 'izin'
+            ? max(0, $this->izinTotal - $this->izinApproved - $this->izinRejected)
+            : max(0, $this->spdTotal - $this->spdApproved - $this->spdWaiting);
     }
 
     /**
-     * @return array{approved:float,rejected:float,pending:float}
+     * @return array<string, float>
      */
     #[Computed]
     public function percentages(): array
     {
         $total = max($this->totalCount, 1);
 
-        if (Auth::user()->hasPermission('izin.view.all') && Auth::user()->isInDepartment('it')) {
+        if ($this->tab === 'izin') {
             return [
-                'approved' => round($this->approvedCount / $total * 100, 1),
-                'rejected' => round($this->rejectedCount / $total * 100, 1),
+                'approved' => round($this->izinApproved / $total * 100, 1),
+                'rejected' => round($this->izinRejected / $total * 100, 1),
                 'pending' => round($this->pendingCount / $total * 100, 1),
             ];
-        }else {
-            return [
-                'approved' => round($this->approvedCount / $total * 100, 1),
-                'waiting' => round($this->waitingCount / $total * 100, 1),
-                'pending' => round($this->pendingCount / $total * 100, 1),
-            ];
-
         }
+
+        return [
+            'approved' => round($this->spdApproved / $total * 100, 1),
+            'waiting' => round($this->spdWaiting / $total * 100, 1),
+            'pending' => round($this->pendingCount / $total * 100, 1),
+        ];
+    }
+
+    /**
+     * @return array<int, array{label:string,value:int,percent:float,dot:string,text:string}>
+     */
+    #[Computed]
+    public function stats(): array
+    {
+        if ($this->tab === 'izin') {
+            return [
+                ['label' => 'Disetujui', 'value' => $this->izinApproved, 'percent' => $this->percentages['approved'], 'dot' => 'bg-emerald-500', 'text' => 'text-emerald-600'],
+                ['label' => 'Ditolak', 'value' => $this->izinRejected, 'percent' => $this->percentages['rejected'], 'dot' => 'bg-rose-500', 'text' => 'text-rose-600'],
+                ['label' => 'Pending', 'value' => $this->pendingCount, 'percent' => $this->percentages['pending'], 'dot' => 'bg-amber-400', 'text' => 'text-amber-600'],
+            ];
+        }
+
+        return [
+            ['label' => 'Disetujui', 'value' => $this->spdApproved, 'percent' => $this->percentages['approved'], 'dot' => 'bg-emerald-500', 'text' => 'text-emerald-600'],
+            ['label' => 'Waiting', 'value' => $this->spdWaiting, 'percent' => $this->percentages['waiting'], 'dot' => 'bg-blue-500', 'text' => 'text-blue-600'],
+            ['label' => 'Pending', 'value' => $this->pendingCount, 'percent' => $this->percentages['pending'], 'dot' => 'bg-amber-400', 'text' => 'text-amber-600'],
+        ];
+    }
+
+    protected function dispatchGroup(): void
+    {
+        $this->dispatch('widget-pengajuan', data: $this->tab === 'izin' ? $this->izinGroup : $this->spdGroup);
     }
 
     protected function loadData(): void
     {
-        try {
-            $cache = app(IzinCache::class);
+        $cache = app(IzinCache::class);
 
-            if (Auth::user()->hasPermission('izin.view.all') && Auth::user()->isInDepartment('it')) {
-                // Response dashboard sudah berisi group, extract langsung (hemat 1 API call).
+        if ($this->canViewIzin) {
+            try {
                 $json = $cache->dashboard(Auth::user()->username);
-                $data = [
-                    'approved' => $json['data']['approve_izin'] ?? 0,
-                    'rejected' => $json['data']['failed_izin'] ?? 0,
-                    'total'    => $json['data']['all_izin'] ?? 0,
-                ];
-                $group = $json['data']['group'] ?? [];
-            } else {
-                // Endpoint SPD tidak punya field group → fetch terpisah dari groupDashboard().
-                $json = $cache->spdListAll();
-                $rows = collect($json['data'] ?? []);
-                $data = [
-                    'approved' => $rows->where('is_submitted', 1)->where('is_approved', 1)->count(),
-                    'waiting'  => $rows->where('is_submitted', 1)->where('is_approved', 0)->count(),
-                    'total'    => $rows->count(),
-                ];
-                $group = $cache->groupDashboard();
+                $this->izinApproved = (int) ($json['data']['approve_izin'] ?? 0);
+                $this->izinRejected = (int) ($json['data']['failed_izin'] ?? 0);
+                $this->izinTotal = (int) ($json['data']['all_izin'] ?? 0);
+                $this->izinGroup = $json['data']['group'] ?? [];
+            } catch (\Throwable $e) {
+                Log::error('Failed to load izin summary', ['message' => $e->getMessage()]);
             }
+        }
+
+        try {
+            $json = $cache->spdListAll();
+            $rows = collect($json['data'] ?? []);
+            $this->spdApproved = $rows->where('is_submitted', 1)->where('is_approved', 1)->count();
+            $this->spdWaiting = $rows->where('is_submitted', 1)->where('is_approved', 0)->count();
+            $this->spdTotal = $rows->count();
+            $this->spdGroup = $cache->groupDashboard();
         } catch (\Throwable $e) {
-            Log::error('Failed to load izin widget data', ['message' => $e->getMessage()]);
-            $data = ['approved' => 0, 'rejected' => 0, 'waiting' => 0, 'total' => 0];
-            $group = [];
+            Log::error('Failed to load spd summary', ['message' => $e->getMessage()]);
         }
 
-        $this->dispatch('widget-pengajuan', data: $group);
-
-        $this->approvedCount = (int) ($data['approved'] ?? 0);
-
-        if (Auth::user()->level <= 90) {
-            $this->rejectedCount = (int) ($data['rejected'] ?? 0);
-        } else {
-            $this->waitingCount = (int) ($data['waiting'] ?? 0);
-        }
-
-        $this->totalCount = (int) ($data['total'] ?? 0);
+        $this->dispatchGroup();
     }
 }; ?>
 
@@ -114,24 +168,38 @@ new class extends Component {
                     <flux:icon name="chart-bar" class="size-5 text-red-600" />
                 </div>
                 <div class="min-w-0">
-                    @if(Auth::user()->hasPermission('izin.view.all') && Auth::user()->isInDepartment('it')) <flux:heading size="lg" class="text-zinc-900 leading-tight">
-                        Ringkasan Izin
-                        </flux:heading>
-                        <flux:description class="text-xs text-zinc-500">
-                            Status pengajuan izin Anda
-                        </flux:description>
-                        @else
-                        <flux:heading size="lg" class="text-zinc-900 leading-tight">
-                            Ringkasan SPD
-                        </flux:heading>
-                        <flux:description class="text-xs text-zinc-500">
-                            Status pengajuan SPD Pegawai
-                        </flux:description>
-                        @endif
+                    <flux:heading size="lg" class="text-zinc-900 leading-tight">
+                        {{ $tab === 'izin' ? 'Ringkasan Izin' : 'Ringkasan SPD' }}
+                    </flux:heading>
+                    <flux:description class="text-xs text-zinc-500">
+                        {{ $tab === 'izin' ? 'Status pengajuan izin Anda' : 'Status pengajuan SPD Pegawai' }}
+                    </flux:description>
                 </div>
             </div>
             <flux:badge size="sm" color="zinc" variant="pill" class="shrink-0">All-time</flux:badge>
         </div>
+
+        {{-- Tab toggle (hanya departemen IT yang bisa beralih ke ringkasan izin) --}}
+        @if ($this->canViewIzin)
+        <div class="mt-5 inline-flex w-full rounded-xl bg-zinc-100 p-1">
+            <button type="button" wire:click="setTab('izin')"
+                @class([
+                    'px-4 w-full py-2 text-sm font-medium rounded-lg transition-all duration-200',
+                    'bg-white text-zinc-900 shadow-sm' => $tab === 'izin',
+                    'text-zinc-500 hover:text-zinc-700' => $tab !== 'izin',
+                ])>
+                Izin
+            </button>
+            <button type="button" wire:click="setTab('spd')"
+                @class([
+                    'px-4 w-full py-2 text-sm font-medium rounded-lg transition-all duration-200',
+                    'bg-white text-zinc-900 shadow-sm' => $tab === 'spd',
+                    'text-zinc-500 hover:text-zinc-700' => $tab !== 'spd',
+                ])>
+                SPD
+            </button>
+        </div>
+        @endif
 
         {{-- Hero stat --}}
         <div class="mt-6 flex items-end justify-between gap-4">
@@ -139,15 +207,12 @@ new class extends Component {
                 <p class="text-xs font-medium text-zinc-500">Total Pengajuan</p>
                 <div class="mt-1 flex items-baseline gap-2">
                     <span class="text-4xl sm:text-5xl font-semibold text-zinc-900 tabular-nums tracking-tight">
-                        {{ $totalCount }}
+                        {{ $this->totalCount }}
                     </span>
-                    @if(Auth::user()->hasPermission('izin.view.all') && Auth::user()->isInDepartment('it')) <span class="text-sm text-zinc-400">izin</span>
-                        @else
-                        <span class="text-sm text-zinc-400">SPD</span>
-                        @endif
+                    <span class="text-sm text-zinc-400">{{ $tab === 'izin' ? 'izin' : 'SPD' }}</span>
                 </div>
             </div>
-            @if ($totalCount > 0)
+            @if ($this->totalCount > 0)
             <div class="text-right space-y-0.5">
                 <p class="text-[11px] font-medium text-zinc-500">Tingkat Disetujui</p>
                 <p class="text-2xl font-semibold text-emerald-600 tabular-nums">
@@ -160,9 +225,9 @@ new class extends Component {
         {{-- Stacked progress bar --}}
         <div class="mt-4">
             <div class="h-2.5 w-full rounded-full overflow-hidden bg-zinc-100 flex">
-                @if ($totalCount > 0)
+                @if ($this->totalCount > 0)
                 <div class="bg-emerald-500 h-full transition-all duration-500" style="width: {{ $this->percentages['approved'] }}%"></div>
-                @if(Auth::user()->hasPermission('izin.view.all') && Auth::user()->isInDepartment('it'))
+                @if ($tab === 'izin')
                 <div class="bg-rose-500 h-full transition-all duration-500" style="width: {{ $this->percentages['rejected'] }}%"></div>
                 @else
                 <div class="bg-blue-500 h-full transition-all duration-500" style="width: {{ $this->percentages['waiting'] }}%"></div>
@@ -174,33 +239,18 @@ new class extends Component {
 
         {{-- Legend / mini stats --}}
         <div class="mt-5 grid grid-cols-3 gap-3">
-            @php
-            if (Auth::user()->hasPermission('izin.view.all') && Auth::user()->isInDepartment('it')){ $stats=[ ['label'=> 'Disetujui', 'value' => $approvedCount, 'percent' => $this->percentages['approved'], 'dot' => 'bg-emerald-500', 'text' => 'text-emerald-600'],
-                ['label' => 'Ditolak', 'value' => $rejectedCount, 'percent' => $this->percentages['rejected'], 'dot' => 'bg-rose-500', 'text' => 'text-rose-600'],
-                ['label' => 'Pending', 'value' => $this->pendingCount, 'percent' => $this->percentages['pending'], 'dot' => 'bg-amber-400', 'text' => 'text-amber-600'],
-                ];
-                }else {
-                $stats = [
-                ['label' => 'Disetujui', 'value' => $approvedCount, 'percent' => $this->percentages['approved'], 'dot' => 'bg-emerald-500', 'text' => 'text-emerald-600'],
-                ['label' => 'Waiting', 'value' => $waitingCount, 'percent' => $this->percentages['waiting'], 'dot' => 'bg-blue-500', 'text' => 'text-blue-600'],
-                ['label' => 'Pending', 'value' => $this->pendingCount, 'percent' => $this->percentages['pending'], 'dot' => 'bg-amber-400', 'text' => 'text-amber-600'],
-                ];
-                }
-
-                @endphp
-
-                @foreach ($stats as $stat)
-                <div class="rounded-xl border border-zinc-200 p-3 transition hover:border-zinc-300 hover:shadow-xs">
-                    <div class="flex items-center gap-1.5">
-                        <span class="size-2 rounded-full {{ $stat['dot'] }}"></span>
-                        <span class="text-[11px] font-medium text-zinc-500 uppercase tracking-wide">{{ $stat['label'] }}</span>
-                    </div>
-                    <div class="mt-1.5 flex items-baseline justify-between gap-1">
-                        <span class="text-xl font-semibold text-zinc-900 tabular-nums">{{ $stat['value'] }}</span>
-                        <span class="text-[11px] {{ $stat['text'] }} tabular-nums font-medium">{{ $stat['percent'] }}%</span>
-                    </div>
+            @foreach ($this->stats as $stat)
+            <div class="rounded-xl border border-zinc-200 p-3 transition hover:border-zinc-300 hover:shadow-xs">
+                <div class="flex items-center gap-1.5">
+                    <span class="size-2 rounded-full {{ $stat['dot'] }}"></span>
+                    <span class="text-[11px] font-medium text-zinc-500 uppercase tracking-wide">{{ $stat['label'] }}</span>
                 </div>
-                @endforeach
+                <div class="mt-1.5 flex items-baseline justify-between gap-1">
+                    <span class="text-xl font-semibold text-zinc-900 tabular-nums">{{ $stat['value'] }}</span>
+                    <span class="text-[11px] {{ $stat['text'] }} tabular-nums font-medium">{{ $stat['percent'] }}%</span>
+                </div>
+            </div>
+            @endforeach
         </div>
     </div>
 </div>

@@ -74,8 +74,10 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function isInDepartment(string $departmentCode): bool
     {
-        return $this->department?->code === $departmentCode
-            || $this->department?->parent?->code === $departmentCode;
+        $department = $this->role?->department;
+
+        return $department?->code === $departmentCode
+            || $department?->parent?->code === $departmentCode;
     }
 
     /**
