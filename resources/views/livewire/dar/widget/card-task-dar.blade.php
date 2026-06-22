@@ -47,7 +47,7 @@ new class extends Component {
             if(Auth::user()->viewScopeFor('project') === 'all'){
                 $this->projectData = $cache->allProjects();
             }else {
-                $this->projectData = $cache->leaderProjects(Auth::id());
+                $this->projectData = $cache->involvedProjects(Auth::id());
             }
             $this->allProjects = $cache->allProjects();
         } catch (\Throwable $e) {
@@ -79,8 +79,7 @@ new class extends Component {
 
     public function updatedProjectSelected(): void
     {
-        $project = collect($this->projectData)->firstWhere('id', $this->projectSelected);
-        $this->timelines = Http::get(config('services.api_project').'timelines/search?project_id='.$this->projectSelected.'&user_id='.$project['project_leader_id'])->json()['data'] ?? [];
+        $this->timelines = Http::get(config('services.api_project').'timelines/search?project_id='.$this->projectSelected)->json()['data'] ?? [];
 
         $this->form->project_id = $this->projectSelected;
     }

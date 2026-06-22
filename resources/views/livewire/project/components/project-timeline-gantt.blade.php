@@ -40,7 +40,7 @@ new class extends Component {
     public function loadTimelines(): void
     {
         try {
-            $response = Http::get(config('services.api_project').'timelines/search?user_id='.$this->user_id.'&project_id='.$this->id)->json();
+            $response = Http::get(config('services.api_project').'timelines/search?project_id='.$this->id)->json();
 
             if (($response['status'] ?? null) !== 200) {
                 Log::error('Gantt timeline loading failed', [

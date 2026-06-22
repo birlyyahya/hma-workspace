@@ -158,7 +158,7 @@ class extends Component
 
         try {
             $apiProject = rtrim(config('services.api_project'), '/');
-            $response = Http::get($apiProject.'/timelines/search?project_id='.$projectId.'&user_id='.Auth::id())->json();
+            $response = Http::get($apiProject.'/timelines/search?project_id='.$projectId)->json();
             $this->editTimelines = $response['data'] ?? [];
         } catch (\Throwable $e) {
             $this->editTimelines = [];
