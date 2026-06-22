@@ -190,7 +190,7 @@ new class extends Component {
                 $params['end_date'] = $this->endDateFilter;
             }
 
-            if (Auth::user()->viewScopeFor('spd') !== 'all') {
+            if (!Auth::user()->hasPermission('spd.view.all')) {
                 $params['user_id'] = Auth::user()->id;
             }
 

@@ -71,6 +71,12 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->role?->level;
     }
 
+    public function isInDepartment(string $departmentCode): bool
+    {
+        return $this->department?->code === $departmentCode
+            || $this->department?->parent?->code === $departmentCode;
+    }
+
     /**
      * Resolusi view scope untuk sebuah modul berdasarkan permission.
      * Urutan prioritas: all > department > own. Super-admin selalu 'all'.

@@ -255,6 +255,10 @@ new class extends Component {
 
     public function confirmDeleteTask(int $id, string $name = ''): void
     {
+        if (!Auth::user()->hasPermission('dar.delete')) {
+            Toaster::error('You do not have permission to delete this activity.');
+            return;
+        }
         $this->pendingDeleteId = $id;
         $this->pendingDeleteName = $name;
         Flux::modal('delete-task')->show();
@@ -550,7 +554,6 @@ new class extends Component {
 
                                 <div x-cloak x-show="menuOpen" @click.away="menuOpen = false" x-transition.origin.top.right class="absolute right-0 z-20 mt-2 w-44 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-slate-200/70">
                                     <a href="{{ $taskUrl }}" class="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">Open</a>
-                                    <button type="button" class="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">Mark as done</button>
                                     <div class="h-px bg-slate-200/70"></div>
                                     <button type="button" @click="menuOpen = false" wire:click="confirmDeleteTask({{ $taskId }}, @js(ucwords($task['activity'] ?? 'Untitled task')))" class="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">
                                         Delete
@@ -683,36 +686,8 @@ new class extends Component {
         </div>
     </section>
 
-    <flux:modal name="delete-task" class="min-w-md" :dismissible="false">
-        <div class="space-y-5">
-            <div class="flex items-start gap-4">
-                <div class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-red-100 text-red-600">
-                    <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M3 6h18" />
-                        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                        <path d="M10 11v6" />
-                        <path d="M14 11v6" />
-                    </svg>
-                </div>
-                <div class="min-w-0 flex-1">
-                    <flux:heading size="lg">Hapus tugas ini?</flux:heading>
-                    <flux:text class="mt-1 text-sm text-slate-600">
-                        Tugas <span class="font-semibold text-slate-900">"{{ $pendingDeleteName ?: 'Untitled task' }}"</span>
-                        akan dihapus secara permanen beserta seluruh aktivitas terkait. Tindakan ini tidak dapat dibatalkan.
-                    </flux:text>
-                </div>
-            </div>
-
-            <div class="flex justify-end gap-2">
-                <flux:button variant="ghost" wire:click="cancelDeleteTask">Batal</flux:button>
-                <flux:button variant="danger" wire:click="deleteTask" wire:loading.attr="disabled" wire:target="deleteTask">
-                    <span wire:loading.remove wire:target="deleteTask">Hapus tugas</span>
-                    <span wire:loading wire:target="deleteTask">Menghapus...</span>
-                </flux:button>
-            </div>
-        </div>
-    </flux:modal>
+    <x-confirm-modal name="delete-task" confirm="deleteTask" title="Hapus aktivitas ini?"
+        description="Aktivitas DAR akan dihapus secara permanen. Tindakan ini tidak dapat dibatalkan." />
 
     <flux:modal name="create-task" class="min-w-screen overflow-auto md:min-w-3xl lg:min-w-5xl xl:min-w-6xl">
         <form wire:submit="createActivity" class="space-y-5">

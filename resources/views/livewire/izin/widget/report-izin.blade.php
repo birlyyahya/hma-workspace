@@ -29,7 +29,7 @@ new class extends Component {
     #[Computed]
     public function pendingCount(): int
     {
-        if (Auth::user()->level <= 90) {
+        if (Auth::user()->hasPermission('izin.view.all') && Auth::user()->isInDepartment('it')) {
             return max(0, $this->totalCount - $this->approvedCount - $this->rejectedCount);
         }else {
             return max(0, $this->totalCount - $this->approvedCount - $this->waitingCount);
@@ -44,7 +44,7 @@ new class extends Component {
     {
         $total = max($this->totalCount, 1);
 
-        if (Auth::user()->level <= 90) {
+        if (Auth::user()->hasPermission('izin.view.all') && Auth::user()->isInDepartment('it')) {
             return [
                 'approved' => round($this->approvedCount / $total * 100, 1),
                 'rejected' => round($this->rejectedCount / $total * 100, 1),
@@ -65,7 +65,7 @@ new class extends Component {
         try {
             $cache = app(IzinCache::class);
 
-            if (Auth::user()->level <= 90) {
+            if (Auth::user()->hasPermission('izin.view.all') && Auth::user()->isInDepartment('it')) {
                 // Response dashboard sudah berisi group, extract langsung (hemat 1 API call).
                 $json = $cache->dashboard(Auth::user()->username);
                 $data = [
@@ -114,7 +114,7 @@ new class extends Component {
                     <flux:icon name="chart-bar" class="size-5 text-red-600" />
                 </div>
                 <div class="min-w-0">
-                    @if(Auth::user()->level <= 90) <flux:heading size="lg" class="text-zinc-900 leading-tight">
+                    @if(Auth::user()->hasPermission('izin.view.all') && Auth::user()->isInDepartment('it')) <flux:heading size="lg" class="text-zinc-900 leading-tight">
                         Ringkasan Izin
                         </flux:heading>
                         <flux:description class="text-xs text-zinc-500">
@@ -141,7 +141,7 @@ new class extends Component {
                     <span class="text-4xl sm:text-5xl font-semibold text-zinc-900 tabular-nums tracking-tight">
                         {{ $totalCount }}
                     </span>
-                    @if(Auth::user()->level <= 90) <span class="text-sm text-zinc-400">izin</span>
+                    @if(Auth::user()->hasPermission('izin.view.all') && Auth::user()->isInDepartment('it')) <span class="text-sm text-zinc-400">izin</span>
                         @else
                         <span class="text-sm text-zinc-400">SPD</span>
                         @endif
@@ -162,7 +162,7 @@ new class extends Component {
             <div class="h-2.5 w-full rounded-full overflow-hidden bg-zinc-100 flex">
                 @if ($totalCount > 0)
                 <div class="bg-emerald-500 h-full transition-all duration-500" style="width: {{ $this->percentages['approved'] }}%"></div>
-                @if(Auth::user()->level <= 90)
+                @if(Auth::user()->hasPermission('izin.view.all') && Auth::user()->isInDepartment('it'))
                 <div class="bg-rose-500 h-full transition-all duration-500" style="width: {{ $this->percentages['rejected'] }}%"></div>
                 @else
                 <div class="bg-blue-500 h-full transition-all duration-500" style="width: {{ $this->percentages['waiting'] }}%"></div>
@@ -175,7 +175,7 @@ new class extends Component {
         {{-- Legend / mini stats --}}
         <div class="mt-5 grid grid-cols-3 gap-3">
             @php
-            if (Auth::user()->level <= 90){ $stats=[ ['label'=> 'Disetujui', 'value' => $approvedCount, 'percent' => $this->percentages['approved'], 'dot' => 'bg-emerald-500', 'text' => 'text-emerald-600'],
+            if (Auth::user()->hasPermission('izin.view.all') && Auth::user()->isInDepartment('it')){ $stats=[ ['label'=> 'Disetujui', 'value' => $approvedCount, 'percent' => $this->percentages['approved'], 'dot' => 'bg-emerald-500', 'text' => 'text-emerald-600'],
                 ['label' => 'Ditolak', 'value' => $rejectedCount, 'percent' => $this->percentages['rejected'], 'dot' => 'bg-rose-500', 'text' => 'text-rose-600'],
                 ['label' => 'Pending', 'value' => $this->pendingCount, 'percent' => $this->percentages['pending'], 'dot' => 'bg-amber-400', 'text' => 'text-amber-600'],
                 ];

@@ -34,11 +34,13 @@
                     </div>
 
                     <div class="flex w-full flex-col gap-2 sm:flex-row md:w-auto md:gap-3">
+                        @can('izin.create')
                         <flux:modal.trigger name="form-izin-modal">
                             <flux:button icon="plus-circle" variant="primary" class="cursor-pointer w-full sm:w-auto bg-white! text-red-700! hover:bg-white/90!">
                                 Ajukan Izin
                             </flux:button>
                         </flux:modal.trigger>
+                        @endcan
                         @can('izin.view.all')
                         <a href="{{ route('izin.laporan-pengajuan') }}" class="w-full sm:w-auto">
                             <flux:button icon="document-text" variant="primary" class="cursor-pointer w-full sm:w-auto bg-white! text-red-700! hover:bg-white/90!">
@@ -54,7 +56,7 @@
                 <livewire:izin.widget.report-izin-category defer />
             </div>
 
-            @if(Auth::user()->level <= 90)
+            @if(!Auth::user()->hasPermission('izin.view.all') && !Auth::user()->isInDepartment('it'))
             <div x-data="{ tab: 'izin' }" class="space-y-4">
                 <div class="flex justify-center">
                     <div class="inline-flex w-full rounded-xl bg-zinc-100 p-1 shadow-sm">

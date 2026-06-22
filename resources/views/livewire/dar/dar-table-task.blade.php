@@ -156,6 +156,11 @@ new class extends Component {
     }
 
     public function confirmDelete($id){
+        dd($id);
+        if (!Auth::user()->hasPermission('dar.delete')) {
+            Toaster::error('You do not have permission to delete this activity.');
+            return;
+        }
         $this->pendingDeleteId = (int) $id;
         \Flux\Flux::modal('delete-task-modal')->show();
     }
