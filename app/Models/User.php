@@ -117,11 +117,19 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function hasPermission(string $name): bool
     {
+        if ($this->hasRole('super-admin')) {
+            return true;
+        }
+
         return $this->permissions()->contains('name', $name);
     }
 
     public function hasAnyPermission(array $names): bool
     {
+        if ($this->hasRole('super-admin')) {
+            return true;
+        }
+
         $permissionNames = $this->permissions()->pluck('name');
 
         return $permissionNames->intersect($names)->isNotEmpty();
