@@ -5,7 +5,23 @@
 
 <link rel="icon" href="{{ asset('img/logo/logo-hma2.png') }}" sizes="any">
 <link rel="icon" href="{{ asset('img/logo/logo-hma2.png') }}" type="image/svg+xml">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="{{ asset('img/logo/logo-hma2.png') }}">
+
+{{-- Open Graph / link preview (WhatsApp, Telegram, dll.) --}}
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="HMA Workspace" />
+<meta property="og:title" content="{{ $title ?? config('app.name') }}" />
+<meta property="og:description" content="Portal internal Hana Tekindo — kelola proyek, DAR, perizinan, dan knowledge dalam satu tempat." />
+<meta property="og:url" content="{{ url()->current() }}" />
+<meta property="og:image" content="{{ asset('img/logo/logo-hma2.png') }}" />
+<meta property="og:image:width" content="1227" />
+<meta property="og:image:height" content="1106" />
+
+{{-- Twitter Card --}}
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="{{ $title ?? config('app.name') }}" />
+<meta name="twitter:description" content="Portal internal Hana Tekindo — kelola proyek, DAR, perizinan, dan knowledge dalam satu tempat." />
+<meta name="twitter:image" content="{{ asset('img/logo/logo-hma2.png') }}" />
 
 <link rel="preconnect" href="https://fonts.bunny.net">
 <link href="https://fonts.bunny.net/css?family=Poppins:400,500,600" rel="stylesheet" />
