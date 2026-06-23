@@ -11,15 +11,33 @@ use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
 use Masmerise\Toaster\Toaster;
 
-new class extends Component {
+new class extends Component
+{
     use WithFileUploads;
 
     public const MAX_STORAGE_BYTES = 500_000_000;
+
     public const PAGE_LIMIT = 8;
 
-    public $files;
-    public int $countAllFiles = 0;
+    /**
+     * Extension groups per folder. Filtering is done client-side because the
+     * external API's `extension_type` parameter performs an unreliable substring
+     * match against the file URL (e.g. "jpg" matches nothing while "doc" matches
+     * everything), which made counts and the file list disagree.
+     *
+     * @var array<string, array<int, string>>
+     */
+    protected const FOLDER_EXTENSIONS = [
+        'images' => ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+        'pdf' => ['pdf'],
+        'excel' => ['xls', 'xlsx'],
+        'docs' => ['doc', 'docx'],
+    ];
+
+    public array $allFiles = [];
+
     public bool $loading = true;
+
     public $id;
 
     public array $folderCounts = [
@@ -31,14 +49,17 @@ new class extends Component {
     ];
 
     public string $search = '';
+
     public string $sort = 'desc';
-    public ?string $type = null;
-    public ?string $folder = null;
-    public int $limit = 8;
+
+    public string $folderKey = 'all';
+
+    public int $limit = self::PAGE_LIMIT;
 
     public $selectId;
 
     public ?int $deletingId = null;
+
     public string $deletingName = '';
 
     public FilesForm $form;
@@ -63,113 +84,114 @@ new class extends Component {
         if (! $path) {
             return '';
         }
+
         return $this->fileBaseUrl().'/'.ltrim($path, '/');
     }
 
-    protected function refreshFolderCounts(): void
+    protected function extensionOf(array $file): string
+    {
+        return strtolower(Str::afterLast(data_get($file, 'files.url', ''), '.'));
+    }
+
+    protected function fetchAllFiles(): array
     {
         $response = Http::timeout(120)->retry(3, 200)->get($this->endpoint('admin-docs/search'), [
             'project_id' => $this->id,
-            'limit'      => 10000,
-            'sortBy'     => 'created_at',
-            'sortOrder'  => 'desc',
-        ])->json();
-
-        $all = collect($response['data'] ?? []);
-        $extOf = fn ($f) => strtolower(Str::afterLast(data_get($f, 'files.url', ''), '.'));
-
-        $this->folderCounts = [
-            'all'    => $all->count(),
-            'images' => $all->filter(fn ($f) => in_array($extOf($f), ['jpg', 'jpeg', 'png', 'gif', 'webp']))->count(),
-            'pdf'    => $all->filter(fn ($f) => $extOf($f) === 'pdf')->count(),
-            'excel'  => $all->filter(fn ($f) => in_array($extOf($f), ['xls', 'xlsx']))->count(),
-            'docs'   => $all->filter(fn ($f) => in_array($extOf($f), ['doc', 'docx']))->count(),
-        ];
-    }
-
-    protected function fetchFiles(int $limit): array
-    {
-        $response = Http::timeout(120)->retry(3, 200)->get($this->endpoint('admin-docs/search'), [
-            'project_id'     => $this->id,
-            'limit'          => $limit,
-            'extension_type' => $this->type,
-            'title'          => $this->search,
-            'sortBy'         => 'created_at',
-            'sortOrder'      => $this->sort,
+            'limit' => 10000,
+            'sortBy' => 'created_at',
+            'sortOrder' => 'desc',
         ])->json();
 
         if (($response['status'] ?? null) !== 200) {
-            return ['ok' => false, 'data' => [], 'total' => 0];
+            return ['ok' => false, 'data' => []];
         }
 
-        return [
-            'ok'    => true,
-            'data'  => $response['data'] ?? [],
-            'total' => $response['pagination']['total'] ?? 0,
+        return ['ok' => true, 'data' => $response['data'] ?? []];
+    }
+
+    protected function recomputeFolderCounts(): void
+    {
+        $all = collect($this->allFiles);
+
+        $this->folderCounts = [
+            'all' => $all->count(),
+            'images' => $all->filter(fn ($f) => in_array($this->extensionOf($f), self::FOLDER_EXTENSIONS['images']))->count(),
+            'pdf' => $all->filter(fn ($f) => in_array($this->extensionOf($f), self::FOLDER_EXTENSIONS['pdf']))->count(),
+            'excel' => $all->filter(fn ($f) => in_array($this->extensionOf($f), self::FOLDER_EXTENSIONS['excel']))->count(),
+            'docs' => $all->filter(fn ($f) => in_array($this->extensionOf($f), self::FOLDER_EXTENSIONS['docs']))->count(),
         ];
     }
 
     #[On('documentLoad')]
     public function mount(): void
     {
-        $result = $this->fetchFiles(self::PAGE_LIMIT);
+        $result = $this->fetchAllFiles();
 
         if (! $result['ok']) {
             Toaster::error('Gagal memuat dokumen');
-            $this->files = [];
+            $this->allFiles = [];
             $this->loading = false;
+
             return;
         }
 
-        $this->files = $result['data'];
-        $this->countAllFiles = $result['total'];
-        $this->refreshFolderCounts();
+        $this->allFiles = $result['data'];
+        $this->recomputeFolderCounts();
         $this->loading = false;
-    }
-
-    public function applyFilters(): void
-    {
-        $result = $this->fetchFiles($this->limit);
-
-        if (! $result['ok']) {
-            Toaster::error('Gagal memuat dokumen');
-            $this->files = [];
-            return;
-        }
-
-        $this->files = $result['data'];
-        $this->countAllFiles = $result['total'];
     }
 
     public function updatedSearch(): void
     {
-        $this->applyFilters();
+        $this->limit = self::PAGE_LIMIT;
     }
 
     public function updatedSort(): void
     {
-        $this->applyFilters();
+        $this->limit = self::PAGE_LIMIT;
     }
 
-    public function updatedType(): void
+    public function updatedFolderKey(): void
     {
-        $this->applyFilters();
-    }
-
-    public function updatedFolder(): void
-    {
-        $this->applyFilters();
+        $this->limit = self::PAGE_LIMIT;
     }
 
     public function loadMore(): void
     {
         $this->limit += self::PAGE_LIMIT;
-        $this->applyFilters();
+    }
+
+    public function getMatchedFilesProperty(): \Illuminate\Support\Collection
+    {
+        $files = collect($this->allFiles);
+
+        if ($this->folderKey !== 'all') {
+            $exts = self::FOLDER_EXTENSIONS[$this->folderKey] ?? [];
+            $files = $files->filter(fn ($f) => in_array($this->extensionOf($f), $exts));
+        }
+
+        if ($this->search !== '') {
+            $needle = mb_strtolower($this->search);
+            $files = $files->filter(fn ($f) => str_contains(mb_strtolower((string) ($f['title'] ?? '')), $needle));
+        }
+
+        return $files
+            ->sortBy(fn ($f) => $f['created_at'] ?? '', SORT_REGULAR, $this->sort === 'desc')
+            ->values();
+    }
+
+    public function getFilesProperty(): array
+    {
+        return $this->matchedFiles->take($this->limit)->values()->all();
+    }
+
+    public function getFilteredTotalProperty(): int
+    {
+        return $this->matchedFiles->count();
     }
 
     public function getSelectedFileProperty()
     {
-        return collect($this->files)->firstWhere('id', $this->selectId[0] ?? null);
+        return collect($this->allFiles)->firstWhere('id', $this->selectId[0] ?? null);
     }
 
     public function formatBytes(int|float $bytes): string
@@ -183,12 +205,13 @@ new class extends Component {
         if ($bytes >= 1024) {
             return round($bytes / 1024, 2).' KB';
         }
+
         return "{$bytes} B";
     }
 
     public function getSizeProperty(): float|int
     {
-        return collect($this->files)->sum(function ($file) {
+        return collect($this->allFiles)->sum(function ($file) {
             $size = data_get($file, 'files.size');
             preg_match('/([\d\.]+)\s*(KB|MB|GB|B)/i', (string) $size, $match);
 
@@ -196,9 +219,9 @@ new class extends Component {
             $unit = strtoupper($match[2] ?? 'B');
 
             return match ($unit) {
-                'GB'    => $value * 1024 * 1024 * 1024,
-                'MB'    => $value * 1024 * 1024,
-                'KB'    => $value * 1024,
+                'GB' => $value * 1024 * 1024 * 1024,
+                'MB' => $value * 1024 * 1024,
+                'KB' => $value * 1024,
                 default => $value,
             };
         });
@@ -226,25 +249,26 @@ new class extends Component {
     public function getCategoryProperty(): array
     {
         $response = Http::timeout(120)->retry(3, 200)->get($this->endpoint('admin-doc-categories'), ['limit' => 1000])->json();
+
         return $response['data'] ?? [];
     }
 
     public function finalizeChunkUpload(array $payload): array
     {
         $data = Validator::make($payload, [
-            'title'                 => ['required', 'string', 'min:5'],
+            'title' => ['required', 'string', 'min:5'],
             'admin_doc_category_id' => ['required', 'integer'],
-            'filename'              => ['required', 'string'],
-            'original_name'         => ['required', 'string'],
+            'filename' => ['required', 'string'],
+            'original_name' => ['required', 'string'],
         ])->validate();
 
         $response = Http::timeout(120)->post($this->endpoint('admin-docs'), [
-            'title'                 => $data['title'],
+            'title' => $data['title'],
             'admin_doc_category_id' => $data['admin_doc_category_id'],
-            'project_id'            => $this->id,
-            'filename'              => $data['filename'],
-            'file'                  => $data['filename'],
-            'original_name'         => $data['original_name'],
+            'project_id' => $this->id,
+            'filename' => $data['filename'],
+            'file' => $data['filename'],
+            'original_name' => $data['original_name'],
         ])->json();
         if (($response['status'] ?? null) === 201) {
             Toaster::success('File berhasil diupload');
@@ -254,9 +278,9 @@ new class extends Component {
                 // non-blocking
             }
         } else {
-           Toaster::error(collect($response['errors'] ?? [])
-                    ->flatten()
-                    ->join("\n")
+            Toaster::error(collect($response['errors'] ?? [])
+                ->flatten()
+                ->join("\n")
             );
         }
 
@@ -265,10 +289,11 @@ new class extends Component {
 
     public function confirmDelete(int $id): void
     {
-        $item = collect($this->files)->firstWhere('id', $id);
+        $item = collect($this->allFiles)->firstWhere('id', $id);
 
         if (! $item) {
             Toaster::error('File tidak ditemukan');
+
             return;
         }
 
@@ -287,22 +312,18 @@ new class extends Component {
         $response = $this->form->delete($id);
 
         if (($response['status'] ?? null) === 200) {
-            $this->files = collect($this->files)
-                ->reject(fn (array $file) => $file['id'] === $id)
-                ->values()
-                ->all();
-            $this->countAllFiles = max(0, $this->countAllFiles - 1);
             $this->reset('deletingId', 'deletingName');
             Flux::modal('delete-file-modal')->close();
             $this->mount();
             Toaster::success('File berhasil dihapus');
+
             return;
         }
 
         Toaster::error('Hapus file gagal');
         Log::error('File delete failed', [
             'status' => $response->status(),
-            'body'   => $response->body(),
+            'body' => $response->body(),
         ]);
 
         $this->reset('deletingId', 'deletingName');
@@ -328,7 +349,7 @@ new class extends Component {
                         <flux:text class="text-sm text-zinc-500">
                             {{ $this->formatBytes($this->size) }} dari {{ $this->formatBytes(500_000_000) }} terpakai
                             <span class="mx-1.5 text-zinc-300">•</span>
-                            {{ $countAllFiles }} dokumen
+                            {{ $folderCounts['all'] }} dokumen
                         </flux:text>
                     </div>
                 </div>
@@ -356,7 +377,7 @@ new class extends Component {
         </div>
 
         {{-- ============ MAIN GRID ============ --}}
-        <div x-data="{ folder: 'All Files' }" class="grid lg:grid-cols-4 grid-cols-1 gap-6">
+        <div x-data="{ folder: 'Semua File' }" class="grid lg:grid-cols-4 grid-cols-1 gap-6">
 
             {{-- ============ FOLDER SIDEBAR ============ --}}
             <aside class="bg-white border border-zinc-200 rounded-2xl p-4 h-fit">
@@ -365,26 +386,26 @@ new class extends Component {
                 <nav class="space-y-1">
                     @php
                         $folders = [
-                            ['key' => 'All Files',   'type' => '',     'label' => 'Semua File',  'icon' => 'folder',          'count' => $folderCounts['all']],
-                            ['key' => 'Photos',      'type' => 'jpg',  'label' => 'Foto',        'icon' => 'photo',           'count' => $folderCounts['images']],
-                            ['key' => 'PDF Files',   'type' => 'pdf',  'label' => 'PDF',         'icon' => 'document-text',   'count' => $folderCounts['pdf']],
-                            ['key' => 'Excel Files', 'type' => 'xls',  'label' => 'Excel',       'icon' => 'table-cells',     'count' => $folderCounts['excel']],
-                            ['key' => 'Docs Files',  'type' => 'docx', 'label' => 'Dokumen',     'icon' => 'document',        'count' => $folderCounts['docs']],
+                            ['group' => 'all',    'label' => 'Semua File', 'icon' => 'folder',        'count' => $folderCounts['all']],
+                            ['group' => 'images', 'label' => 'Foto',       'icon' => 'photo',         'count' => $folderCounts['images']],
+                            ['group' => 'pdf',    'label' => 'PDF',        'icon' => 'document-text', 'count' => $folderCounts['pdf']],
+                            ['group' => 'excel',  'label' => 'Excel',      'icon' => 'table-cells',   'count' => $folderCounts['excel']],
+                            ['group' => 'docs',   'label' => 'Dokumen',    'icon' => 'document',      'count' => $folderCounts['docs']],
                         ];
                     @endphp
 
                     @foreach($folders as $f)
                         <button
                             type="button"
-                            @click="folder = '{{ $f['key'] }}'; $wire.set('type', '{{ $f['type'] }}')"
-                            :class="folder === '{{ $f['key'] }}' ? 'bg-red-50 text-red-600 ring-1 ring-red-100' : 'text-zinc-700 hover:bg-zinc-50'"
+                            @click="folder = '{{ $f['label'] }}'; $wire.set('folderKey', '{{ $f['group'] }}')"
+                            :class="folder === '{{ $f['label'] }}' ? 'bg-red-50 text-red-600 ring-1 ring-red-100' : 'text-zinc-700 hover:bg-zinc-50'"
                             class="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg transition cursor-pointer text-sm font-medium"
                         >
                             <span class="flex items-center gap-3 min-w-0">
                                 <flux:icon name="{{ $f['icon'] }}" class="w-4 h-4 shrink-0" />
                                 <span class="truncate">{{ $f['label'] }}</span>
                             </span>
-                            <span :class="folder === '{{ $f['key'] }}' ? 'bg-white text-red-600' : 'bg-zinc-100 text-zinc-500'"
+                            <span :class="folder === '{{ $f['label'] }}' ? 'bg-white text-red-600' : 'bg-zinc-100 text-zinc-500'"
                                   class="text-[11px] font-semibold px-1.5 py-0.5 rounded-md min-w-6 text-center">
                                 {{ $f['count'] }}
                             </span>
@@ -421,7 +442,7 @@ new class extends Component {
                 {{-- File List --}}
                 <div class="p-4">
                     {{-- Loading --}}
-                    <div wire:loading wire:target="type, search, sort, loadMore" class="space-y-2">
+                    <div wire:loading wire:target="folderKey, search, sort, loadMore" class="space-y-2">
                             <div class="flex items-center gap-3 p-3 rounded-xl bg-zinc-50 animate-pulse">
                                 <div class="w-10 h-10 bg-zinc-200 rounded-lg"></div>
                                 <div class="flex-1 space-y-2">
@@ -431,7 +452,7 @@ new class extends Component {
                             </div>
                     </div>
 
-                    <div wire:loading.remove wire:target="type, search, sort, loadMore" class="space-y-1.5">
+                    <div wire:loading.remove wire:target="folderKey, search, sort, loadMore" class="space-y-1.5">
                         @forelse ($this->files as $item)
                             @php
                                 $ext = strtolower(Str::afterLast($item['files']['url'] ?? '', '.'));
@@ -521,12 +542,12 @@ new class extends Component {
                             </div>
                         @endforelse
 
-                        @if($this->limit <= $this->countAllFiles && count($this->files ?? []) > 0)
+                        @if($this->limit < $this->filteredTotal && count($this->files) > 0)
                             <div class="flex items-center justify-center pt-4">
                                 <flux:button variant="outline" size="sm" wire:click="loadMore"
-                                    wire:loading.remove wire:target="folder, type, search, sort">
-                                    <span wire:loading.remove wire:target="loadMore,applyFilters">Muat Lebih Banyak</span>
-                                    <span class="animate-pulse" wire:loading wire:target="loadMore,applyFilters">Memuat...</span>
+                                    wire:loading.remove wire:target="folderKey, search, sort">
+                                    <span wire:loading.remove wire:target="loadMore">Muat Lebih Banyak</span>
+                                    <span class="animate-pulse" wire:loading wire:target="loadMore">Memuat...</span>
                                 </flux:button>
                             </div>
                         @endif

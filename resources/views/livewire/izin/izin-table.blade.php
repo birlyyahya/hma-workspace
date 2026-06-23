@@ -87,6 +87,8 @@ new class extends Component {
 
             $json = $response->json();
 
+
+
             if (! ($json['success'] ?? false)) {
                 Toaster::error('Failed to fetch izin data from API.');
                 Log::error('Izin API returned error', [
@@ -100,7 +102,7 @@ new class extends Component {
 
             $this->data = $json;
         } catch (\Throwable $e) {
-            Toaster::error('Error Server Izin, silahkan coba lagi atau menghubungi tim IT.');
+            Toaster::error($e->getMessage() ?: 'Connection error while fetching izin data.');
             Log::error('Izin API connection error', [
                 'message' => $e->getMessage(),
             ]);
@@ -160,6 +162,8 @@ new class extends Component {
         if ($this->laporan) {
             return $base + ['search_name' => $this->search];
         }
+
+
 
         return $base + [
             'username' => Auth::user()->username,

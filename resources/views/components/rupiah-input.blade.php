@@ -17,8 +17,15 @@
     x-data="{
         display: '',
         init() {
+            this.syncFromModel();
+            $wire.$watch(@js($model), () => this.syncFromModel());
+        },
+        syncFromModel() {
             const raw = String($wire.get(@js($model)) ?? '').replace(/\D/g, '');
-            this.display = raw ? new Intl.NumberFormat('id-ID').format(raw) : '';
+            const formatted = raw ? new Intl.NumberFormat('id-ID').format(raw) : '';
+            if (formatted !== this.display) {
+                this.display = formatted;
+            }
         },
         format() {
             const digits = this.display.replace(/\D/g, '');

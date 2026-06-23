@@ -30,7 +30,7 @@ class SpectechForm extends Form
 
     protected function endpoint(?string $suffix = null): string
     {
-        return rtrim((string) config('services.api_project'), '/') . '/activity-categories' . ($suffix ? '/' . $suffix : '');
+        return rtrim((string) config('services.api_project'), '/').'/activity-categories'.($suffix ? '/'.$suffix : '');
     }
 
     protected function payload(?int $projectId = null): array
@@ -39,6 +39,7 @@ class SpectechForm extends Form
             'name' => $this->name,
             'qty_total' => $this->quantity,
             'total_nominal' => (int) preg_replace('/[^0-9]/', '', (string) $this->price),
+            'note' => $this->notes,
             'type' => $this->type,
         ];
 
@@ -64,7 +65,7 @@ class SpectechForm extends Form
     {
         $this->name = $spectech['name'] ?? '';
         $this->quantity = (int) ($spectech['qty_total'] ?? 0);
-        $this->price = number_format((float) ($spectech['total_nominal'] ?? 0), 0, ',', '.');
+        $this->price = (int) ($spectech['total_nominal'] ?? 0);
         $this->received_quantity = (int) ($spectech['qty_recived'] ?? 0);
 
         $this->notes = $spectech['note'] ?? null;
