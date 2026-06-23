@@ -461,13 +461,13 @@ new class extends Component {
                             Selesai
                         </flux:button>
                     @else
-                        <flux:button class="" wire:click="toggleBulkMode" variant="ghost" size="sm" icon="check-circle"
+                        {{-- <flux:button class="" wire:click="toggleBulkMode" variant="ghost" size="sm" icon="check-circle"
                             :disabled="$this->totalItems === 0">
                             Pilih
                         </flux:button>
                         <flux:button wire:click="$dispatch('openManageSpectech')" variant="filled" icon="squares-plus" size="sm">
                             Bulk Tambah
-                        </flux:button>
+                        </flux:button> --}}
                         <flux:modal.trigger name="addSpectech">
                             <flux:button variant="primary" icon="plus" size="sm">Tambah</flux:button>
                         </flux:modal.trigger>
