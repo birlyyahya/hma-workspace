@@ -131,9 +131,9 @@ new class extends Component {
 
         if ($this->file) {
             if ($this->existingFile) {
-                Storage::disk('public')->delete($this->existingFile);
+                Storage::delete($this->existingFile);
             }
-            $payload['file'] = $this->file->store('knowledge/documentations', 'public');
+            $payload['file'] = $this->file->storePublicly('knowledge/documentations', config('filesystems.default'));
         }
 
         if ($this->editingId) {
@@ -175,7 +175,7 @@ new class extends Component {
         }
 
         if ($item->file) {
-            Storage::disk('public')->delete($item->file);
+            Storage::delete($item->file);
         }
 
         $item->delete();
@@ -200,7 +200,7 @@ new class extends Component {
         if (! $item || Gate::denies('update', $item)) {
             return;
         }
-        Storage::disk('public')->delete($this->existingFile);
+        Storage::delete($this->existingFile);
         $item->update(['file' => null]);
         $this->existingFile = null;
         Toaster::success('File dihapus');

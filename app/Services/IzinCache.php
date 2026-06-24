@@ -27,12 +27,12 @@ class IzinCache
      *
      * @return array<string, mixed>
      */
-    public function dashboard(string $username): array
+    public function dashboard(string $username, int $id): array
     {
         return Cache::tags([self::TAG, "izin:user:{$username}"])
-            ->remember("izin:dashboard:{$username}", self::TTL_DASHBOARD, function () use ($username) {
+            ->remember("izin:dashboard:{$username}", self::TTL_DASHBOARD, function () use ($username, $id) {
                 $response = Http::timeout(5)->retry(2, 200)
-                    ->get($this->apiBase.'/global/izin/dashboard/'.$username);
+                    ->get($this->apiBase.'/global/izin/dashboard/'.$username.'/'.$id);
 
                 if (! $response->successful()) {
                     return [];

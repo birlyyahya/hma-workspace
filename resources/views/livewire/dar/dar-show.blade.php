@@ -302,14 +302,21 @@ class extends Component
             $projectId = $this->editIsProject && $this->editProjectId ? (int) $this->editProjectId : null;
             $categoryId = $this->editIsProject && $this->editProjectCategoryId ? (int) $this->editProjectCategoryId : null;
 
+            $startDate = Carbon::parse($this->editStartDate)->format('Y-m-d H:i:s');
+            $endDate = Carbon::parse($this->editEndDate)->format('Y-m-d H:i:s');
+            $date = ! empty($this->task['date'])
+                ? Carbon::parse($this->task['date'])->format('Y-m-d H:i:s')
+                : null;
+
             $response = Http::post(config('services.api_izin')."/global/dar/update/{$this->id}", [
                 '_method' => 'PUT',
                 'user_id' => $this->task['user_id'] ?? null,
                 'activity' => $this->editActivity,
                 'description' => $this->editDescription,
                 'status' => $this->editStatus,
-                'start_date' => $this->editStartDate,
-                'end_date' => $this->editEndDate,
+                'date' => $date,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
                 'team' => $teamUser,
                 'team_user' => $teamUser,
                 'project_id' => $projectId,
@@ -324,8 +331,9 @@ class extends Component
                     'activity' => $this->editActivity,
                     'description' => $this->editDescription,
                     'status' => (int) $this->editStatus,
-                    'start_date' => $this->editStartDate,
-                    'end_date' => $this->editEndDate,
+                    'date' => $date,
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
                     'team_user' => collect($teamUser)->map(fn ($id) => ['user_id' => $id])->toArray(),
                     'project_id' => $projectId,
                     'project_category_id' => $categoryId,

@@ -133,7 +133,7 @@ new class extends Component
         $cache = app(IzinCache::class);
         if ($this->canViewIzin) {
             try {
-                $json = $cache->dashboard(Auth::user()->username);
+                $json = $cache->dashboard(Auth::user()->username, Auth::user()->id);
                 $this->izinApproved = (int) ($json['data']['approve_izin'] ?? 0);
                 $this->izinRejected = (int) ($json['data']['failed_izin'] ?? 0);
                 $this->izinTotal = (int) ($json['data']['all_izin'] ?? 0);
@@ -146,14 +146,16 @@ new class extends Component
         try {
             if (Auth::user()->hasPermission('spd.view.all')) {
                 $json = $cache->spdListAll();
+                $rows = collect($json['data'] ?? []);
+                $this->spdApproved = $rows->where('is_submitted', 1)->where('is_approved', 1)->count();
+                $this->spdWaiting = $rows->where('is_submitted', 1)->where('is_approved', 0)->count();
+                $this->spdTotal = $rows->count();
             } else {
-                $json = $cache->spdListForUser(Auth::id(), Auth::user()->username);
+                $this->spdApproved = (int) ($json['data']['spd_approved'] ?? 0);
+                $this->spdWaiting = (int) ($json['data']['spd_waiting'] ?? 0);
+                $this->spdTotal = (int) ($json['data']['spd_all'] ?? 0);
             }
 
-            $rows = collect($json['data'] ?? []);
-            $this->spdApproved = $rows->where('is_submitted', 1)->where('is_approved', 1)->count();
-            $this->spdWaiting = $rows->where('is_submitted', 1)->where('is_approved', 0)->count();
-            $this->spdTotal = $rows->count();
             $this->spdGroup = $cache->groupDashboard();
         } catch (\Throwable $e) {
             Log::error('Failed to load spd summary', ['message' => $e->getMessage()]);

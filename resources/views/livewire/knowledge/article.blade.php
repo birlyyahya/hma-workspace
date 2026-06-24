@@ -86,7 +86,7 @@ new class extends Component {
         }
 
         if ($item->featured_image) {
-            Storage::disk('public')->delete($item->featured_image);
+            Storage::disk('s3')->delete($item->featured_image);
         }
 
         $item->delete();

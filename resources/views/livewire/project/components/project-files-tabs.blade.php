@@ -582,7 +582,7 @@ new class extends Component
     @endif
 
     {{-- ============ VIEW MODAL ============ --}}
-    <flux:modal name="viewModal" wire:close="resetViewModal" class="!max-w-[900px]">
+    <flux:modal name="viewModal" wire:close="resetViewModal" class="!max-w-[900px] lg:min-w-[900px] md:min-w-[600px]">
         @php
             $viewFile = $this->selectedFile;
             $viewExt  = $viewFile ? strtolower(Str::afterLast($viewFile['files']['url'], '.')) : null;

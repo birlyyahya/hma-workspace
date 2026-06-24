@@ -67,9 +67,10 @@ class extends Component {
 
         if ($this->image) {
             if ($this->existingImage) {
-                Storage::disk('public')->delete($this->existingImage);
+                Storage::disk('s3')
+                ->delete($this->existingImage);
             }
-            $payload['featured_image'] = $this->image->store('knowledge/article', 'public');
+            $payload['featured_image'] = $this->image->store('knowledge/article', config('filesystems.default'));
         }
 
         if ($this->article) {
