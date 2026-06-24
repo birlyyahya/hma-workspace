@@ -41,7 +41,7 @@ new #[Lazy] class extends Component {
     protected function fetchProject(): void
     {
         try {
-            $response = Http::timeout(120)->retry(3, 200)->get(
+            $response = Http::timeout(15)->retry(2, 200)->get(
                 rtrim((string) config('services.api_project'), '/').'/projects/'.$this->id
             )->json();
 

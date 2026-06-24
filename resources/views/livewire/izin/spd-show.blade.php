@@ -27,7 +27,7 @@ class extends Component {
     {
         try {
             $apiIzin = rtrim(config('services.api_izin'), '/');
-            $response = Http::timeout(30)->get($apiIzin . '/global/dar/activity/list-spd', [
+            $response = Http::timeout(15)->retry(2, 200)->get($apiIzin . '/global/dar/activity/list-spd', [
                 'per_page' => 1000,
             ])->json();
 
@@ -83,7 +83,7 @@ class extends Component {
         }
 
         try {
-            $response = Http::timeout(30)->get($url);
+            $response = Http::timeout(15)->retry(2, 200)->get($url);
 
             if (! $response->successful()) {
                 return null;

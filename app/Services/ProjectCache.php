@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class ProjectCache
 {
@@ -44,17 +46,27 @@ class ProjectCache
      */
     public function defaultProjectsList(int $limit = 12): array
     {
-        return Cache::tags([self::TAG_PROJECTS])->remember(
-            "projects:list:default:limit-{$limit}",
-            self::TTL_USER,
-            function () use ($limit) {
-                return Http::timeout(120)->retry(3, 200)
-                    ->get($this->apiBase.'/projects/search', [
-                        'limit' => $limit,
-                        'page' => 1,
-                    ])->json() ?? [];
-            }
-        );
+        $key = "projects:list:default:limit-{$limit}";
+
+        if (is_array($cached = Cache::tags([self::TAG_PROJECTS])->get($key))) {
+            return $cached;
+        }
+
+        try {
+            $data = Http::timeout(15)->retry(2, 200)
+                ->get($this->apiBase.'/projects/search', [
+                    'limit' => $limit,
+                    'page' => 1,
+                ])->json() ?? [];
+        } catch (ConnectionException $e) {
+            Log::warning('ProjectCache defaultProjectsList gagal', ['error' => $e->getMessage()]);
+
+            return [];
+        }
+
+        Cache::tags([self::TAG_PROJECTS])->put($key, $data, self::TTL_USER);
+
+        return $data;
     }
 
     /**
@@ -134,14 +146,28 @@ class ProjectCache
      */
     public function spectechFor(int $projectId): array
     {
-        return Cache::tags([self::TAG_SPECTECH, "spectech:project:{$projectId}"])
-            ->remember("spectech:project:{$projectId}", self::TTL_USER, function () use ($projectId) {
-                return Http::timeout(120)->retry(3, 200)
-                    ->get($this->apiBase.'/activity-categories/search', [
-                        'project_id' => $projectId,
-                        'limit' => 99999,
-                    ])->json()['data'] ?? [];
-            });
+        $tags = [self::TAG_SPECTECH, "spectech:project:{$projectId}"];
+        $key = "spectech:project:{$projectId}";
+
+        if (is_array($cached = Cache::tags($tags)->get($key))) {
+            return $cached;
+        }
+
+        try {
+            $data = Http::timeout(15)->retry(2, 200)
+                ->get($this->apiBase.'/activity-categories/search', [
+                    'project_id' => $projectId,
+                    'limit' => 99999,
+                ])->json('data') ?? [];
+        } catch (ConnectionException $e) {
+            Log::warning('ProjectCache spectechFor gagal', ['project_id' => $projectId, 'error' => $e->getMessage()]);
+
+            return [];
+        }
+
+        Cache::tags($tags)->put($key, $data, self::TTL_USER);
+
+        return $data;
     }
 
     public function flushProjects(): void

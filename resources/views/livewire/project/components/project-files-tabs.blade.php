@@ -95,12 +95,18 @@ new class extends Component
 
     protected function fetchAllFiles(): array
     {
-        $response = Http::timeout(120)->retry(3, 200)->get($this->endpoint('admin-docs/search'), [
-            'project_id' => $this->id,
-            'limit' => 10000,
-            'sortBy' => 'created_at',
-            'sortOrder' => 'desc',
-        ])->json();
+        try {
+            $response = Http::timeout(15)->retry(2, 200)->get($this->endpoint('admin-docs/search'), [
+                'project_id' => $this->id,
+                'limit' => 10000,
+                'sortBy' => 'created_at',
+                'sortOrder' => 'desc',
+            ])->json();
+        } catch (\Throwable $e) {
+            Log::error('Gagal memuat dokumen project', ['project_id' => $this->id, 'error' => $e->getMessage()]);
+
+            return ['ok' => false, 'data' => []];
+        }
 
         if (($response['status'] ?? null) !== 200) {
             return ['ok' => false, 'data' => []];
@@ -248,7 +254,13 @@ new class extends Component
 
     public function getCategoryProperty(): array
     {
-        $response = Http::timeout(120)->retry(3, 200)->get($this->endpoint('admin-doc-categories'), ['limit' => 1000])->json();
+        try {
+            $response = Http::timeout(15)->retry(2, 200)->get($this->endpoint('admin-doc-categories'), ['limit' => 1000])->json();
+        } catch (\Throwable $e) {
+            Log::error('Gagal memuat kategori dokumen', ['error' => $e->getMessage()]);
+
+            return [];
+        }
 
         return $response['data'] ?? [];
     }

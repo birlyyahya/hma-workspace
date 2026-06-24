@@ -42,7 +42,7 @@ new class extends Component
     public function fetchProject(): void
     {
         try {
-            $response = Http::timeout(120)->retry(3, 200)->get(
+            $response = Http::timeout(15)->retry(2, 200)->get(
                 rtrim((string) config('services.api_project'), '/').'/projects/'.$this->id
             )->json();
 
@@ -133,7 +133,7 @@ new class extends Component
             'status'            => ['required', 'string', 'in:WAITING,ON PROGRESS,CLOSED'],
             'start_date'        => ['required', 'date'],
             'end_date'          => ['required', 'date', 'after_or_equal:start_date'],
-            'maintenance_date'  => ['nullable', 'date', 'after_or_equal:end_date'],
+            'maintenance_date'  => ['required', 'date', 'after_or_equal:end_date'],
             'project_leader_id' => ['required', 'integer'],
             'company_id'        => ['required', 'integer'],
             'support_teams'     => ['array'],

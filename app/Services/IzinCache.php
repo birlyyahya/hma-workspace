@@ -98,6 +98,30 @@ class IzinCache
     }
 
     /**
+     * Cache SPD list milik satu user (limit besar) — dipakai widget report-izin
+     * untuk user tanpa permission spd.view.all.
+     *
+     * @return array<string, mixed>
+     */
+    public function spdListForUser(int $userId, string $username): array
+    {
+        return Cache::tags([self::TAG, "izin:user:{$username}"])
+            ->remember("izin:spd:list:user:{$username}", self::TTL_SPD, function () use ($userId) {
+                $response = Http::timeout(5)->retry(2, 200, throw: false)
+                    ->get($this->apiBase.'/global/dar/activity/list-spd', [
+                        'user_id' => $userId,
+                        'limit' => 1000,
+                    ]);
+
+                if (! $response->successful()) {
+                    return [];
+                }
+
+                return $response->json() ?? [];
+            });
+    }
+
+    /**
      * Cache detail izin per-id.
      * Endpoint: /global/izin/detail/{id}
      *

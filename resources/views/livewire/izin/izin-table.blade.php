@@ -185,7 +185,7 @@ new class extends Component {
         }
 
         try {
-            $imageContent = Http::timeout(120)->retry(3, 200)->get($url)->body();
+            $imageContent = Http::timeout(15)->retry(2, 200)->get($url)->body();
 
             if (! $imageContent) {
                 return null;

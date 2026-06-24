@@ -432,7 +432,7 @@ new class extends Component {
         }
 
         try {
-            $response = Http::timeout(30)->get($url);
+            $response = Http::timeout(15)->retry(2, 200)->get($url);
 
             if (! $response->successful()) {
                 return null;

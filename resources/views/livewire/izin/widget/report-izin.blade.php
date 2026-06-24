@@ -43,7 +43,7 @@ new class extends Component
     #[Computed]
     public function canViewIzin(): bool
     {
-        return (bool) Auth::user()?->isInDepartment('it');
+        return (bool) Auth::user()?->isInDepartment('it') && Auth::user()?->hasPermission('izin.create');
     }
 
     #[On('izinAdded')]
@@ -131,7 +131,6 @@ new class extends Component
     protected function loadData(): void
     {
         $cache = app(IzinCache::class);
-
         if ($this->canViewIzin) {
             try {
                 $json = $cache->dashboard(Auth::user()->username);
@@ -145,7 +144,12 @@ new class extends Component
         }
 
         try {
-            $json = $cache->spdListAll();
+            if (Auth::user()->hasPermission('spd.view.all')) {
+                $json = $cache->spdListAll();
+            } else {
+                $json = $cache->spdListForUser(Auth::id(), Auth::user()->username);
+            }
+
             $rows = collect($json['data'] ?? []);
             $this->spdApproved = $rows->where('is_submitted', 1)->where('is_approved', 1)->count();
             $this->spdWaiting = $rows->where('is_submitted', 1)->where('is_approved', 0)->count();

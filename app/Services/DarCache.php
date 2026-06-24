@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class DarCache
 {
@@ -25,15 +26,27 @@ class DarCache
             ? 'dar:list:all'
             : "dar:list:user:{$userId}";
 
-        return Cache::tags([self::TAG])->remember($key, self::TTL, function () use ($scope, $userId) {
-            $url = $this->apiBase.'/global/dar/list?limit=1000000';
+        if (is_array($cached = Cache::tags([self::TAG])->get($key))) {
+            return $cached;
+        }
 
-            if ($scope !== 'all' && $userId) {
-                $url .= '&team_user='.$userId;
-            }
+        $url = $this->apiBase.'/global/dar/list?limit=1000000';
 
-            return Http::timeout(30)->retry(3, 200)->get($url)->json() ?? ['data' => []];
-        });
+        if ($scope !== 'all' && $userId) {
+            $url .= '&team_user='.$userId;
+        }
+
+        try {
+            $data = Http::timeout(15)->retry(2, 200)->get($url)->json() ?? ['data' => []];
+        } catch (\Throwable $e) {
+            Log::warning('DarCache list gagal', ['scope' => $scope, 'user_id' => $userId, 'error' => $e->getMessage()]);
+
+            return ['data' => []];
+        }
+
+        Cache::tags([self::TAG])->put($key, $data, self::TTL);
+
+        return $data;
     }
 
     public function flush(): void

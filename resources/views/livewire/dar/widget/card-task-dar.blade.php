@@ -110,7 +110,7 @@ new class extends Component {
                 $params['project_id'] = $this->projectFilter;
             }
 
-            $response = Http::timeout(120)->retry(3, 200)
+            $response = Http::timeout(15)->retry(2, 200)
                 ->get($apiIzin.'/global/dar/list', $params)
                 ->json();
 

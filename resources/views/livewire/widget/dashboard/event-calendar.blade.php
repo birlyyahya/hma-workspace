@@ -9,7 +9,8 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 
-new class extends Component {
+new class extends Component
+{
     public Carbon $currentMonth;
 
     public string $selectedDate;
@@ -19,8 +20,8 @@ new class extends Component {
 
     public function mount(): void
     {
-        $this->currentMonth  = Carbon::now()->startOfMonth();
-        $this->selectedDate  = Carbon::today()->toDateString();
+        $this->currentMonth = Carbon::now()->startOfMonth();
+        $this->selectedDate = Carbon::today()->toDateString();
         $this->loadEvents();
     }
 
@@ -65,7 +66,17 @@ new class extends Component {
                 ->filter()
                 ->toArray();
 
-            $userIds = collect($rows)->pluck('user_id')->filter()->unique()->values();
+            $teamUserIds = collect($rows)
+                ->pluck('team_user')
+                ->filter()
+                ->flatMap(fn ($team) => collect($team)->pluck('user_id'));
+
+            $userIds = collect($rows)
+                ->pluck('user_id')
+                ->merge($teamUserIds)
+                ->filter()
+                ->unique()
+                ->values();
             $userMap = $userIds->isNotEmpty()
                 ? User::whereIn('id', $userIds)->pluck('name', 'id')->toArray()
                 : [];
@@ -115,6 +126,14 @@ new class extends Component {
             $userId = $row['user_id'] ?? null;
             $userName = $userId ? ($userMap[$userId] ?? null) : null;
 
+            $teamUsers = collect($row['team_user'] ?? [])
+                ->map(fn ($member) => [
+                    'user_id' => $member['user_id'] ?? null,
+                    'name' => $userMap[$member['user_id'] ?? null] ?? null,
+                ])
+                ->values()
+                ->all();
+
             $events[$start->toDateString()][] = [
                 'id' => $id,
                 'title' => $row['activity'] ?? 'Untitled',
@@ -126,6 +145,7 @@ new class extends Component {
                 'end_date' => $end->toDateString(),
                 'is_multi_day' => $isMultiDay,
                 'user_name' => $userName,
+                'team_user' => $teamUsers,
                 'url' => $id ? route('dar.dar-show', ['id' => $id]) : null,
             ];
         }
@@ -283,17 +303,52 @@ new class extends Component {
                                     {{ $event['time'] }}
                                 </span>
                                 @if(! empty($event['location']))
-                                <span class="inline-flex items-center gap-1">
-                                    <flux:icon name="map-pin" class="size-3.5" />
-                                    {{ $event['location'] }}
-                                </span>
+                                <div class="flex gap-3 justify-between">
+                                    <span class="inline-flex items-start gap-1">
+                                        <flux:icon name="map-pin" class="size-3.5" />
+                                        {{ $event['location'] }}
+                                    </span>
+                                </div>
                                 @endif
-                                @if($event['is_multi_day'])
-                                <span class="inline-flex items-center gap-1 text-zinc-400">
-                                    <flux:icon name="calendar" class="size-3.5" />
-                                    sampai {{ Carbon::parse($event['end_date'])->translatedFormat('d M Y') }}
-                                </span>
+                                <div class="flex gap-1 justify-between mt-2">
+                                    @if($event['is_multi_day'])
+                                    <span class="inline-flex items-center gap-1 text-zinc-400">
+                                        <flux:icon name="calendar" class="size-3.5" />
+                                        sampai {{ Carbon::parse($event['end_date'])->translatedFormat('d M Y') }}
+                                    </span>
+                                    @else
+                                    <span class="inline-flex items-center gap-1 text-zinc-400">
+                                        <flux:icon name="users" class="size-3.5" />
+                                        Teams :
+                                    </span>
+                                    @endif
+                                @php
+                                    $supportCount = count($event['team_user']);
+                                @endphp
+                                @if($supportCount > 0 || ! empty($event['user_name']))
+                                <flux:avatar.group>
+                                    @if(! empty($event['user_name']))
+                                        <flux:tooltip content="Pembuat: {{ $event['user_name'] }}">
+                                            <flux:avatar size="xs" circle name="{{ $event['user_name'] }}" color="auto" color:seed="{{ $event['user_name'] }}" class="ring-2 ring-violet-400" />
+                                        </flux:tooltip>
+                                    @endif
+                                    @foreach (array_slice($event['team_user'], 0, 4) as $user)
+                                        @php $label = $user['name'] ?? $user['user_id']; @endphp
+                                        <flux:tooltip wire:key="team-{{ $event['id'] }}-{{ $user['user_id'] }}" content="{{ $label }}">
+                                            <flux:avatar size="xs" circle name="{{ $label }}" color="auto" color:seed="{{ $user['user_id'] }}" />
+                                        </flux:tooltip>
+                                    @endforeach
+
+                                    @if($supportCount > 4)
+                                        <flux:tooltip content="{{ collect(array_slice($event['team_user'], 4))->map(fn ($u) => $u['name'] ?? $u['user_id'])->implode(', ') }}">
+                                            <flux:avatar circle size="xs" class="ring-2 ring-white">
+                                                +{{ $supportCount - 4 }}
+                                            </flux:avatar>
+                                        </flux:tooltip>
+                                    @endif
+                                </flux:avatar.group>
                                 @endif
+                                </div>
                             </div>
                         </div>
                     </div>

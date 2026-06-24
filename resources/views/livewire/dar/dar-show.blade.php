@@ -201,7 +201,7 @@ class extends Component
     public function loadLogs(): void
     {
         try {
-            $response = Http::timeout(30)
+            $response = Http::timeout(15)->retry(2, 200)
                 ->get(config('services.api_izin').'/global/dar/log-activity', [
                     'activity_id' => $this->id,
                     'perPage' => 99999,

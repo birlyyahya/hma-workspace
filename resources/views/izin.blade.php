@@ -55,11 +55,10 @@
                 <livewire:izin.widget.report-izin defer />
                 <livewire:izin.widget.report-izin-category defer />
             </div>
-            @if(Auth::user()->isInDepartment('it'))
+        @if(Auth::user()->isInDepartment('it') && Auth::user()->hasPermission('izin.create'))
             <div x-data="{ tab: 'izin' }" class="space-y-4">
                 <div class="flex justify-center">
                     <div class="inline-flex w-full rounded-xl bg-zinc-100 p-1 shadow-sm">
-
                         <button @click="tab = 'izin'" :class="tab === 'izin'
                 ? 'bg-white text-zinc-900 shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-700'" class="px-4 w-full py-2 text-sm font-medium rounded-lg transition-all duration-200">
@@ -86,13 +85,13 @@
 
                     <!-- SPD -->
                     <div x-show="tab === 'spd'" x-transition>
-                        <livewire:izin.spd-list defer />
+                        <livewire:izin.spd-list lazy />
                     </div>
 
                 </div>
         </div>
         @else
-        <livewire:izin.spd-list defer />
+        <livewire:izin.spd-list lazy />
         @endif
     </div>
     <livewire:izin.add-izin-modal />
