@@ -92,7 +92,7 @@ new class extends Component {
         try {
             $apiIzin = rtrim(config('services.api_izin'), '/');
 
-            $params = ['limit' => 50000];
+            $params = ['perPage' => 50000];
 
             if ($this->search !== '') {
                 $params['search'] = $this->search;
