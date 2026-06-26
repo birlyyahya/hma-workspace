@@ -54,7 +54,7 @@ new class extends Component {
 
         $this->timelines = $response['data'] ?? [];
 
-        $response_dar = Http::timeout(5)->retry(3)->get(config('services.api_izin'). '/global/dar/list?team_user='.$this->user_id.'&project_id='.$this->id)->json();
+        $response_dar = Http::timeout(5)->retry(3)->get(config('services.api_izin'). '/global/dar/list?project_id='.$this->id)->json();
 
         if(!$response_dar['success']) {
             Toaster::error('Failed to load activities. Please refresh the page.');

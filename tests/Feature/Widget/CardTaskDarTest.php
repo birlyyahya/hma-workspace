@@ -44,6 +44,56 @@ test('fetchTasks loads tasks and visibleTasks returns them sorted by status', fu
     expect($statuses)->toBe([1, 2, 4]);
 });
 
+test('tasks are trimmed so the heavy comment files never reach the component state', function () {
+    Http::fake(['*global/dar/list*' => Http::response([
+        'data' => [
+            cardDarActivity([
+                'project_category_id' => 99,
+                'comments' => [[
+                    'id' => 1,
+                    'user_id' => 5,
+                    'body' => 'Done',
+                    'created_at' => '2026-06-22 05:33:05',
+                    'files' => [['id' => 1, 'url' => 'http://example.test/huge.jpeg', 'size' => 244985]],
+                ]],
+            ]),
+        ],
+    ])]);
+
+    $component = Volt::actingAs(User::factory()->create())
+        ->test('dar.widget.card-task-dar');
+
+    $task = $component->get('tasks')[0];
+
+    expect($task)->not->toHaveKey('project_category_id')
+        ->and($task['comments'][0])->toBe([
+            'user_id' => 5,
+            'body' => 'Done',
+            'created_at' => '2026-06-22 05:33:05',
+        ]);
+});
+
+test('unchecking kegiatan project after picking a project saves a non-project activity', function () {
+    Http::fake([
+        '*global/dar/list*' => Http::response(['data' => []]),
+        '*timelines/search*' => Http::response(['data' => []]),
+        '*global/dar/create*' => Http::response(['success' => true]),
+    ]);
+
+    Volt::actingAs(User::factory()->create())
+        ->test('dar.widget.card-task-dar')
+        ->set('form.isproject', true)
+        ->set('projectSelected', '77')
+        ->set('form.isproject', false)
+        ->set('form.activity', 'Aktivitas non project')
+        ->call('createActivity')
+        ->assertHasNoErrors();
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'global/dar/create')
+        && $request->data()['project_id'] === null
+        && $request->data()['project_category_id'] === null);
+});
+
 test('selecting a project filter sends project_id to the API', function () {
     Http::fake(['*global/dar/list*' => Http::response(['data' => []])]);
 

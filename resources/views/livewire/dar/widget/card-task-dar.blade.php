@@ -39,17 +39,17 @@ new class extends Component {
 
     public function mount(): void
     {
-        $this->users = User::whereNotIn('role_id', [1, 2])->get()->toArray();
+        $this->users = User::whereNotIn('role_id', [1, 2])->orderBy('name')->get(['id', 'name'])->toArray();
         $this->allUsers = User::orderBy('name')->get(['id', 'name'])->toArray();
 
         try {
             $cache = app(ProjectCache::class);
-            if(Auth::user()->viewScopeFor('project') === 'all'){
-                $this->projectData = $cache->allProjects();
-            }else {
-                $this->projectData = $cache->involvedProjects(Auth::id());
-            }
-            $this->allProjects = $cache->allProjects();
+            $source = Auth::user()->viewScopeFor('project') === 'all'
+                ? $cache->allProjects()
+                : $cache->involvedProjects(Auth::id());
+
+            $this->projectData = $this->trimProjects($source);
+            $this->allProjects = $this->trimProjects($cache->allProjects());
         } catch (\Throwable $e) {
             $this->projectData = [];
             $this->allProjects = [];
@@ -57,6 +57,55 @@ new class extends Component {
 
         $this->fetchTasks();
         $this->resetForm();
+    }
+
+    /**
+     * Sisakan hanya kolom yang dipakai card/dropdown agar snapshot Livewire tetap ramping.
+     *
+     * @param  array<int, array<string, mixed>>  $projects
+     * @return array<int, array{id:int,code:?string,name:?string}>
+     */
+    private function trimProjects(array $projects): array
+    {
+        return collect($projects)
+            ->map(fn ($p) => [
+                'id' => $p['id'] ?? null,
+                'code' => $p['code'] ?? null,
+                'name' => $p['name'] ?? null,
+            ])
+            ->filter(fn ($p) => $p['id'] !== null)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Buang payload berat (file komentar & kolom tak terpakai) dari respons API DAR.
+     *
+     * @param  array<int, array<string, mixed>>  $tasks
+     * @return array<int, array<string, mixed>>
+     */
+    private function trimTasks(array $tasks): array
+    {
+        return collect($tasks)->map(fn ($task) => [
+            'id' => $task['id'] ?? null,
+            'user_id' => $task['user_id'] ?? null,
+            'activity' => $task['activity'] ?? null,
+            'description' => $task['description'] ?? null,
+            'status' => (int) ($task['status'] ?? 0),
+            'project_id' => $task['project_id'] ?? null,
+            'start_date' => $task['start_date'] ?? null,
+            'end_date' => $task['end_date'] ?? null,
+            'team_user' => collect($task['team_user'] ?? [])
+                ->map(fn ($member) => ['user_id' => $member['user_id'] ?? null])
+                ->all(),
+            'comments' => collect($task['comments'] ?? [])
+                ->map(fn ($comment) => [
+                    'user_id' => $comment['user_id'] ?? null,
+                    'body' => $comment['body'] ?? '',
+                    'created_at' => $comment['created_at'] ?? '',
+                ])
+                ->all(),
+        ])->all();
     }
 
     public function updatedProjectFilter(): void
@@ -76,6 +125,16 @@ new class extends Component {
         $this->form->project_id = $this->projectSelected;
     }
 
+    public function updatedFormIsproject($value): void
+    {
+        if (! $value) {
+            $this->projectSelected = null;
+            $this->timelines = [];
+            $this->form->project_id = null;
+            $this->form->timelines_id = null;
+        }
+    }
+
     #[On('updatedCardTaskDar')]
     public function fetchTasks(): void
     {
@@ -84,7 +143,7 @@ new class extends Component {
         try {
             $apiIzin = rtrim(config('services.api_izin'), '/');
 
-            $params = ['perPage' => 50000];
+            $params = ['perPage' => 2000];
 
             if ($this->search !== '') {
                 $params['search'] = $this->search;
@@ -106,7 +165,7 @@ new class extends Component {
                 ->get($apiIzin.'/global/dar/list', $params)
                 ->json();
 
-            $this->tasks = $response['data'] ?? [];
+            $this->tasks = $this->trimTasks($response['data'] ?? []);
 
             if ($this->projectFilter === '' && $this->search === '') {
                 $this->accessibleProjectIds = collect($this->tasks)
@@ -762,25 +821,31 @@ new class extends Component {
 
                             <div>
                                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Timeline</label>
-                                @if (! empty($this->timelines))
-                                <flux:select wire:model.live="form.timelines_id" placeholder="Pilih timeline...">
-                                    <flux:select.option selected>Pilih Timeline...</flux:select.option>
-                                    @foreach ($this->timelines as $item)
-                                    <flux:select.option value="{{ $item['id'] }}">{{ $item['title'] }}</flux:select.option>
-                                    @endforeach
-                                </flux:select>
-                                @elseif ($projectSelected)
-                                <div wire:loading wire:target="updatedProjectSelected, projectSelected" class="rounded-xl bg-zinc-100 px-3 py-2.5 text-xs text-zinc-500">
+
+                                {{-- Loading selalu di DOM agar wire:loading bisa menampilkannya saat fetch timeline --}}
+                                <div wire:loading.flex wire:target="updatedProjectSelected, projectSelected" class="items-center gap-2 rounded-xl bg-zinc-100 px-3 py-2.5 text-xs text-zinc-500">
+                                    <flux:icon name="arrow-path" class="h-3.5 w-3.5 animate-spin" />
                                     Memuat timeline...
                                 </div>
-                                <div wire:loading.remove wire:target="updatedProjectSelected, projectSelected" class="rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-700 ring-1 ring-amber-200">
-                                    Tidak ada timeline. Buat dulu di menu project.
+
+                                <div wire:loading.remove wire:target="updatedProjectSelected, projectSelected">
+                                    @if (! empty($this->timelines))
+                                    <flux:select wire:model.live="form.timelines_id" placeholder="Pilih timeline...">
+                                        <flux:select.option selected>Pilih Timeline...</flux:select.option>
+                                        @foreach ($this->timelines as $item)
+                                        <flux:select.option value="{{ $item['id'] }}">{{ $item['title'] }}</flux:select.option>
+                                        @endforeach
+                                    </flux:select>
+                                    @elseif ($projectSelected)
+                                    <div class="rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-700 ring-1 ring-amber-200">
+                                        Tidak ada timeline. Buat dulu di menu project.
+                                    </div>
+                                    @else
+                                    <div class="rounded-xl bg-zinc-100 px-3 py-2.5 text-xs text-zinc-500">
+                                        Pilih project dulu.
+                                    </div>
+                                    @endif
                                 </div>
-                                @else
-                                <div class="rounded-xl bg-zinc-100 px-3 py-2.5 text-xs text-zinc-500">
-                                    Pilih project dulu.
-                                </div>
-                                @endif
                                 @error('form.timelines_id')
                                 <flux:error message="{{ $message }}" /> @enderror
                             </div>

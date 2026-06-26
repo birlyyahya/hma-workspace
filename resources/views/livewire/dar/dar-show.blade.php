@@ -290,7 +290,7 @@ class extends Component
 
         if ($this->editIsProject) {
             $rules['editProjectId'] = ['required', 'integer'];
-            $rules['editProjectCategoryId'] = ['required', 'integer'];
+            $rules['editProjectCategoryId'] = ['nullable', 'integer'];
         }
 
         $this->validate($rules);
@@ -792,22 +792,28 @@ class extends Component
                                             </div>
                                             <div>
                                                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Timeline / Category</label>
-                                                @if ($editProjectId && empty($editTimelines))
-                                                    <div wire:loading wire:target="editProjectId,updatedEditProjectId" class="rounded-xl bg-zinc-100 px-3 py-2.5 text-xs text-zinc-500">
-                                                        Memuat timeline...
-                                                    </div>
-                                                    <div wire:loading.remove wire:target="editProjectId,updatedEditProjectId" class="rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-700 ring-1 ring-amber-200">
-                                                        Tidak ada timeline untuk project ini.
-                                                    </div>
-                                                @else
-                                                    <select wire:model="editProjectCategoryId" @disabled(! $editProjectId)
-                                                        class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-800 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200 disabled:cursor-not-allowed disabled:opacity-50">
-                                                        <option value="">— Pilih timeline —</option>
-                                                        @foreach ($editTimelines as $tl)
-                                                            <option value="{{ $tl['id'] }}">{{ $tl['title'] ?? $tl['name'] ?? '#' . $tl['id'] }}</option>
-                                                        @endforeach
-                                                    </select>
-                                                @endif
+
+                                                {{-- Loading selalu di DOM agar wire:loading bisa menampilkannya saat fetch timeline --}}
+                                                <div wire:loading.flex wire:target="editProjectId,updatedEditProjectId" class="items-center gap-2 rounded-xl bg-zinc-100 px-3 py-2.5 text-xs text-zinc-500">
+                                                    <flux:icon name="arrow-path" class="h-3.5 w-3.5 animate-spin" />
+                                                    Memuat timeline...
+                                                </div>
+
+                                                <div wire:loading.remove wire:target="editProjectId,updatedEditProjectId">
+                                                    @if ($editProjectId && empty($editTimelines))
+                                                        <div class="rounded-xl bg-amber-50 px-3 py-2.5 text-xs text-amber-700 ring-1 ring-amber-200">
+                                                            Tidak ada timeline untuk project ini.
+                                                        </div>
+                                                    @else
+                                                        <select wire:model="editProjectCategoryId" @disabled(! $editProjectId)
+                                                            class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-800 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200 disabled:cursor-not-allowed disabled:opacity-50">
+                                                            <option value="">— Pilih timeline —</option>
+                                                            @foreach ($editTimelines as $tl)
+                                                                <option value="{{ $tl['id'] }}">{{ $tl['title'] ?? $tl['name'] ?? '#' . $tl['id'] }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    @endif
+                                                </div>
                                                 @error('editProjectCategoryId')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                                             </div>
                                         </div>

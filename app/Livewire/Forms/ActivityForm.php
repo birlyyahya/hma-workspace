@@ -44,7 +44,7 @@ class ActivityForm extends Form
 
         if ($this->isproject) {
             $rules['project_id'] = ['required', 'integer'];
-            $rules['timelines_id'] = ['required', 'integer'];
+            $rules['timelines_id'] = ['nullable', 'integer'];
         }
 
         return $rules;
@@ -70,6 +70,9 @@ class ActivityForm extends Form
     {
         if ($this->isproject) {
             $this->project_id = $id;
+        } else {
+            $this->project_id = null;
+            $this->timelines_id = null;
         }
 
         $this->validate();
