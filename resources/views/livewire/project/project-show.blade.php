@@ -18,6 +18,12 @@ new #[Lazy] class extends Component {
 
     public function deleteProject(): void
     {
+        if (! Auth::user()->hasPermission('project.delete')) {
+            Toaster::warning('Anda tidak memiliki akses untuk menghapus project.');
+
+            return;
+        }
+
         try {
             $response = Http::delete(
                 rtrim((string) config('services.api_project'), '/').'/projects/'.$this->id
@@ -270,6 +276,7 @@ new #[Lazy] class extends Component {
                                     <flux:menu.item icon="pencil-square" :href="route('projects.edit', $this->id)" wire:navigate>
                                         Edit Proyek
                                     </flux:menu.item>
+                                    @can('project.delete')
                                     <flux:menu.separator />
                                     <flux:menu.item
                                         icon="trash"
@@ -278,6 +285,7 @@ new #[Lazy] class extends Component {
                                     >
                                         Hapus Proyek
                                     </flux:menu.item>
+                                    @endcan
                                 </flux:menu>
                             </flux:dropdown>
                         </div>

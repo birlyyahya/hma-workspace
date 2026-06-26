@@ -812,7 +812,7 @@ new class extends Component {
                                 <flux:select wire:model.live="projectSelected" placeholder="Pilih project...">
                                     <flux:select.option selected>Pilih Project...</flux:select.option>
                                     @foreach ($this->projectData() as $item)
-                                    <flux:select.option value="{{ $item['id'] }}">{{ $item['name'] }}</flux:select.option>
+                                    <flux:select.option value="{{ $item['id'] }}">{{ $item['code'] }} - {{ $item['name'] }}</flux:select.option>
                                     @endforeach
                                 </flux:select>
                                 @error('form.project_id')

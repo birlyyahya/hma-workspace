@@ -2,6 +2,7 @@
 
 use App\Services\ProjectCache;
 use Livewire\Volt\Component;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Url;
@@ -9,6 +10,8 @@ use Masmerise\Toaster\Toaster;
 
 new class extends Component
 {
+    public bool $forbidden = false;
+
     public array $projects = [];
     public array $pagination = [];
     public array $availableYears = [];
@@ -30,6 +33,12 @@ new class extends Component
 
     public function mount(): void
     {
+        if (! Auth::user()?->hasPermission('project.view.all')) {
+            $this->forbidden = true;
+
+            return;
+        }
+
         $this->fetchProjects();
         $this->buildAvailableYears();
     }
@@ -44,6 +53,10 @@ new class extends Component
 
     public function fetchProjects(): void
     {
+        if ($this->forbidden) {
+            return;
+        }
+
         $search = trim($this->search);
         $hasSearch = $search !== '';
         $hasYear = $this->year !== '';
@@ -186,6 +199,12 @@ new class extends Component
     $defaultStatus = ['label' => 'Lainnya', 'bg' => 'bg-zinc-100 dark:bg-zinc-800', 'text' => 'text-zinc-500 dark:text-zinc-400', 'bar' => 'bg-zinc-400', 'accent' => 'from-zinc-300 to-zinc-400'];
 @endphp
 
+<div>
+@if ($forbidden)
+    <div class="min-h-[60vh] flex items-center justify-center px-4 py-10">
+        <x-errors.403 />
+    </div>
+@else
 <div class="space-y-6">
 
     {{-- Header --}}
@@ -622,4 +641,6 @@ new class extends Component
         akan dihapus secara permanen. Tindakan ini tidak dapat dibatalkan.
     </x-confirm-modal>
 
+</div>
+@endif
 </div>

@@ -1,10 +1,26 @@
 <?php
 
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Livewire\Volt\Volt;
+
+function userWithProjectViewAll(): User
+{
+    $role = Role::factory()->create();
+
+    $permission = Permission::query()->firstOrCreate(
+        ['name' => 'project.view.all'],
+        ['module' => 'project', 'action' => 'view.all', 'label' => 'View all projects'],
+    );
+
+    $role->permissions()->attach($permission);
+
+    return User::factory()->create(['role_id' => $role->id]);
+}
 
 beforeEach(function () {
     Livewire::withoutLazyLoading();
@@ -47,7 +63,7 @@ beforeEach(function () {
 });
 
 test('search matches by ppk name', function () {
-    $user = User::factory()->create();
+    $user = userWithProjectViewAll();
 
     Volt::actingAs($user)
         ->test('project.project-cards')
@@ -58,7 +74,7 @@ test('search matches by ppk name', function () {
 });
 
 test('search matches by project name', function () {
-    $user = User::factory()->create();
+    $user = userWithProjectViewAll();
 
     Volt::actingAs($user)
         ->test('project.project-cards')
@@ -69,7 +85,7 @@ test('search matches by project name', function () {
 });
 
 test('search matches by project code', function () {
-    $user = User::factory()->create();
+    $user = userWithProjectViewAll();
 
     Volt::actingAs($user)
         ->test('project.project-cards')
@@ -80,7 +96,7 @@ test('search matches by project code', function () {
 });
 
 test('confirming delete stages the pending project for the modal', function () {
-    $user = User::factory()->create();
+    $user = userWithProjectViewAll();
 
     Volt::actingAs($user)
         ->test('project.project-cards')
@@ -90,7 +106,7 @@ test('confirming delete stages the pending project for the modal', function () {
 });
 
 test('deleting without a pending project is a no-op', function () {
-    $user = User::factory()->create();
+    $user = userWithProjectViewAll();
 
     Volt::actingAs($user)
         ->test('project.project-cards')
@@ -100,7 +116,7 @@ test('deleting without a pending project is a no-op', function () {
 });
 
 test('deleting the pending project sends the delete request and clears the pending state', function () {
-    $user = User::factory()->create();
+    $user = userWithProjectViewAll();
 
     Volt::actingAs($user)
         ->test('project.project-cards')
@@ -111,4 +127,16 @@ test('deleting the pending project sends the delete request and clears the pendi
 
     Http::assertSent(fn ($request) => $request->method() === 'DELETE'
         && str_contains($request->url(), 'projects/1'));
+});
+
+test('a user without project.view.all sees the forbidden state instead of projects', function () {
+    $user = User::factory()->create();
+
+    Volt::actingAs($user)
+        ->test('project.project-cards')
+        ->assertSet('forbidden', true)
+        ->assertSee('Akses Ditolak')
+        ->assertDontSee('Pembangunan Jembatan');
+
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'projects/search'));
 });

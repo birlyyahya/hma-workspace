@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
@@ -7,6 +8,20 @@ use Livewire\Livewire;
 use Livewire\Volt\Volt;
 
 beforeEach(fn () => Livewire::withoutLazyLoading());
+
+function leaderWithProjectDelete(): User
+{
+    $role = Role::factory()->create();
+
+    $permission = Permission::query()->firstOrCreate(
+        ['name' => 'project.delete'],
+        ['module' => 'project', 'action' => 'delete', 'label' => 'Delete project'],
+    );
+
+    $role->permissions()->attach($permission);
+
+    return User::factory()->create(['role_id' => $role->id]);
+}
 
 function fakeProject(int $leaderId, array $internalUserIds = []): void
 {
@@ -146,4 +161,27 @@ test('an unrelated user sees the forbidden state instead of the project', functi
         ->assertSet('project', null)
         ->assertSee('Akses Ditolak')
         ->assertDontSee('Secret Project');
+});
+
+test('a leader with project.delete permission can delete the project', function () {
+    $leader = leaderWithProjectDelete();
+    fakeProject(leaderId: $leader->id);
+
+    Volt::actingAs($leader)
+        ->test('project.project-show', ['id' => 1])
+        ->call('deleteProject');
+
+    Http::assertSent(fn ($request) => $request->method() === 'DELETE'
+        && str_contains($request->url(), 'projects/1'));
+});
+
+test('a leader without project.delete permission cannot delete the project', function () {
+    $leader = User::factory()->create();
+    fakeProject(leaderId: $leader->id);
+
+    Volt::actingAs($leader)
+        ->test('project.project-show', ['id' => 1])
+        ->call('deleteProject');
+
+    Http::assertNotSent(fn ($request) => $request->method() === 'DELETE');
 });
