@@ -18,6 +18,11 @@ new class extends Component
     /** @var array<string, array<int, array{id:int,title:string,time:string,location:string,color:string,source:string,status:int,end_date:string,is_multi_day:bool,user_name:?string,url:?string}>> */
     public array $eventMap = [];
 
+    public function placeholder(): \Illuminate\Contracts\View\View
+    {
+        return view('components.placeholder.ph_event_calendar');
+    }
+
     public function mount(): void
     {
         $this->currentMonth = Carbon::now()->startOfMonth();

@@ -3,7 +3,7 @@
 
         {{-- Welcome banner --}}
         <div class="relative w-full rounded-xl">
-            <livewire:widget.dashboard.welcome />
+            <livewire:widget.dashboard.welcome lazy />
         </div>
 
         {{-- Mobile-only quick shortcuts --}}
@@ -39,15 +39,15 @@
         </div>
 
         {{-- Announcement (full width — important) --}}
-        <livewire:widget.dashboard.announcement />
+        <livewire:widget.dashboard.announcement lazy />
 
-        <livewire:widget.dashboard.event-calendar />
+        <livewire:widget.dashboard.event-calendar lazy />
 
         {{-- Latest Articles --}}
-        <livewire:widget.dashboard.latest-articles />
+        <livewire:widget.dashboard.latest-articles lazy />
 
         {{-- Knowledge Hub --}}
-        <livewire:widget.dashboard.knowledge-hub />
+        <livewire:widget.dashboard.knowledge-hub lazy />
 
     </div>
 </x-layouts.app>

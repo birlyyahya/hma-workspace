@@ -5,7 +5,7 @@
         <!-- Session Status -->
         <x-auth-session-status class="text-center" :status="session('status')" />
 
-        <form method="POST" action="{{ route('login.store') }}" class="flex flex-col gap-6">
+        <form method="POST" action="{{ route('login.store') }}" class="flex flex-col gap-6" x-data="{ loading: false }" @submit="loading = true">
             @csrf
 
             <!-- Username -->
@@ -43,8 +43,12 @@
             <flux:checkbox name="remember" :label="__('Remember me')" :checked="old('remember')" />
 
             <div class="flex items-center justify-end">
-                <flux:button variant="primary" type="submit" class="w-full" data-test="login-button">
-                    {{ __('Log in') }}
+                <flux:button variant="primary" type="submit" class="w-full" data-test="login-button" x-bind:disabled="loading">
+                    <span x-show="!loading">{{ __('Log in') }}</span>
+                    <span x-show="loading" x-cloak class="flex items-center justify-center gap-2">
+                        <flux:icon.loading class="size-4" />
+                        {{ __('Logging in...') }}
+                    </span>
                 </flux:button>
             </div>
         </form>

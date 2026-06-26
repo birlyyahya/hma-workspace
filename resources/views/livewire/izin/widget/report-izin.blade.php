@@ -28,6 +28,11 @@ new class extends Component
 
     public array $spdGroup = [];
 
+    public function placeholder(): \Illuminate\Contracts\View\View
+    {
+        return view('components.placeholder.ph_report_izin');
+    }
+
     public function mount(): void
     {
         if (! $this->canViewIzin) {

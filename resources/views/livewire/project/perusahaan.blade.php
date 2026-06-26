@@ -8,7 +8,7 @@ use Livewire\WithFileUploads;
 use Masmerise\Toaster\Toaster;
 
 
-new #[Lazy(isolate: false)]  class extends Component {
+new #[Lazy]  class extends Component {
     use WithFileUploads;
 
     public array $companies = [];

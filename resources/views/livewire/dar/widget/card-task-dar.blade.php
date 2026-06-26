@@ -59,14 +59,6 @@ new class extends Component {
         $this->resetForm();
     }
 
-    public function updatedTab(): void
-    {
-        if ($this->projectFilter !== '') {
-            $this->projectFilter = '';
-            $this->fetchTasks();
-        }
-    }
-
     public function updatedProjectFilter(): void
     {
         $this->fetchTasks();
@@ -106,7 +98,7 @@ new class extends Component {
                 $params['team_user'] = Auth::id();
             }
 
-            if ($this->tab === 'project' && $this->projectFilter !== '') {
+            if ($this->projectFilter !== '') {
                 $params['project_id'] = $this->projectFilter;
             }
 
@@ -143,6 +135,7 @@ new class extends Component {
             Log::error('DAR list API failed', ['message' => $e->getMessage()]);
         } finally {
             $this->loading = false;
+            $this->dispatch('dar-tasks-updated');
         }
     }
 
@@ -154,26 +147,8 @@ new class extends Component {
     public function visibleTasks(): \Illuminate\Support\Collection
     {
         return collect($this->tasks)
-            ->when($this->tab === 'project', fn ($c) => $c->filter(fn ($t) => ! empty($t['project_id'])))
-            ->when($this->tab === 'nonproject', fn ($c) => $c->filter(fn ($t) => empty($t['project_id'])))
-            ->when($this->statusFilter !== 'all', fn ($c) => $c->filter(fn ($t) => (int) ($t['status'] ?? 0) === (int) $this->statusFilter))
             ->sortBy('status')
             ->values();
-    }
-
-    public function statusCounts(): array
-    {
-        $base = collect($this->tasks)
-            ->when($this->tab === 'project', fn ($c) => $c->filter(fn ($t) => ! empty($t['project_id'])))
-            ->when($this->tab === 'nonproject', fn ($c) => $c->filter(fn ($t) => empty($t['project_id'])));
-
-        return [
-            'all' => $base->count(),
-            1 => $base->where('status', 1)->count(),
-            2 => $base->where('status', 2)->count(),
-            3 => $base->where('status', 3)->count(),
-            4 => $base->where('status', 4)->count(),
-        ];
     }
 
     public function teamUser($users): array
@@ -323,7 +298,6 @@ new class extends Component {
 
     @php
         $isSuperadmin = (int) (Auth::user()->level ?? 0) >= 100;
-        $statusCounts = $this->statusCounts();
         $statusOptions = [
             'all' => ['label' => 'Semua', 'active' => 'bg-slate-900 text-white ring-slate-900'],
             '1' => ['label' => 'Open', 'active' => 'bg-blue-600 text-white ring-blue-600'],
@@ -338,7 +312,34 @@ new class extends Component {
         ];
     @endphp
 
-    <section>
+    <section x-data="{
+        tab: @js($tab),
+        status: @js($statusFilter),
+        counts: { all: 0, 1: 0, 2: 0, 3: 0, 4: 0 },
+        visible: 0,
+        filter() {
+            const c = { all: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
+            let vis = 0;
+            this.$root.querySelectorAll('[data-dar-card]').forEach(el => {
+                const s = el.dataset.status;
+                const isProject = el.dataset.type === 'project';
+                const inTab = this.tab === 'all' || (this.tab === 'project' && isProject) || (this.tab === 'nonproject' && !isProject);
+                if (!inTab) { return; }
+                c.all++;
+                c[s] = (c[s] ?? 0) + 1;
+                if (this.status === 'all' || this.status === s) { vis++; }
+            });
+            this.counts = c;
+            this.visible = vis;
+        },
+        switchTab(next) {
+            this.tab = next;
+            if (next !== 'project' && this.$wire.projectFilter) {
+                this.$wire.set('projectFilter', '');
+            }
+            this.filter();
+        },
+    }" x-init="$nextTick(() => filter())" @dar-tasks-updated.window="$nextTick(() => filter())">
         {{-- Basecamp-ish section header --}}
         <header class="space-y-4 px-5 py-4">
             <div class="flex items-center gap-3">
@@ -361,24 +362,24 @@ new class extends Component {
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="inline-flex items-center rounded-xl bg-slate-100 p-1">
                     @foreach ($tabOptions as $key => $label)
-                        <button type="button" wire:click="$set('tab', '{{ $key }}')"
-                            class="rounded-lg px-3 py-1.5 text-sm font-medium transition {{ $tab === $key ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900' }}">
+                        <button type="button" @click="switchTab('{{ $key }}')"
+                            class="rounded-lg px-3 py-1.5 text-sm font-medium transition"
+                            :class="tab === '{{ $key }}' ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'">
                             {{ $label }}
                         </button>
                     @endforeach
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
-                    @if ($tab === 'project')
-                        @php
-                            $filterProjects = $isSuperadmin
-                                ? $allProjects
-                                : collect($allProjects)->whereIn('id', $accessibleProjectIds)->values()->toArray();
-                            $projectLabel = $projectFilter !== ''
-                                ? (collect($allProjects)->firstWhere('id', (int) $projectFilter)['name'] ?? 'Semua project')
-                                : 'Semua project';
-                        @endphp
-                        <div class="relative w-56" x-data="{ open: false, query: '' }" @click.away="open = false" @keydown.escape.window="open = false">
+                    @php
+                        $filterProjects = $isSuperadmin
+                            ? $allProjects
+                            : collect($allProjects)->whereIn('id', $accessibleProjectIds)->values()->toArray();
+                        $projectLabel = $projectFilter !== ''
+                            ? (collect($allProjects)->firstWhere('id', (int) $projectFilter)['name'] ?? 'Semua project')
+                            : 'Semua project';
+                    @endphp
+                    <div x-show="tab === 'project'" x-cloak class="relative w-56" x-data="{ open: false, query: '' }" @click.away="open = false" @keydown.escape.window="open = false">
                             <button type="button" @click="open = !open; if (open) $nextTick(() => $refs.projectSearch?.focus())"
                                 class="flex w-full items-center justify-between gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 transition hover:border-zinc-300">
                                 <span class="truncate">{{ $projectLabel }}</span>
@@ -406,7 +407,6 @@ new class extends Component {
                                 </div>
                             </div>
                         </div>
-                    @endif
 
                     @if ($isSuperadmin)
                         @php
@@ -450,13 +450,13 @@ new class extends Component {
             {{-- Status pills dengan counter --}}
             <div class="flex flex-wrap items-center gap-2">
                 @foreach ($statusOptions as $key => $opt)
-                    @php $isActive = (string) $statusFilter === (string) $key; @endphp
-                    <button type="button" wire:click="$set('statusFilter', '{{ $key }}')"
-                        class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 transition {{ $isActive ? $opt['active'] . ' shadow-sm' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50' }}">
+                    <button type="button" @click="status = '{{ $key }}'; filter()"
+                        class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 transition"
+                        :class="status === '{{ $key }}' ? '{{ $opt['active'] }} shadow-sm' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'">
                         <span>{{ $opt['label'] }}</span>
-                        <span class="rounded-full {{ $isActive ? 'bg-white/25' : 'bg-slate-100' }} px-1.5 text-[10px] font-bold">
-                            {{ $statusCounts[$key] ?? 0 }}
-                        </span>
+                        <span class="rounded-full px-1.5 text-[10px] font-bold"
+                            :class="status === '{{ $key }}' ? 'bg-white/25' : 'bg-slate-100'"
+                            x-text="counts['{{ $key }}'] ?? 0"></span>
                     </button>
                 @endforeach
             </div>
@@ -507,7 +507,12 @@ new class extends Component {
                 $ownerName = $isSuperadmin && ! empty($task['user_id']) ? ($userMap[$task['user_id']]['name'] ?? null) : null;
                 @endphp
 
-                <article x-data="{ menuOpen: false }" class="group relative overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/70 shadow-sm transition hover:z-50 hover:-translate-y-0.5 hover:shadow-lg hover:ring-slate-300/70">
+                <article x-data="{ menuOpen: false }"
+                    data-dar-card
+                    data-status="{{ $status }}"
+                    data-type="{{ $taskProjectId ? 'project' : 'nonproject' }}"
+                    x-show="(tab === 'all' || (tab === 'project' ? {{ $taskProjectId ? 'true' : 'false' }} : !{{ $taskProjectId ? 'true' : 'false' }})) && (status === 'all' || status === '{{ $status }}')"
+                    class="group relative overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/70 shadow-sm transition hover:z-50 hover:-translate-y-0.5 hover:shadow-lg hover:ring-slate-300/70">
                     <a href="{{ $taskUrl }}" wire:navigate class="absolute inset-0 z-0" aria-label="Open task"></a>
 
                     {{-- Top status accent --}}
@@ -642,6 +647,12 @@ new class extends Component {
                     Belum ada tugas. Klik <span class="font-semibold">Tambah Tugas</span> untuk membuat yang baru.
                 </div>
                 @endforelse
+
+                @if (! empty($this->tasks))
+                <div x-show="visible === 0" x-cloak class="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600">
+                    Tidak ada tugas pada filter ini.
+                </div>
+                @endif
             </div>
             @endif
             <div class="w-1/3" wire:loading wire:target="fetchTasks">

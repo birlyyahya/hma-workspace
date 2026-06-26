@@ -41,15 +41,10 @@
                 </div>
             </div>
 
-            {{-- <livewire:dar.widget.kpi-overview-dar lazy/> --}}
-
-            {{-- <livewire:dar.widget.chart-activity-task/> --}}
-
-            <livewire:dar.widget.timeline-today-dar lazy />
+            <livewire:dar.widget.timeline-today-dar lazy/>
 
             <livewire:dar.widget.board-overview-dar lazy/>
 
-            {{-- <livewire:dar.dar-table-task lazy/> --}}
             <livewire:dar.widget.card-task-dar lazy/>
         </div>
     </div>

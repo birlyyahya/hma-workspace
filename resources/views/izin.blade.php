@@ -52,8 +52,8 @@
                 </div>
             </div>
             <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                <livewire:izin.widget.report-izin defer />
-                <livewire:izin.widget.report-izin-category defer />
+                <livewire:izin.widget.report-izin lazy />
+                <livewire:izin.widget.report-izin-category lazy />
             </div>
         @if(Auth::user()->isInDepartment('it') && Auth::user()->hasPermission('izin.create'))
             <div x-data="{ tab: 'izin' }" class="space-y-4">

@@ -133,7 +133,7 @@ new class extends Component {
             if ($this->existingFile) {
                 Storage::delete($this->existingFile);
             }
-            $payload['file'] = $this->file->storePublicly('knowledge/documentations', config('filesystems.default'));
+            $payload['file'] = $this->file->store('knowledge/documentations', config('filesystems.default'));
         }
 
         if ($this->editingId) {

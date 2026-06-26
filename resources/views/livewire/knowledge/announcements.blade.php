@@ -117,7 +117,7 @@ new class extends Component {
             if ($this->existingFile) {
                 Storage::delete($this->existingFile);
             }
-            $payload['file'] = $this->file->storePublicly('knowledge/announcements', config('filesystems.default'));
+            $payload['file'] = $this->file->store('knowledge/announcements', config('filesystems.default'));
         }
 
         if ($this->editingId) {
