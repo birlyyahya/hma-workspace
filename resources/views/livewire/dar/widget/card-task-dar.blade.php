@@ -414,7 +414,7 @@ new class extends Component {
                     <div class="h-px flex-1 bg-slate-200/70"></div>
                 </div>
 
-                <flux:input x-on:keydown.enter="$wire.fetchTasks()" wire:model.live.debounce.300ms="search" icon="magnifying-glass" placeholder="Search task..." class="w-full md:w-64" />
+                <flux:input x-on:keydown.enter="$wire.fetchTasks()" wire:model="search" icon="magnifying-glass" placeholder="Search task..." class="w-full md:w-64" />
             </div>
 
             {{-- Tabs tipe + filter project/user --}}

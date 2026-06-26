@@ -104,3 +104,15 @@ test('selecting a project filter sends project_id to the API', function () {
     Http::assertSent(fn ($request) => str_contains($request->url(), 'global/dar/list')
         && ($request->data()['project_id'] ?? null) === '77');
 });
+
+test('fetchTasks forwards the current search term to the API', function () {
+    Http::fake(['*global/dar/list*' => Http::response(['data' => []])]);
+
+    Volt::actingAs(User::factory()->create())
+        ->test('dar.widget.card-task-dar')
+        ->set('search', 'laporan')
+        ->call('fetchTasks');
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'global/dar/list')
+        && ($request->data()['search'] ?? null) === 'laporan');
+});
