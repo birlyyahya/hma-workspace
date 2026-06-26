@@ -215,7 +215,7 @@ new class extends Component {
                         </button>
                     </header>
 
-                    <div class="p-5" wire:poll.5s="refreshMessages">
+                    <div class="p-5" wire:poll.visible.5s="refreshMessages">
                         <div class="space-y-3 overflow-scroll max-h-65">
                             @forelse($messages as $msg)
                             <button

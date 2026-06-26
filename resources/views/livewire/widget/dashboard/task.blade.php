@@ -214,7 +214,7 @@ new class extends Component
 
 
 
-<div>
+<div wire:poll.visible.10s="checkNotification">
     <div class="rounded-xl bg-white shadow-sm border border-gray-200  p-6 flex flex-col">
         <div class="card-heading flex items-center justify-between mb-8">
             <div class="flex items-center">
@@ -380,7 +380,7 @@ new class extends Component
                     <flux:select.option value="low">Low</flux:select.option>
                 </flux:select>
             </div>
-            <div wire:poll.10s='checkNotification' class="flex gap-4 items-center">
+            <div class="flex gap-4 items-center">
                 <div class="relative w-full max-w-45">
                     <flux:input iconTrailing="magnifying-glass" autocomplete="off" wire:model.live='query' placeholder="Assign to " class="w-full" />
                     @if(!empty($results))
