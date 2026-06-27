@@ -137,6 +137,43 @@ new class extends Component
         ];
     }
 
+    /**
+     * Build a toast message from the API's field-level validation errors,
+     * falling back to the API message or a generic message.
+     */
+    protected function apiErrorMessage(\Illuminate\Http\Client\Response $response, string $fallback): string
+    {
+        $messages = collect($response->json('errors'))
+            ->flatten()
+            ->filter()
+            ->all();
+
+        if (count($messages) > 0) {
+            return implode("\n", $messages);
+        }
+
+        return $response->json('message') ?? $fallback;
+    }
+
+    /**
+     * Merge field-level validation errors returned by the external API
+     * into Livewire's error bag so they display on the matching fields.
+     *
+     * @param  array<string, array<int, string>|string>|null  $errors
+     */
+    protected function mergeApiErrors(?array $errors): void
+    {
+        if (! is_array($errors)) {
+            return;
+        }
+
+        foreach ($errors as $field => $messages) {
+            foreach ((array) $messages as $message) {
+                $this->addError($field, $message);
+            }
+        }
+    }
+
     public function store(): void
     {
         $this->submitting = true;
@@ -164,7 +201,7 @@ new class extends Component
 
             $response = Http::post(config('services.api_project').'projects', $payload);
 
-            if ($response->json()['status'] === 201) {
+            if ((int) $response->json('status') === 201) {
                 app(ProjectCache::class)->flushProjects();
 
                 $id = $response->json('data.id') ?? $response->json('data.0.id');
@@ -178,7 +215,9 @@ new class extends Component
                 return;
             }
 
-            Toaster::error($response->json('message') ?? 'Gagal membuat proyek. Coba lagi.');
+            $this->mergeApiErrors($response->json('errors'));
+
+            Toaster::error($this->apiErrorMessage($response, 'Gagal membuat proyek. Coba lagi.'));
         } finally {
             $this->submitting = false;
         }
