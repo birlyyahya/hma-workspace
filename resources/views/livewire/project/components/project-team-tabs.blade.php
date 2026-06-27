@@ -726,8 +726,9 @@ new class extends Component {
                     wire:keydown.enter="addTimduk"
                     icon="user"
                 />
-                <flux:button wire:click="addTimduk" variant="primary" icon="check">
-                    Tambah
+                <flux:button wire:click="addTimduk" variant="primary" icon="check" wire:loading.attr="disabled" wire:target="addTimduk">
+                    <span wire:loading.remove wire:target="addTimduk">Tambah</span>
+                    <span wire:loading wire:target="addTimduk">Menambah...</span>
                 </flux:button>
             </div>
 

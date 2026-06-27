@@ -541,8 +541,9 @@ new class extends Component {
                     <flux:button type="button" variant="ghost" wire:click="closeTimelineModal">
                         Batal
                     </flux:button>
-                    <flux:button type="submit" variant="primary" icon="check">
-                        {{ $editingTimelineId ? 'Simpan Perubahan' : 'Tambah Timeline' }}
+                    <flux:button type="submit" variant="primary" icon="check" wire:loading.attr="disabled" wire:target="saveTimeline">
+                        <span wire:loading.remove wire:target="saveTimeline">{{ $editingTimelineId ? 'Simpan Perubahan' : 'Tambah Timeline' }}</span>
+                        <span wire:loading wire:target="saveTimeline">Menyimpan...</span>
                     </flux:button>
                 </div>
             </form>
@@ -582,8 +583,9 @@ new class extends Component {
                 <flux:button type="button" variant="ghost" wire:click="$set('showDeleteModal', false)">
                     Batal
                 </flux:button>
-                <flux:button type="button" variant="danger" icon="trash" wire:click="deleteTimeline">
-                    Hapus
+                <flux:button type="button" variant="danger" icon="trash" wire:click="deleteTimeline" wire:loading.attr="disabled" wire:target="deleteTimeline">
+                    <span wire:loading.remove wire:target="deleteTimeline">Hapus</span>
+                    <span wire:loading wire:target="deleteTimeline">Menghapus...</span>
                 </flux:button>
             </div>
         </div>

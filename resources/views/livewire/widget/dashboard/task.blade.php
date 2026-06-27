@@ -297,12 +297,12 @@ new class extends Component
                     </div>
                     @if($task->assignments->pluck('status')[0] === 'pending' && $task->assignments->pluck('user_id')[0] === auth()->id())
                     <div class="flex gap-2">
-                        <flux:button size="xs" icon="hand-thumb-down" class="cursor-pointer w-4 h-4  transition duration-300 hover:scale-130" iconVariant="outline" wire:click="modalConfirm({{ $task->assignments->pluck('id')[0] }})" />
-                        <flux:button size="xs" icon="hand-thumb-up" iconVariant="outline" class="cursor-pointer w-4 h-4 hover:scale-130 transition duration-300" wire:click="acceptTask({{ $task->assignments->pluck('id')[0] }})" />
+                        <flux:button size="xs" icon="hand-thumb-down" class="cursor-pointer w-4 h-4  transition duration-300 hover:scale-130" iconVariant="outline" wire:click="modalConfirm({{ $task->assignments->pluck('id')[0] }})" wire:loading.attr="disabled" wire:target="acceptTask({{ $task->assignments->pluck('id')[0] }})" />
+                        <flux:button size="xs" icon="hand-thumb-up" iconVariant="outline" class="cursor-pointer w-4 h-4 hover:scale-130 transition duration-300" wire:click="acceptTask({{ $task->assignments->pluck('id')[0] }})" wire:loading.attr="disabled" wire:target="acceptTask({{ $task->assignments->pluck('id')[0] }})" />
                     </div>
                     @elseif ($task->assignments->pluck('status')[0] === 'accepted')
                     <flux:tooltip content="Completed">
-                        <flux:button size="xs" icon="check" class="cursor-pointer w-4 h-4  transition duration-300 hover:scale-130" iconVariant="outline" wire:click="taskCompleted({{ $task['id'] }})" />
+                        <flux:button size="xs" icon="check" class="cursor-pointer w-4 h-4  transition duration-300 hover:scale-130" iconVariant="outline" wire:click="taskCompleted({{ $task['id'] }})" wire:loading.attr="disabled" wire:target="taskCompleted({{ $task['id'] }})" />
                     </flux:tooltip>
                     @endif
                 </div>
@@ -413,7 +413,10 @@ new class extends Component
             </div>
             <div class="flex">
                 <flux:spacer />
-                <flux:button wire:click="saveTask" variant="primary">Save changes</flux:button>
+                <flux:button wire:click="saveTask" variant="primary" wire:loading.attr="disabled" wire:target="saveTask">
+                    <span wire:loading.remove wire:target="saveTask">Save changes</span>
+                    <span wire:loading wire:target="saveTask">Saving...</span>
+                </flux:button>
             </div>
         </div>
     </flux:modal>
@@ -428,7 +431,10 @@ new class extends Component
             </div>
             <div class="flex gap-4 justify-end">
                 <flux:button variant="outline" wire:click="closeModal">Cancel</flux:button>
-                <flux:button variant="danger" wire:click="rejectTask">Reject</flux:button>
+                <flux:button variant="danger" wire:click="rejectTask" wire:loading.attr="disabled" wire:target="rejectTask">
+                    <span wire:loading.remove wire:target="rejectTask">Reject</span>
+                    <span wire:loading wire:target="rejectTask">Rejecting...</span>
+                </flux:button>
             </div>
         </div>
     </flux:modal>

@@ -1093,7 +1093,7 @@ class extends Component
                             'timelines_id' => 'Timeline',
                         ];
 
-                        $statusMap = [1 => 'Pending', 2 => 'On Hold', 3 => 'In Progress', 4 => 'Completed'];
+                        $statusMap = [1 => 'OPEN', 2 => 'PENDING', 3 => 'CANCELLED', 4 => 'CLOSED'];
 
                         $formatLogValue = function ($field, $val) use ($statusMap) {
                             if ($val === null || $val === '' || $val === []) {

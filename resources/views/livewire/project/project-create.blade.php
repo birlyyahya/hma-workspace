@@ -58,6 +58,11 @@ new class extends Component
     public function getLeaderOptionsProperty(): array
     {
         return $this->users
+            ->reject(fn ($user) => in_array($user->role_id, [
+                '1',
+                '10',
+                '11',
+            ]))
             ->map(fn ($u) => ['value' => $u->id, 'label' => $u->name])
             ->all();
     }
