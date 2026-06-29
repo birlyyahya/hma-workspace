@@ -66,13 +66,13 @@ class IzinCache
             return $cached;
         }
 
-        $username = Auth::user()?->username;
+        $user = Auth::user();
 
-        if (! $username) {
+        if (! $user) {
             return [];
         }
 
-        $json = $this->dashboard($username);
+        $json = $this->dashboard($user->username, (int) $user->id);
 
         return $json['data']['group'] ?? [];
     }
