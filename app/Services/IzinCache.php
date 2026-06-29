@@ -154,7 +154,7 @@ class IzinCache
 
     public function flushGroup(): void
     {
-        Cache::forget('izin:dashboard:group');
+        Cache::tags([self::TAG])->forget('izin:dashboard:group');
     }
 
     public function flushDetail(int $id): void
