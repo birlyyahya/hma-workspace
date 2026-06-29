@@ -37,7 +37,12 @@ class DarCache
         }
 
         try {
-            $data = Http::timeout(15)->retry(2, 200)->get($url)->json() ?? ['data' => []];
+            $data = Http::timeout(15)
+                ->retry(2, 200, function ($e) {
+                    return $e instanceof \Illuminate\Http\Client\ConnectionException
+                        || (method_exists($e, 'response') && optional($e->response)->serverError());
+                }, throw: false)
+                ->get($url)->json() ?? ['data' => []];
         } catch (\Throwable $e) {
             Log::warning('DarCache list gagal', ['scope' => $scope, 'user_id' => $userId, 'error' => $e->getMessage()]);
 
