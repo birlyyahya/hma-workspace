@@ -40,7 +40,8 @@ new class extends Component
 
    public function getTaskProperty()
     {
-        return Tasks::where(function ($query) {
+        return Tasks::with(['assignments.user', 'creator'])
+        ->where(function ($query) {
 
         // ✅ Task yang saya buat
         $query->where('assigned_by', auth()->id())
@@ -53,7 +54,12 @@ new class extends Component
               ->where('status', '!=', 'rejected');
         });
 
-    })->get();
+    })->latest()->limit(50)->get();
+    }
+
+    public function getNotificationsProperty()
+    {
+        return auth()->user()->notifications()->latest()->limit(10)->get();
     }
 
     public function saveTask()
@@ -214,7 +220,7 @@ new class extends Component
 
 
 
-<div wire:poll.visible.10s="checkNotification">
+<div wire:poll.visible.30s="checkNotification">
     <div class="rounded-xl bg-white shadow-sm border border-gray-200  p-6 flex flex-col">
         <div class="card-heading flex items-center justify-between mb-8">
             <div class="flex items-center">
@@ -222,7 +228,7 @@ new class extends Component
             </div>
             <div class="flex gap-4">
                 <div class="relative">
-                    @if(auth()->user()->unreadNotifications->isNotEmpty())
+                    @if($this->notifications->whereNull('read_at')->isNotEmpty())
                     <span class="absolute top-1 right-1 flex size-3">
                         <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
                         <span class="relative inline-flex size-2 rounded-full bg-red-500"></span>
@@ -236,12 +242,12 @@ new class extends Component
                             <flux:menu.item>Notification</flux:menu.item>
                             <flux:menu.separator />
                             <div class="h-78 overflow-auto">
-                                @if(empty(auth()->user()->notifications))
+                                @if($this->notifications->isEmpty())
                                 <flux:menu.item>
                                     <flux:description class="text-xs font-light">No new notifications</flux:description>
                                 </flux:menu.item>
                                 @endif
-                                @foreach (auth()->user()->notifications as $notification)
+                                @foreach ($this->notifications as $notification)
                                 <flux:menu.item class="mb-2">
                                     <flux:avatar name="{{ $notification->data['assigned_by'] }}" size="sm" class="me-2"></flux:avatar>
                                     <div class="flex flex-col">
