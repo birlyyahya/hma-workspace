@@ -2,12 +2,15 @@
 
 namespace App\Services;
 
+use App\Services\Concerns\CachesFlexibly;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class IzinCache
 {
+    use CachesFlexibly;
+
     private const TTL_DASHBOARD = 300;
 
     private const TTL_DETAIL = 300;
@@ -29,27 +32,26 @@ class IzinCache
      */
     public function dashboard(string $username, int $id): array
     {
-        return Cache::tags([self::TAG, "izin:user:{$username}"])
-            ->remember("izin:dashboard:{$username}", self::TTL_DASHBOARD, function () use ($username, $id) {
-                $response = Http::timeout(5)->retry(2, 200)
-                    ->get($this->apiBase.'/global/izin/dashboard/'.$username.'/'.$id);
+        return $this->rememberFlexible([self::TAG, "izin:user:{$username}"], "izin:dashboard:{$username}", [self::TTL_DASHBOARD, self::TTL_DASHBOARD * 4], function () use ($username, $id) {
+            $response = Http::timeout(5)->retry(2, 200)
+                ->get($this->apiBase.'/global/izin/dashboard/'.$username.'/'.$id);
 
-                if (! $response->successful()) {
-                    return [];
-                }
+            if (! $response->successful()) {
+                throw new \RuntimeException('izin dashboard status '.$response->status());
+            }
 
-                $json = $response->json() ?? [];
+            $json = $response->json() ?? [];
 
-                if (isset($json['data']['group'])) {
-                    Cache::tags([self::TAG])->put(
-                        'izin:dashboard:group',
-                        $json['data']['group'],
-                        self::TTL_DASHBOARD,
-                    );
-                }
+            if (isset($json['data']['group'])) {
+                Cache::tags([self::TAG])->put(
+                    'izin:dashboard:group',
+                    $json['data']['group'],
+                    self::TTL_DASHBOARD,
+                );
+            }
 
-                return $json;
-            });
+            return $json;
+        });
     }
 
     /**
@@ -84,17 +86,16 @@ class IzinCache
      */
     public function spdListAll(): array
     {
-        return Cache::tags([self::TAG])
-            ->remember('izin:spd:list:all', self::TTL_SPD, function () {
-                $response = Http::timeout(5)->retry(2, 200)
-                    ->get($this->apiBase.'/global/dar/activity/list-spd');
+        return $this->rememberFlexible([self::TAG], 'izin:spd:list:all', [self::TTL_SPD, self::TTL_SPD * 4], function () {
+            $response = Http::timeout(5)->retry(2, 200)
+                ->get($this->apiBase.'/global/dar/activity/list-spd');
 
-                if (! $response->successful()) {
-                    return [];
-                }
+            if (! $response->successful()) {
+                throw new \RuntimeException('izin spd list status '.$response->status());
+            }
 
-                return $response->json() ?? [];
-            });
+            return $response->json() ?? [];
+        });
     }
 
     /**
@@ -105,20 +106,19 @@ class IzinCache
      */
     public function spdListForUser(int $userId, string $username): array
     {
-        return Cache::tags([self::TAG, "izin:user:{$username}"])
-            ->remember("izin:spd:list:user:{$username}", self::TTL_SPD, function () use ($userId) {
-                $response = Http::timeout(5)->retry(2, 200, throw: false)
-                    ->get($this->apiBase.'/global/dar/activity/list-spd', [
-                        'user_id' => $userId,
-                        'limit' => 1000,
-                    ]);
+        return $this->rememberFlexible([self::TAG, "izin:user:{$username}"], "izin:spd:list:user:{$username}", [self::TTL_SPD, self::TTL_SPD * 4], function () use ($userId) {
+            $response = Http::timeout(5)->retry(2, 200, throw: false)
+                ->get($this->apiBase.'/global/dar/activity/list-spd', [
+                    'user_id' => $userId,
+                    'limit' => 1000,
+                ]);
 
-                if (! $response->successful()) {
-                    return [];
-                }
+            if (! $response->successful()) {
+                throw new \RuntimeException('izin spd list user status '.$response->status());
+            }
 
-                return $response->json() ?? [];
-            });
+            return $response->json() ?? [];
+        });
     }
 
     /**
@@ -129,17 +129,16 @@ class IzinCache
      */
     public function detail(int $id): array
     {
-        return Cache::tags([self::TAG, "izin:detail:{$id}"])
-            ->remember("izin:detail:{$id}", self::TTL_DETAIL, function () use ($id) {
-                $response = Http::timeout(5)->retry(2, 200)
-                    ->get($this->apiBase.'/global/izin/detail/'.$id);
+        return $this->rememberFlexible([self::TAG, "izin:detail:{$id}"], "izin:detail:{$id}", [self::TTL_DETAIL, self::TTL_DETAIL * 4], function () use ($id) {
+            $response = Http::timeout(5)->retry(2, 200)
+                ->get($this->apiBase.'/global/izin/detail/'.$id);
 
-                if (! $response->successful()) {
-                    return [];
-                }
+            if (! $response->successful()) {
+                throw new \RuntimeException('izin detail status '.$response->status());
+            }
 
-                return $response->json() ?? [];
-            });
+            return $response->json() ?? [];
+        });
     }
 
     public function flush(): void

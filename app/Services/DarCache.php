@@ -2,12 +2,15 @@
 
 namespace App\Services;
 
+use App\Services\Concerns\CachesFlexibly;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class DarCache
 {
+    use CachesFlexibly;
+
     private const TTL = 300;
 
     private const TAG = 'dar';
@@ -26,27 +29,27 @@ class DarCache
             ? 'dar:list:all'
             : "dar:list:user:{$userId}";
 
-        if (is_array($cached = Cache::tags([self::TAG])->get($key))) {
-            return $cached;
-        }
-
         $url = $this->apiBase.'/global/dar/list?perPage=1000000';
 
         if ($scope !== 'all' && $userId) {
             $url .= '&team_user='.$userId;
         }
 
-        try {
-            $data = Http::timeout(15)->retry(2, 200)->get($url)->json() ?? ['data' => []];
-        } catch (\Throwable $e) {
-            Log::warning('DarCache list gagal', ['scope' => $scope, 'user_id' => $userId, 'error' => $e->getMessage()]);
+        return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], function () use ($url, $scope, $userId) {
+            try {
+                $response = Http::timeout(15)->retry(2, 200)->get($url);
 
-            return ['data' => []];
-        }
+                if ($response->failed()) {
+                    throw new \RuntimeException('status '.$response->status());
+                }
 
-        Cache::tags([self::TAG])->put($key, $data, self::TTL);
+                return $response->json() ?? ['data' => []];
+            } catch (\Throwable $e) {
+                Log::warning('DarCache list gagal', ['scope' => $scope, 'user_id' => $userId, 'error' => $e->getMessage()]);
 
-        return $data;
+                throw $e;
+            }
+        }, ['data' => []]);
     }
 
     public function flush(): void

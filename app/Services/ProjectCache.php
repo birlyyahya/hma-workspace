@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\Concerns\CachesFlexibly;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -9,6 +10,8 @@ use Illuminate\Support\Facades\Log;
 
 class ProjectCache
 {
+    use CachesFlexibly;
+
     private const TTL_GLOBAL = 600;
 
     private const TTL_USER = 300;
@@ -26,7 +29,7 @@ class ProjectCache
      */
     public function allCompanies(): array
     {
-        return Cache::tags([self::TAG_COMPANIES])->remember('companies:all', self::TTL_GLOBAL, function () {
+        return $this->rememberFlexible([self::TAG_COMPANIES], 'companies:all', [self::TTL_GLOBAL, self::TTL_GLOBAL * 4], function () {
             return Http::get($this->apiBase.'/companies?limit=999999999')->json()['data'] ?? [];
         });
     }
@@ -36,7 +39,7 @@ class ProjectCache
      */
     public function allProjects(): array
     {
-        return Cache::tags([self::TAG_PROJECTS])->remember('projects:all', self::TTL_GLOBAL, function () {
+        return $this->rememberFlexible([self::TAG_PROJECTS], 'projects:all', [self::TTL_GLOBAL, self::TTL_GLOBAL * 4], function () {
             return Http::get($this->apiBase.'/projects/search?limit=99999')->json()['data'] ?? [];
         });
     }
@@ -74,10 +77,9 @@ class ProjectCache
      */
     public function leaderProjects(int $userId): array
     {
-        return Cache::tags([self::TAG_PROJECTS, "projects:user:{$userId}"])
-            ->remember("projects:leader:{$userId}", self::TTL_USER, function () use ($userId) {
-                return Http::get($this->apiBase.'/projects/search?project_leader_id='.$userId)->json()['data'] ?? [];
-            });
+        return $this->rememberFlexible([self::TAG_PROJECTS, "projects:user:{$userId}"], "projects:leader:{$userId}", [self::TTL_USER, self::TTL_USER * 4], function () use ($userId) {
+            return Http::get($this->apiBase.'/projects/search?project_leader_id='.$userId)->json()['data'] ?? [];
+        });
     }
 
     /**
@@ -88,10 +90,9 @@ class ProjectCache
      */
     public function teamProjects(int $userId): array
     {
-        return Cache::tags([self::TAG_PROJECTS, "projects:user:{$userId}"])
-            ->remember("projects:team:{$userId}", self::TTL_USER, function () use ($userId) {
-                return Http::get($this->apiBase.'/project-teams/search?user_id='.$userId)->json('data') ?? [];
-            });
+        return $this->rememberFlexible([self::TAG_PROJECTS, "projects:user:{$userId}"], "projects:team:{$userId}", [self::TTL_USER, self::TTL_USER * 4], function () use ($userId) {
+            return Http::get($this->apiBase.'/project-teams/search?user_id='.$userId)->json('data') ?? [];
+        });
     }
 
     /**
