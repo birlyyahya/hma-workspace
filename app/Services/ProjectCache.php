@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\Concerns\CachesFlexibly;
 use App\Services\Concerns\MakesExternalRequests;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
@@ -10,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 
 class ProjectCache
 {
+    use CachesFlexibly;
     use MakesExternalRequests;
 
     private const TTL_GLOBAL = 600;
@@ -29,21 +31,19 @@ class ProjectCache
      */
     public function allCompanies(): array
     {
-        return Cache::tags([self::TAG_COMPANIES])->remember('companies:all', self::TTL_GLOBAL, function () {
+        return $this->rememberFlexible([self::TAG_COMPANIES], 'companies:all', [self::TTL_GLOBAL, self::TTL_GLOBAL * 4], function () {
             try {
                 $response = $this->externalGet()->get($this->apiBase.'/companies?limit=999999999');
 
                 if ($response->failed()) {
-                    Log::warning('ProjectCache allCompanies gagal', ['status' => $response->status()]);
-
-                    return [];
+                    throw new \RuntimeException('companies status '.$response->status());
                 }
 
                 return $response->json()['data'] ?? [];
             } catch (\Throwable $e) {
-                Log::warning('ProjectCache allCompanies exception', ['error' => $e->getMessage()]);
+                Log::warning('ProjectCache allCompanies gagal', ['error' => $e->getMessage()]);
 
-                return [];
+                throw $e;
             }
         });
     }
@@ -53,21 +53,19 @@ class ProjectCache
      */
     public function allProjects(): array
     {
-        return Cache::tags([self::TAG_PROJECTS])->remember('projects:all', self::TTL_GLOBAL, function () {
+        return $this->rememberFlexible([self::TAG_PROJECTS], 'projects:all', [self::TTL_GLOBAL, self::TTL_GLOBAL * 4], function () {
             try {
                 $response = $this->externalGet()->get($this->apiBase.'/projects/search?limit=99999');
 
                 if ($response->failed()) {
-                    Log::warning('ProjectCache allProjects gagal', ['status' => $response->status()]);
-
-                    return [];
+                    throw new \RuntimeException('projects status '.$response->status());
                 }
 
                 return $response->json()['data'] ?? [];
             } catch (\Throwable $e) {
-                Log::warning('ProjectCache allProjects exception', ['error' => $e->getMessage()]);
+                Log::warning('ProjectCache allProjects gagal', ['error' => $e->getMessage()]);
 
-                return [];
+                throw $e;
             }
         });
     }
@@ -109,24 +107,21 @@ class ProjectCache
      */
     public function leaderProjects(int $userId): array
     {
-        return Cache::tags([self::TAG_PROJECTS, "projects:user:{$userId}"])
-            ->remember("projects:leader:{$userId}", self::TTL_USER, function () use ($userId) {
-                try {
-                    $response = $this->externalGet()->get($this->apiBase.'/projects/search?project_leader_id='.$userId);
+        return $this->rememberFlexible([self::TAG_PROJECTS, "projects:user:{$userId}"], "projects:leader:{$userId}", [self::TTL_USER, self::TTL_USER * 4], function () use ($userId) {
+            try {
+                $response = $this->externalGet()->get($this->apiBase.'/projects/search?project_leader_id='.$userId);
 
-                    if ($response->failed()) {
-                        Log::warning('ProjectCache leaderProjects gagal', ['user_id' => $userId, 'status' => $response->status()]);
-
-                        return [];
-                    }
-
-                    return $response->json()['data'] ?? [];
-                } catch (\Throwable $e) {
-                    Log::warning('ProjectCache leaderProjects exception', ['user_id' => $userId, 'error' => $e->getMessage()]);
-
-                    return [];
+                if ($response->failed()) {
+                    throw new \RuntimeException('leader projects status '.$response->status());
                 }
-            });
+
+                return $response->json()['data'] ?? [];
+            } catch (\Throwable $e) {
+                Log::warning('ProjectCache leaderProjects gagal', ['user_id' => $userId, 'error' => $e->getMessage()]);
+
+                throw $e;
+            }
+        });
     }
 
     /**
@@ -137,24 +132,21 @@ class ProjectCache
      */
     public function teamProjects(int $userId): array
     {
-        return Cache::tags([self::TAG_PROJECTS, "projects:user:{$userId}"])
-            ->remember("projects:team:{$userId}", self::TTL_USER, function () use ($userId) {
-                try {
-                    $response = $this->externalGet()->get($this->apiBase.'/project-teams/search?user_id='.$userId);
+        return $this->rememberFlexible([self::TAG_PROJECTS, "projects:user:{$userId}"], "projects:team:{$userId}", [self::TTL_USER, self::TTL_USER * 4], function () use ($userId) {
+            try {
+                $response = $this->externalGet()->get($this->apiBase.'/project-teams/search?user_id='.$userId);
 
-                    if ($response->failed()) {
-                        Log::warning('ProjectCache teamProjects gagal', ['user_id' => $userId, 'status' => $response->status()]);
-
-                        return [];
-                    }
-
-                    return $response->json('data') ?? [];
-                } catch (\Throwable $e) {
-                    Log::warning('ProjectCache teamProjects exception', ['user_id' => $userId, 'error' => $e->getMessage()]);
-
-                    return [];
+                if ($response->failed()) {
+                    throw new \RuntimeException('team projects status '.$response->status());
                 }
-            });
+
+                return $response->json('data') ?? [];
+            } catch (\Throwable $e) {
+                Log::warning('ProjectCache teamProjects gagal', ['user_id' => $userId, 'error' => $e->getMessage()]);
+
+                throw $e;
+            }
+        });
     }
 
     /**
