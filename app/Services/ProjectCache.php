@@ -53,7 +53,11 @@ class ProjectCache
         }
 
         try {
-            $data = Http::timeout(15)->retry(2, 200)
+            $data = Http::timeout(15)
+                ->retry(2, 200, function ($e) {
+                    return $e instanceof ConnectionException
+                        || (method_exists($e, 'response') && optional($e->response)->serverError());
+                }, throw: false)
                 ->get($this->apiBase.'/projects/search', [
                     'limit' => $limit,
                     'page' => 1,
@@ -154,7 +158,11 @@ class ProjectCache
         }
 
         try {
-            $data = Http::timeout(15)->retry(2, 200)
+            $data = Http::timeout(15)
+                ->retry(2, 200, function ($e) {
+                    return $e instanceof ConnectionException
+                        || (method_exists($e, 'response') && optional($e->response)->serverError());
+                }, throw: false)
                 ->get($this->apiBase.'/activity-categories/search', [
                     'project_id' => $projectId,
                     'limit' => 99999,
