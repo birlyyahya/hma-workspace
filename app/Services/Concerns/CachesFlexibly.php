@@ -21,16 +21,16 @@ trait CachesFlexibly
     {
         $lastGoodKey = $key.':last_good';
 
-        return Cache::tags($tags)->flexible($key, $window, function () use ($tags, $lastGoodKey, $fetch, $default) {
-            try {
+        try {
+            return Cache::tags($tags)->flexible($key, $window, function () use ($tags, $lastGoodKey, $fetch) {
                 $data = $fetch();
 
                 Cache::tags($tags)->forever($lastGoodKey, $data);
 
                 return $data;
-            } catch (\Throwable $e) {
-                return Cache::tags($tags)->get($lastGoodKey, $default);
-            }
-        });
+            });
+        } catch (\Throwable $e) {
+            return Cache::tags($tags)->get($lastGoodKey, $default);
+        }
     }
 }
