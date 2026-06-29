@@ -307,7 +307,7 @@ new class extends Component {
                                         @checked($isDone)
                                         wire:change="toggleTodo({{ $todo['id'] }})"
                                         wire:loading.attr="disabled"
-                                        wire:target="toggleTodo({{ $todo['id'] }})"
+                                        wire:target="toggleTodo"
                                         class="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900"
                                     >
                                     <span class="flex-1 text-sm text-slate-800 group-hover:text-slate-950 {{ $isDone ? 'line-through text-slate-400' : '' }}">
@@ -336,7 +336,7 @@ new class extends Component {
                                         @checked($isDone)
                                         wire:change="toggleTodo({{ $todo['id'] }})"
                                         wire:loading.attr="disabled"
-                                        wire:target="toggleTodo({{ $todo['id'] }})"
+                                        wire:target="toggleTodo"
                                         class="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900/20"
                                     >
                                     <span class="flex-1 min-w-0 text-sm text-slate-800 group-hover:text-slate-950 {{ $isDone ? 'line-through text-slate-400' : '' }}">
