@@ -33,7 +33,7 @@ class ProjectCache
     {
         return $this->rememberFlexible([self::TAG_COMPANIES], 'companies:all', [self::TTL_GLOBAL, self::TTL_GLOBAL * 4], function () {
             try {
-                $response = $this->externalGet()->get($this->apiBase.'/companies?limit=999999999');
+                $response = $this->externalRead()->get($this->apiBase.'/companies?limit=999999999');
 
                 if ($response->failed()) {
                     throw new \RuntimeException('companies status '.$response->status());
@@ -55,7 +55,7 @@ class ProjectCache
     {
         return $this->rememberFlexible([self::TAG_PROJECTS], 'projects:all', [self::TTL_GLOBAL, self::TTL_GLOBAL * 4], function () {
             try {
-                $response = $this->externalGet()->get($this->apiBase.'/projects/search?limit=99999');
+                $response = $this->externalRead()->get($this->apiBase.'/projects/search?limit=99999');
 
                 if ($response->failed()) {
                     throw new \RuntimeException('projects status '.$response->status());
@@ -109,7 +109,7 @@ class ProjectCache
     {
         return $this->rememberFlexible([self::TAG_PROJECTS, "projects:user:{$userId}"], "projects:leader:{$userId}", [self::TTL_USER, self::TTL_USER * 4], function () use ($userId) {
             try {
-                $response = $this->externalGet()->get($this->apiBase.'/projects/search?project_leader_id='.$userId);
+                $response = $this->externalRead()->get($this->apiBase.'/projects/search?project_leader_id='.$userId);
 
                 if ($response->failed()) {
                     throw new \RuntimeException('leader projects status '.$response->status());
@@ -134,7 +134,7 @@ class ProjectCache
     {
         return $this->rememberFlexible([self::TAG_PROJECTS, "projects:user:{$userId}"], "projects:team:{$userId}", [self::TTL_USER, self::TTL_USER * 4], function () use ($userId) {
             try {
-                $response = $this->externalGet()->get($this->apiBase.'/project-teams/search?user_id='.$userId);
+                $response = $this->externalRead()->get($this->apiBase.'/project-teams/search?user_id='.$userId);
 
                 if ($response->failed()) {
                     throw new \RuntimeException('team projects status '.$response->status());
