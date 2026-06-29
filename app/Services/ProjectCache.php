@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\Concerns\MakesExternalRequests;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -9,6 +10,8 @@ use Illuminate\Support\Facades\Log;
 
 class ProjectCache
 {
+    use MakesExternalRequests;
+
     private const TTL_GLOBAL = 600;
 
     private const TTL_USER = 300;
@@ -27,7 +30,21 @@ class ProjectCache
     public function allCompanies(): array
     {
         return Cache::tags([self::TAG_COMPANIES])->remember('companies:all', self::TTL_GLOBAL, function () {
-            return Http::get($this->apiBase.'/companies?limit=999999999')->json()['data'] ?? [];
+            try {
+                $response = $this->externalGet()->get($this->apiBase.'/companies?limit=999999999');
+
+                if ($response->failed()) {
+                    Log::warning('ProjectCache allCompanies gagal', ['status' => $response->status()]);
+
+                    return [];
+                }
+
+                return $response->json()['data'] ?? [];
+            } catch (\Throwable $e) {
+                Log::warning('ProjectCache allCompanies exception', ['error' => $e->getMessage()]);
+
+                return [];
+            }
         });
     }
 
@@ -37,7 +54,21 @@ class ProjectCache
     public function allProjects(): array
     {
         return Cache::tags([self::TAG_PROJECTS])->remember('projects:all', self::TTL_GLOBAL, function () {
-            return Http::get($this->apiBase.'/projects/search?limit=99999')->json()['data'] ?? [];
+            try {
+                $response = $this->externalGet()->get($this->apiBase.'/projects/search?limit=99999');
+
+                if ($response->failed()) {
+                    Log::warning('ProjectCache allProjects gagal', ['status' => $response->status()]);
+
+                    return [];
+                }
+
+                return $response->json()['data'] ?? [];
+            } catch (\Throwable $e) {
+                Log::warning('ProjectCache allProjects exception', ['error' => $e->getMessage()]);
+
+                return [];
+            }
         });
     }
 
@@ -80,7 +111,21 @@ class ProjectCache
     {
         return Cache::tags([self::TAG_PROJECTS, "projects:user:{$userId}"])
             ->remember("projects:leader:{$userId}", self::TTL_USER, function () use ($userId) {
-                return Http::get($this->apiBase.'/projects/search?project_leader_id='.$userId)->json()['data'] ?? [];
+                try {
+                    $response = $this->externalGet()->get($this->apiBase.'/projects/search?project_leader_id='.$userId);
+
+                    if ($response->failed()) {
+                        Log::warning('ProjectCache leaderProjects gagal', ['user_id' => $userId, 'status' => $response->status()]);
+
+                        return [];
+                    }
+
+                    return $response->json()['data'] ?? [];
+                } catch (\Throwable $e) {
+                    Log::warning('ProjectCache leaderProjects exception', ['user_id' => $userId, 'error' => $e->getMessage()]);
+
+                    return [];
+                }
             });
     }
 
@@ -94,7 +139,21 @@ class ProjectCache
     {
         return Cache::tags([self::TAG_PROJECTS, "projects:user:{$userId}"])
             ->remember("projects:team:{$userId}", self::TTL_USER, function () use ($userId) {
-                return Http::get($this->apiBase.'/project-teams/search?user_id='.$userId)->json('data') ?? [];
+                try {
+                    $response = $this->externalGet()->get($this->apiBase.'/project-teams/search?user_id='.$userId);
+
+                    if ($response->failed()) {
+                        Log::warning('ProjectCache teamProjects gagal', ['user_id' => $userId, 'status' => $response->status()]);
+
+                        return [];
+                    }
+
+                    return $response->json('data') ?? [];
+                } catch (\Throwable $e) {
+                    Log::warning('ProjectCache teamProjects exception', ['user_id' => $userId, 'error' => $e->getMessage()]);
+
+                    return [];
+                }
             });
     }
 
