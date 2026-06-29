@@ -41,4 +41,9 @@ return [
     'url_project' => env('URL_PROJECT'),
     'api_ca' => env('API_CA'),
     'aws_url' => env('AWS_URL'),
+
+    'whatsapp_gateway' => [
+        'base' => env('WHATSAPP_GATEWAY_BASE', 'http://localhost:8080'),
+        'timeout' => (int) env('WHATSAPP_GATEWAY_TIMEOUT', 10),
+    ],
 ];
