@@ -2,6 +2,7 @@
 
 use App\Notifications\DarCommentReceived;
 use App\Services\DarCache;
+use App\Services\DarWriter;
 use App\Services\ProjectCache;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
@@ -170,11 +171,7 @@ new class extends Component {
 
         $newStatus = $todo['status'] == 1 ? 4 : 1;
 
-        Http::put(config('services.api_izin').'global/dar/activity/'.$id.'/status', [
-            'status' => $newStatus
-        ]);
-
-        app(DarCache::class)->flush();
+        app(DarWriter::class)->updateStatus((int) $id, $newStatus);
 
         Toaster::success('Todo status updated');
 
