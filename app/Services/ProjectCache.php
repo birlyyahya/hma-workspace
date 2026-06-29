@@ -150,6 +150,30 @@ class ProjectCache
     }
 
     /**
+     * Timeline/kategori sebuah project — dipakai di dropdown create/edit task DAR.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function timelines(int $projectId): array
+    {
+        return $this->rememberFlexible([self::TAG_PROJECTS], "timelines:project:{$projectId}", [self::TTL_USER, self::TTL_USER * 4], function () use ($projectId) {
+            try {
+                $response = $this->externalRead()->get($this->apiBase.'/timelines/search?project_id='.$projectId);
+
+                if ($response->failed()) {
+                    throw new \RuntimeException('timelines status '.$response->status());
+                }
+
+                return $response->json('data') ?? [];
+            } catch (\Throwable $e) {
+                Log::warning('ProjectCache timelines gagal', ['project_id' => $projectId, 'error' => $e->getMessage()]);
+
+                throw $e;
+            }
+        });
+    }
+
+    /**
      * Semua project yang melibatkan user — sebagai leader maupun anggota tim —
      * terdeduplikasi per id. Dipakai untuk daftar project di sidebar.
      *
