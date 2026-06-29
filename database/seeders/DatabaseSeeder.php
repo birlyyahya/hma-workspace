@@ -18,7 +18,10 @@ class DatabaseSeeder extends Seeder
         // User::factory(1)->create();
 
         // Bulk insert from API Project
-        $response = Http::withToken(env('TOKEN_KEY'))->get(env('API_PROJECT').'users?limit=100')->json();
+        $response = Http::withToken(config('services.bepm.token'))
+            ->timeout(10)
+            ->get(rtrim((string) config('services.bepm.base'), '/').'/users?limit=100')
+            ->json();
 
         if (! $response['status']) {
             throw new \Exception('Gagal ambil data user dari API');

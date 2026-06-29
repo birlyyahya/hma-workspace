@@ -42,6 +42,19 @@ return [
     'api_ca' => env('API_CA'),
     'aws_url' => env('AWS_URL'),
 
+    'bepm' => [
+        'base' => env('API_PROJECT'),
+        'token' => env('TOKEN_KEY'),
+        'timeout' => (int) env('BEPM_TIMEOUT', 3),
+    ],
+
+    'darbe' => [
+        'base' => env('API_IZIN'),
+        'timeout' => (int) env('DARBE_TIMEOUT', 3),
+    ],
+
+    'api_izin_register_endpoint' => env('API_IZIN_REGISTER_ENDPOINT'),
+
     'whatsapp_gateway' => [
         'base' => env('WHATSAPP_GATEWAY_BASE', 'http://localhost:8080'),
         'timeout' => (int) env('WHATSAPP_GATEWAY_TIMEOUT', 10),
