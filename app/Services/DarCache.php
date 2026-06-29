@@ -30,7 +30,7 @@ class DarCache
             return $cached;
         }
 
-        $url = $this->apiBase.'/global/dar/list?limit=1000000';
+        $url = $this->apiBase.'/global/dar/list?perPage=1000000';
 
         if ($scope !== 'all' && $userId) {
             $url .= '&team_user='.$userId;
