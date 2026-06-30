@@ -558,10 +558,12 @@ new class extends Component {
                 $ownerName = $isSuperadmin && ! empty($task['user_id']) ? ($userMap[$task['user_id']]['name'] ?? null) : null;
                 @endphp
 
-                <article x-data="{ menuOpen: false }"
+                <article wire:key="dar-card-{{ $taskId }}"
+                    x-data="{ menuOpen: false }"
                     data-dar-card
                     data-status="{{ $status }}"
                     data-type="{{ $taskProjectId ? 'project' : 'nonproject' }}"
+                    wire:key='{{ $taskProjectId }}'
                     x-show="(tab === 'all' || (tab === 'project' ? {{ $taskProjectId ? 'true' : 'false' }} : !{{ $taskProjectId ? 'true' : 'false' }})) && (status === 'all' || status === '{{ $status }}')"
                     class="group relative overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/70 shadow-sm transition hover:z-50 hover:-translate-y-0.5 hover:shadow-lg hover:ring-slate-300/70">
                     <a href="{{ $taskUrl }}" wire:navigate class="absolute inset-0 z-0" aria-label="Open task"></a>
