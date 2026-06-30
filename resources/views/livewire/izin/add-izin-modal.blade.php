@@ -1,10 +1,8 @@
 <?php
 
-use App\Services\IzinCache;
+use App\Services\IzinWriter;
 use Carbon\Carbon;
 use Flux\Flux;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Livewire\Volt\Component;
 use Masmerise\Toaster\Toaster;
 
@@ -67,34 +65,23 @@ new class extends Component {
     {
         $this->validate();
 
-        try {
-            $response = Http::timeout(8)
-                ->post(config('services.api_izin').'/global/izin/create-izin-saya', [
-                    'start_date' => $this->start_date,
-                    'end_date' => $this->end_date,
-                    'start_time' => $this->start_time,
-                    'end_time' => $this->end_time,
-                    'alasan' => $this->alasan,
-                    'deskripsi' => $this->deskripsi,
-                    'username' => Auth::user()->username,
-                ])->json();
-        } catch (\Throwable $e) {
-            Log::error('Izin Create API connection error', ['message' => $e->getMessage()]);
-            Toaster::error('Gagal menghubungi server izin. Silakan coba lagi.');
+        $result = app(IzinWriter::class)->createIzin([
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'start_time' => $this->start_time,
+            'end_time' => $this->end_time,
+            'alasan' => $this->alasan,
+            'deskripsi' => $this->deskripsi,
+            'username' => Auth::user()->username,
+        ]);
 
-            return;
-        }
-
-        if (! ($response['success'] ?? false)) {
+        if (! $result['ok']) {
             Toaster::error('Gagal mengajukan izin. Silakan coba lagi.');
 
             return;
         }
 
         Toaster::success('Izin berhasil diajukan!');
-        $cache = app(IzinCache::class);
-        $cache->flushUser(Auth::user()->username);
-        $cache->flushGroup();
         $this->dispatch('izinAdded');
         $this->reset(['alasan', 'deskripsi']);
         Flux::modal('form-izin-modal')->close();
