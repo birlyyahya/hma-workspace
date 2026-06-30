@@ -2,6 +2,7 @@
 
 use App\Notifications\DarCommentReceived;
 use App\Services\DarCache;
+use App\Services\DarWriter;
 use App\Services\ProjectCache;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
@@ -170,11 +171,7 @@ new class extends Component {
 
         $newStatus = $todo['status'] == 1 ? 4 : 1;
 
-        Http::put(config('services.api_izin').'global/dar/activity/'.$id.'/status', [
-            'status' => $newStatus
-        ]);
-
-        app(DarCache::class)->flush();
+        app(DarWriter::class)->updateStatus((int) $id, $newStatus);
 
         Toaster::success('Todo status updated');
 
@@ -310,7 +307,7 @@ new class extends Component {
                                         @checked($isDone)
                                         wire:change="toggleTodo({{ $todo['id'] }})"
                                         wire:loading.attr="disabled"
-                                        wire:target="toggleTodo({{ $todo['id'] }})"
+                                        wire:target="toggleTodo"
                                         class="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900"
                                     >
                                     <span class="flex-1 text-sm text-slate-800 group-hover:text-slate-950 {{ $isDone ? 'line-through text-slate-400' : '' }}">
@@ -339,7 +336,7 @@ new class extends Component {
                                         @checked($isDone)
                                         wire:change="toggleTodo({{ $todo['id'] }})"
                                         wire:loading.attr="disabled"
-                                        wire:target="toggleTodo({{ $todo['id'] }})"
+                                        wire:target="toggleTodo"
                                         class="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900/20"
                                     >
                                     <span class="flex-1 min-w-0 text-sm text-slate-800 group-hover:text-slate-950 {{ $isDone ? 'line-through text-slate-400' : '' }}">

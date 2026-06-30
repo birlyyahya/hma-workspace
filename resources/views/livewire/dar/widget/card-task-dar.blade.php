@@ -3,10 +3,10 @@
 use App\Livewire\Forms\ActivityForm;
 use App\Models\User;
 use App\Services\DarCache;
+use App\Services\DarWriter;
 use App\Services\ProjectCache;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
@@ -120,7 +120,7 @@ new class extends Component {
 
     public function updatedProjectSelected(): void
     {
-        $this->timelines = Http::get(config('services.api_project').'timelines/search?project_id='.$this->projectSelected)->json()['data'] ?? [];
+        $this->timelines = app(ProjectCache::class)->timelines((int) $this->projectSelected);
 
         $this->form->project_id = $this->projectSelected;
     }
@@ -141,8 +141,6 @@ new class extends Component {
         $this->loading = true;
 
         try {
-            $apiIzin = rtrim(config('services.api_izin'), '/');
-
             $params = ['perPage' => 2000];
 
             if ($this->search !== '') {
@@ -161,9 +159,7 @@ new class extends Component {
                 $params['project_id'] = $this->projectFilter;
             }
 
-            $response = Http::timeout(15)->retry(2, 200)
-                ->get($apiIzin.'/global/dar/list', $params)
-                ->json();
+            $response = app(DarCache::class)->tasks($params);
 
             $this->tasks = $this->trimTasks($response['data'] ?? []);
 
@@ -313,35 +309,31 @@ new class extends Component {
             return;
         }
 
-        try {
-            $apiIzin = rtrim(config('services.api_izin'), '/');
-            $response = Http::delete($apiIzin . '/global/dar/activity/' . $id);
+        $result = app(DarWriter::class)->deleteActivity((int) $id);
 
-            $status = method_exists($response, 'status') ? $response->status() : null;
-            $body = method_exists($response, 'json') ? $response->json() : null;
+        if ($result['ok']) {
+            Toaster::success('Task berhasil dihapus');
+            $this->pendingDeleteId = null;
+            $this->pendingDeleteName = '';
+            Flux::modal('delete-task')->close();
+            $this->dispatch('updatedTimeline');
+            $this->fetchTasks();
+            return;
+        }
 
-            if ($status === 200 || ($body['success'] ?? false)) {
-                app(DarCache::class)->flush();
-                Toaster::success('Task berhasil dihapus');
-                $this->pendingDeleteId = null;
-                $this->pendingDeleteName = '';
-                Flux::modal('delete-task')->close();
-                $this->dispatch('updatedTimeline');
-                $this->fetchTasks();
-                return;
-            }
-
-            Toaster::error('Menghapus task gagal');
-            \Log::error('DAR delete API failed', [
-                'status' => $status,
-                'body' => method_exists($response, 'body') ? $response->body() : $body,
-            ]);
-        } catch (\Throwable $e) {
+        if ($result['error'] !== null) {
             Toaster::error('Server Error saat menghapus task');
             \Log::error('DAR delete API exception', [
-                'message' => $e->getMessage(),
+                'message' => $result['error'],
             ]);
+            return;
         }
+
+        Toaster::error('Menghapus task gagal');
+        \Log::error('DAR delete API failed', [
+            'status' => $result['status'],
+            'body' => $result['body'],
+        ]);
     }
 
 }; ?>
@@ -566,10 +558,12 @@ new class extends Component {
                 $ownerName = $isSuperadmin && ! empty($task['user_id']) ? ($userMap[$task['user_id']]['name'] ?? null) : null;
                 @endphp
 
-                <article x-data="{ menuOpen: false }"
+                <article wire:key="dar-card-{{ $taskId }}"
+                    x-data="{ menuOpen: false }"
                     data-dar-card
                     data-status="{{ $status }}"
                     data-type="{{ $taskProjectId ? 'project' : 'nonproject' }}"
+                    wire:key='{{ $taskProjectId }}'
                     x-show="(tab === 'all' || (tab === 'project' ? {{ $taskProjectId ? 'true' : 'false' }} : !{{ $taskProjectId ? 'true' : 'false' }})) && (status === 'all' || status === '{{ $status }}')"
                     class="group relative overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/70 shadow-sm transition hover:z-50 hover:-translate-y-0.5 hover:shadow-lg hover:ring-slate-300/70">
                     <a href="{{ $taskUrl }}" wire:navigate class="absolute inset-0 z-0" aria-label="Open task"></a>
