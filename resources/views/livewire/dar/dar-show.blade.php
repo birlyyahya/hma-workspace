@@ -156,14 +156,7 @@ class extends Component
             return;
         }
 
-        try {
-            $apiProject = rtrim(config('services.api_project'), '/');
-            $response = Http::get($apiProject.'/timelines/search?project_id='.$projectId)->json();
-            $this->editTimelines = $response['data'] ?? [];
-        } catch (\Throwable $e) {
-            $this->editTimelines = [];
-            Log::warning('Failed to load timelines', ['message' => $e->getMessage()]);
-        }
+        $this->editTimelines = app(ProjectCache::class)->timelines($projectId);
     }
 
     public function updatedEditProjectId($value): void
@@ -183,7 +176,7 @@ class extends Component
 
     protected function loadTask(): void
     {
-        $response = Http::get(config('services.api_izin')."/global/dar/activity?id={$this->id}")->json();
+        $response = app(DarCache::class)->activity((int) $this->id);
 
         $this->task = $response['data'] ?? [];
         $this->comments = $this->task['comments'] ?? [];
@@ -200,18 +193,8 @@ class extends Component
 
     public function loadLogs(): void
     {
-        try {
-            $response = Http::timeout(15)->retry(2, 200)
-                ->get(config('services.api_izin').'/global/dar/log-activity', [
-                    'activity_id' => $this->id,
-                    'perPage' => 99999,
-                ])->json();
-
-            $this->logs = $response['data'] ?? [];
-        } catch (\Throwable $e) {
-            $this->logs = [];
-            Log::warning('Failed to load DAR activity logs', ['message' => $e->getMessage()]);
-        }
+        $response = app(DarCache::class)->logs((int) $this->id);
+        $this->logs = $response['data'] ?? [];
     }
 
     public function getUserProperty(): ?User
