@@ -3,10 +3,10 @@
 use App\Models\User;
 use App\Notifications\DarCommentReceived;
 use App\Services\DarCache;
+use App\Services\DarWriter;
 use App\Services\ProjectCache;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Attributes\Layout;
@@ -278,8 +278,6 @@ class extends Component
 
         $this->validate($rules);
 
-        $response = null;
-
         try {
             $teamUser = collect($this->editTeamUser)->map(fn ($id) => (int) $id)->values()->toArray();
             $projectId = $this->editIsProject && $this->editProjectId ? (int) $this->editProjectId : null;
@@ -291,8 +289,7 @@ class extends Component
                 ? Carbon::parse($this->task['date'])->format('Y-m-d H:i:s')
                 : null;
 
-            $response = Http::post(config('services.api_izin')."/global/dar/update/{$this->id}", [
-                '_method' => 'PUT',
+            $result = app(DarWriter::class)->updateActivity((int) $this->id, [
                 'user_id' => $this->task['user_id'] ?? null,
                 'activity' => $this->editActivity,
                 'description' => $this->editDescription,
@@ -307,8 +304,7 @@ class extends Component
                 'project_category_id' => $categoryId,
             ]);
 
-            if ($response['success']) {
-                app(DarCache::class)->flush();
+            if ($result['ok']) {
                 $this->task = [
                     ...$this->task,
                     'activity' => $this->editActivity,
@@ -328,12 +324,17 @@ class extends Component
                 return;
             }
 
-            Toaster::error(getErrorMessages($response['errors']));
+            if ($result['error'] !== null) {
+                Toaster::error('An error occurred while updating the task.');
+                Log::error('Failed to update task', ['system' => $result['error']]);
+
+                return;
+            }
+
+            Toaster::error(getErrorMessages($result['body']['errors'] ?? []));
         } catch (Exception $e) {
             Toaster::error('An error occurred while updating the task.');
             Log::error('Failed to update task', [
-                'body' => $response['message'] ?? 'No message',
-                'error' => $response['errors'] ?? 'No error',
                 'system' => $e->getMessage(),
             ]);
         }
@@ -341,30 +342,23 @@ class extends Component
 
     public function markAsDone(): void
     {
-        $response = null;
+        $result = app(DarWriter::class)->updateStatus((int) $this->id, 4);
 
-        try {
-            $response = Http::post(config('services.api_izin')."/global/dar/activity/{$this->id}/status", [
-                '_method' => 'PUT',
-                'status' => 4,
-            ]);
+        if ($result['ok']) {
+            $this->task['status'] = 4;
+            Toaster::success('Task marked as done!');
 
-            if ($response['success']) {
-                app(DarCache::class)->flush();
-                $this->task['status'] = 4;
-                Toaster::success('Task marked as done!');
-
-                return;
-            }
-
-            Toaster::error($response['message'] ?? 'Failed to update status.');
-        } catch (Exception $e) {
-            Toaster::error('An error occurred while updating status.');
-            Log::error('Failed to mark task as done', [
-                'body' => $response['message'] ?? 'No message',
-                'system' => $e->getMessage(),
-            ]);
+            return;
         }
+
+        if ($result['error'] !== null) {
+            Toaster::error('An error occurred while updating status.');
+            Log::error('Failed to mark task as done', ['system' => $result['error']]);
+
+            return;
+        }
+
+        Toaster::error($result['body']['message'] ?? 'Failed to update status.');
     }
 
     public function removeNewFile(int $index): void
@@ -382,32 +376,27 @@ class extends Component
             'newFiles.*' => ['file', 'max:10240'],
         ]);
 
-        $response = null;
-
         try {
-            $request = Http::asMultipart();
+            $files = [];
 
             foreach ($this->newFiles as $upload) {
-                $request = $request->attach(
-                    'files[]',
-                    file_get_contents($upload->getRealPath()),
-                    $upload->getClientOriginalName(),
-                );
+                $files[] = [
+                    'contents' => file_get_contents($upload->getRealPath()),
+                    'name' => $upload->getClientOriginalName(),
+                ];
             }
 
-            $response = $request->post(config('services.api_izin').'/global/dar/activity/create-comment', [
-                'activity_id' => $this->id,
-                'user_id' => Auth::id(),
-                'body' => $this->comment,
-            ]);
+            $result = app(DarWriter::class)->addComment(
+                (int) $this->id,
+                (int) Auth::id(),
+                $this->comment,
+                $files,
+            );
 
-            $payload = $response->json();
-
-            if ($payload['success'] ?? false) {
-                app(DarCache::class)->flush();
+            if ($result['ok']) {
                 $userId = Auth::id();
 
-                $newComment = $payload['data'] ?? [];
+                $newComment = $result['body']['data'] ?? [];
 
                 $taskOwnerId = (int) ($this->task['user_id'] ?? 0);
                 $teamUserIds = collect($this->task['team_user'] ?? [])
@@ -446,12 +435,18 @@ class extends Component
 
                 return;
             }
-            Toaster::error(getErrorMessages($response['message'] ?? []));
+
+            if ($result['error'] !== null) {
+                Toaster::error('Ada serror pada server!');
+                Log::error('Failed to add comment', ['system' => $result['error']]);
+
+                return;
+            }
+
+            Toaster::error(getErrorMessages($result['body']['message'] ?? []));
         } catch (Exception $e) {
             Toaster::error('Ada serror pada server!');
             Log::error('Failed to add comment', [
-                'body' => $response['message'] ?? 'No message',
-                'error' => $response['errors'] ?? 'No error',
                 'system' => $e->getMessage(),
             ]);
         }
@@ -475,39 +470,31 @@ class extends Component
             'editingCommentBody' => ['required', 'min:1'],
         ]);
 
-        $response = null;
+        $result = app(DarWriter::class)->updateComment((int) $this->editingCommentId, $this->editingCommentBody);
 
-        try {
-            $response = Http::post(config('services.api_izin')."/global/dar/activity/update-comment/{$this->editingCommentId}", [
-                '_method' => 'PUT',
-                'body' => $this->editingCommentBody,
-            ]);
+        if ($result['ok']) {
+            $this->comments = array_map(function ($c) {
+                if ($c['id'] === $this->editingCommentId) {
+                    $c['body'] = $this->editingCommentBody;
+                }
 
-            if ($response['success']) {
-                app(DarCache::class)->flush();
-                $this->comments = array_map(function ($c) {
-                    if ($c['id'] === $this->editingCommentId) {
-                        $c['body'] = $this->editingCommentBody;
-                    }
+                return $c;
+            }, $this->comments);
 
-                    return $c;
-                }, $this->comments);
+            $this->cancelEditingComment();
+            Toaster::success('Comment updated successfully!');
 
-                $this->cancelEditingComment();
-                Toaster::success('Comment updated successfully!');
-
-                return;
-            }
-
-            Toaster::error($response['message'] ?? 'Failed to update comment.');
-        } catch (Exception $e) {
-            Toaster::error('An error occurred while updating the comment.');
-            Log::error('Failed to update comment', [
-                'body' => $response['message'] ?? 'No message',
-                'error' => $response['errors'] ?? 'No error',
-                'system' => $e->getMessage(),
-            ]);
+            return;
         }
+
+        if ($result['error'] !== null) {
+            Toaster::error('An error occurred while updating the comment.');
+            Log::error('Failed to update comment', ['system' => $result['error']]);
+
+            return;
+        }
+
+        Toaster::error($result['body']['message'] ?? 'Failed to update comment.');
     }
 
     public function confirmDeleteComment(int $commentId): void
@@ -529,30 +516,26 @@ class extends Component
         }
 
         $commentId = $this->pendingDeleteCommentId;
-        $response = null;
 
-        try {
-            $response = Http::delete(config('services.api_izin')."/global/dar/activity/delete-comment/{$commentId}");
+        $result = app(DarWriter::class)->deleteComment((int) $commentId);
 
-            if ($response['success']) {
-                app(DarCache::class)->flush();
-                $this->comments = array_values(array_filter($this->comments, fn ($c) => ($c['id'] ?? null) !== $commentId));
-                $this->pendingDeleteCommentId = null;
-                \Flux\Flux::modal('delete-comment-modal')->close();
-                Toaster::success('Comment deleted successfully!');
+        if ($result['ok']) {
+            $this->comments = array_values(array_filter($this->comments, fn ($c) => ($c['id'] ?? null) !== $commentId));
+            $this->pendingDeleteCommentId = null;
+            \Flux\Flux::modal('delete-comment-modal')->close();
+            Toaster::success('Comment deleted successfully!');
 
-                return;
-            }
-
-            Toaster::error(getErrorMessages($response['errors']));
-        } catch (Exception $e) {
-            Toaster::error('An error occurred while deleting the comment.');
-            Log::error('Failed to delete comment', [
-                'body' => $response['message'] ?? 'No message',
-                'error' => $response['errors'] ?? 'No error',
-                'system' => $e->getMessage(),
-            ]);
+            return;
         }
+
+        if ($result['error'] !== null) {
+            Toaster::error('An error occurred while deleting the comment.');
+            Log::error('Failed to delete comment', ['system' => $result['error']]);
+
+            return;
+        }
+
+        Toaster::error(getErrorMessages($result['body']['errors'] ?? []));
     }
 }; ?>
 
