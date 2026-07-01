@@ -1,11 +1,11 @@
 <?php
 
 use App\Models\User;
+use App\Services\IzinCache;
 use App\Services\NotificationService;
+use App\Services\RemoteImageFetcher;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
@@ -25,18 +25,10 @@ class extends Component {
 
     protected function loadSpd(): void
     {
-        try {
-            $apiIzin = rtrim(config('services.api_izin'), '/');
-            $response = Http::timeout(15)->retry(2, 200)->get($apiIzin . '/global/dar/activity/list-spd', [
-                'per_page' => 1000,
-            ])->json();
+        $response = app(IzinCache::class)->spdList(['per_page' => 1000]);
 
-            $rows = $response['data'] ?? [];
-            $this->spd = collect($rows)->firstWhere('id', (int) $this->id);
-        } catch (\Throwable $e) {
-            Log::error('SPD preview load failed', ['message' => $e->getMessage(), 'id' => $this->id]);
-            $this->spd = null;
-        }
+        $rows = $response['data'] ?? [];
+        $this->spd = collect($rows)->firstWhere('id', (int) $this->id);
     }
 
     public function downloadPdf()
@@ -72,35 +64,7 @@ class extends Component {
      */
     protected function fetchAttachmentImage(?string $url): ?array
     {
-        if (! $url) {
-            return null;
-        }
-
-        $ext = strtolower(pathinfo(parse_url($url, PHP_URL_PATH) ?: '', PATHINFO_EXTENSION));
-
-        if (! in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
-            return null;
-        }
-
-        try {
-            $response = Http::timeout(15)->retry(2, 200)->get($url);
-
-            if (! $response->successful()) {
-                return null;
-            }
-
-            $body = $response->body();
-            $mime = finfo_buffer(finfo_open(FILEINFO_MIME_TYPE), $body) ?: 'image/png';
-
-            return [
-                'data' => 'data:' . $mime . ';base64,' . base64_encode($body),
-                'mime' => $mime,
-            ];
-        } catch (\Throwable $e) {
-            Log::warning('SPD attachment fetch failed', ['url' => $url, 'message' => $e->getMessage()]);
-
-            return null;
-        }
+        return app(RemoteImageFetcher::class)->toImageData($url);
     }
     public function sendText()
     {
