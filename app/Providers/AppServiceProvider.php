@@ -7,6 +7,7 @@ use App\Services\DarWriter;
 use App\Services\IzinCache;
 use App\Services\IzinWriter;
 use App\Services\ProjectCache;
+use App\Services\ProjectWriter;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
@@ -39,6 +40,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(IzinWriter::class, fn ($app) => new IzinWriter(
             rtrim((string) config('services.api_izin'), '/'),
             $app->make(IzinCache::class),
+        ));
+
+        $this->app->singleton(ProjectWriter::class, fn ($app) => new ProjectWriter(
+            rtrim((string) config('services.api_project'), '/'),
+            $app->make(ProjectCache::class),
         ));
     }
 
