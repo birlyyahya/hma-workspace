@@ -1,10 +1,9 @@
 <?php
 
 use App\Services\ProjectCache;
+use App\Services\ProjectWriter;
 use Livewire\Volt\Component;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Url;
 use Masmerise\Toaster\Toaster;
 
@@ -148,37 +147,30 @@ new class extends Component
             return;
         }
 
-        try {
-            $response = Http::delete(config('services.api_project') . 'projects/' . $id);
+        $result = app(ProjectWriter::class)->deleteProject((int) $id);
 
-            if ($response->successful()) {
-                app(ProjectCache::class)->flushProjects();
+        if ($result['ok']) {
+            $this->projects = array_values(array_filter(
+                $this->projects,
+                fn ($p) => (int) ($p['id'] ?? 0) !== $id
+            ));
 
-                $this->projects = array_values(array_filter(
-                    $this->projects,
-                    fn ($p) => (int) ($p['id'] ?? 0) !== $id
-                ));
+            $this->pendingDeleteId = null;
+            $this->pendingDeleteName = '';
+            \Flux\Flux::modal('delete-project-modal')->close();
 
-                $this->pendingDeleteId = null;
-                $this->pendingDeleteName = '';
-                \Flux\Flux::modal('delete-project-modal')->close();
+            Toaster::success('Proyek berhasil dihapus');
 
-                Toaster::success('Proyek berhasil dihapus');
-
-                if (count($this->projects) === 0 && $this->currentPage > 1) {
-                    $this->currentPage--;
-                }
-
-                $this->fetchProjects();
-
-                return;
+            if (count($this->projects) === 0 && $this->currentPage > 1) {
+                $this->currentPage--;
             }
 
-            Toaster::error($response->json('message') ?? 'Gagal menghapus proyek');
-        } catch (\Throwable $e) {
-            Toaster::error('Gagal menghapus proyek');
-            Log::error('Failed to delete project', ['id' => $id, 'error' => $e->getMessage()]);
+            $this->fetchProjects();
+
+            return;
         }
+
+        Toaster::error($result['body']['message'] ?? 'Gagal menghapus proyek');
     }
 
     public function placeholder(): object

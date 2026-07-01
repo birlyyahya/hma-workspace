@@ -1,8 +1,8 @@
 <?php
 
+use App\Services\DarCache;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Volt\Component;
 
@@ -13,22 +13,11 @@ new class extends Component {
     #[Computed]
     public function tasks(): array
     {
-        return Cache::remember(
-            'dashboard_dar_tasks_'.Auth::id(),
-            now()->addMinutes(5),
-            function (): array {
-                try {
-                    $response = Http::timeout(5)->get(
-                        config('services.api_izin').'/global/dar/list',
-                        ['user_id' => Auth::id(), 'limit' => 5, 'status' => 1]
-                    );
-
-                    return $response->successful() ? ($response->json()['data'] ?? []) : [];
-                } catch (\Throwable) {
-                    return [];
-                }
-            }
-        );
+        return app(DarCache::class)->tasks([
+            'user_id' => Auth::id(),
+            'limit' => 5,
+            'status' => 1,
+        ])['data'] ?? [];
     }
 
     /** @return array{total:int,inprogress:int,late:int} */

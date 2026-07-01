@@ -1,7 +1,7 @@
 <?php
 
 use App\Services\ProjectCache;
-use Illuminate\Support\Facades\Http;
+use App\Services\ProjectWriter;
 use Livewire\Attributes\Lazy;
 use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
@@ -56,22 +56,20 @@ new #[Lazy]  class extends Component {
         $this->loading = true;
         $this->errorMessage = null;
 
-        try {
-            $response = Http::get(config('services.api_project') . 'companies/search', [
-                'page'   => $this->currentPage,
-                'limit'  => $this->limit,
-                'name' => $this->search,
-            ])->json();
+        $response = app(ProjectCache::class)->searchCompanies([
+            'page'  => $this->currentPage,
+            'limit' => $this->limit,
+            'name'  => $this->search,
+        ]);
 
-            $this->companies  = $response['data'] ?? [];
-            $this->pagination = $response['pagination'] ?? [];
-        } catch (\Throwable $e) {
+        $this->companies = $response['data'] ?? [];
+        $this->pagination = $response['pagination'] ?? [];
+
+        if (empty($response)) {
             $this->errorMessage = 'Gagal memuat data perusahaan. Silakan coba lagi.';
-            $this->companies   = [];
-            $this->pagination  = [];
-        } finally {
-            $this->loading = false;
         }
+
+        $this->loading = false;
     }
 
     public function applyFilters(): void
@@ -115,52 +113,36 @@ new #[Lazy]  class extends Component {
     {
         $this->validate();
 
-        try {
-            $request = Http::asMultipart();
+        $file = null;
 
-            if ($this->letter_head) {
-                $request = $request->attach(
-                    'letter_head',
-                    file_get_contents($this->letter_head->getRealPath()),
-                    $this->letter_head->getClientOriginalName()
-                );
-            }
-
-            $payload = [
-                'name'             => $this->name,
-                'address'          => $this->address,
-                'director_name'    => $this->director_name,
-                'established_date' => $this->established_date,
+        if ($this->letter_head) {
+            $file = [
+                'contents' => file_get_contents($this->letter_head->getRealPath()),
+                'name' => $this->letter_head->getClientOriginalName(),
             ];
-
-            $url = config('services.api_project') . 'companies'
-                . ($this->isEdit ? '/' . $this->editingId : '');
-
-            $response = $this->isEdit
-                ? $request->post($url, $payload)
-                : $request->post($url, $payload);
-
-            if (!$response->successful()) {
-                $this->errorMessage = $response->json('message') ?? 'Gagal menyimpan data.';
-                Toaster::error(getErrorMessages($response->json()));
-                return;
-            }
-
-            app(ProjectCache::class)->flushCompanies();
-
-            $this->showForm = false;
-            $this->resetForm();
-            $this->fetchCompanies();
-            Toaster::success($this->isEdit ? 'Perusahaan diperbarui' : 'Perusahaan ditambahkan');
-        } catch (\Throwable $e) {
-            $this->errorMessage = 'Terjadi kesalahan saat menyimpan.';
-            Toaster::error($this->errorMessage);
-             \Log::error('delete API failed', [
-                'success' => $response['success'] ?? null,
-                'status' => $response['status'] ?? null,
-                'body' => method_exists($response, 'body') ? $response->body() : null,
-            ]);
         }
+
+        $payload = [
+            'name'             => $this->name,
+            'address'          => $this->address,
+            'director_name'    => $this->director_name,
+            'established_date' => $this->established_date,
+        ];
+
+        $result = $this->isEdit
+            ? app(ProjectWriter::class)->updateCompany((int) $this->editingId, $payload, $file)
+            : app(ProjectWriter::class)->createCompany($payload, $file);
+
+        if (! $result['ok']) {
+            $this->errorMessage = $result['body']['message'] ?? 'Gagal menyimpan data.';
+            Toaster::error(getErrorMessages($result['body']));
+            return;
+        }
+
+        $this->showForm = false;
+        $this->resetForm();
+        $this->fetchCompanies();
+        Toaster::success($this->isEdit ? 'Perusahaan diperbarui' : 'Perusahaan ditambahkan');
     }
 
     public function confirmDelete(int $id): void
@@ -177,31 +159,19 @@ new #[Lazy]  class extends Component {
             return;
         }
 
-        try {
-            $response = Http::delete(config('services.api_project') . 'companies/' . $this->deletingId);
+        $result = app(ProjectWriter::class)->deleteCompany((int) $this->deletingId);
 
-            if (!$response->successful()) {
-                $this->errorMessage = $response->json('message') ?? 'Gagal menghapus data.';
-                Toaster::error(getErrorMessages($response->json()));
-                return;
-            }
-
-            app(ProjectCache::class)->flushCompanies();
-
-            $this->showDelete   = false;
-            $this->deletingId   = null;
-            $this->deletingName = null;
-            $this->fetchCompanies();
-            Toaster::success('Perusahaan dihapus');
-        } catch (\Throwable $e) {
-            $this->errorMessage = 'Terjadi kesalahan saat menghapus.';
-            Toaster::error($this->errorMessage);
-            \Log::error('delete API failed', [
-                'success' => $response['success'] ?? null,
-                'status' => $response['status'] ?? null,
-                'body' => method_exists($response, 'body') ? $response->body() : null,
-            ]);
+        if (! $result['ok']) {
+            $this->errorMessage = $result['body']['message'] ?? 'Gagal menghapus data.';
+            Toaster::error(getErrorMessages($result['body']));
+            return;
         }
+
+        $this->showDelete   = false;
+        $this->deletingId   = null;
+        $this->deletingName = null;
+        $this->fetchCompanies();
+        Toaster::success('Perusahaan dihapus');
     }
 
     public function resetForm(): void
@@ -212,7 +182,7 @@ new #[Lazy]  class extends Component {
         ]);
         $this->resetValidation();
     }
-    public function placeholder(): string
+    public function placeholder(): object
     {
         return view('components.placeholder.ph_perusahaan');
     }

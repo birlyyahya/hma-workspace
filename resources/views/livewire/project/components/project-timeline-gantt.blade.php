@@ -1,13 +1,10 @@
 <?php
 
+use App\Services\ProjectCache;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
-use Masmerise\Toaster\Toaster;
 
 new class extends Component {
     public $id;
@@ -39,23 +36,7 @@ new class extends Component {
     #[On('timelinesUpdated')]
     public function loadTimelines(): void
     {
-        try {
-            $response = Http::get(config('services.api_project').'timelines/search?project_id='.$this->id)->json();
-
-            if (($response['status'] ?? null) !== 200) {
-                Log::error('Gantt timeline loading failed', [
-                    'response_status' => $response['status'] ?? null,
-                    'response_message' => $response['message'] ?? 'No message',
-                ]);
-                $this->timelines = [];
-            } else {
-                $this->timelines = $response['data'] ?? [];
-            }
-        } catch (\Throwable $e) {
-            $this->timelines = [];
-            Toaster::error('Gagal memuat timeline: '.$e->getMessage());
-            Log::error('Gantt timeline exception', ['message' => $e->getMessage()]);
-        }
+        $this->timelines = app(ProjectCache::class)->timelines((int) $this->id);
 
         $this->buildMonths();
     }

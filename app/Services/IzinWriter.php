@@ -106,6 +106,35 @@ class IzinWriter
     }
 
     /**
+     * Perbarui tanda tangan user (data di BE izin). Idempotent — real value replace.
+     * Sukses = body.success. Invalidasi cache tanda tangan user saat berhasil.
+     *
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function updateSignature(string $username, string $base64): array
+    {
+        try {
+            $response = $this->externalWrite(timeout: 15)
+                ->post($this->apiBase.'/global/user/update-signature/'.$username, [
+                    'base64' => $base64,
+                ]);
+
+            $body = (array) $response->json();
+            $ok = (bool) ($body['success'] ?? false);
+
+            if ($ok) {
+                $this->cache->flushUser($username);
+            } else {
+                Log::warning('IzinWriter updateSignature non-success', ['status' => $response->status(), 'body' => $body]);
+            }
+
+            return ['ok' => $ok, 'body' => $body, 'status' => $response->status(), 'error' => null];
+        } catch (\Throwable $e) {
+            return $this->fail('updateSignature', $e, ['username' => $username]);
+        }
+    }
+
+    /**
      * Bangun struktur hasil; flush cache Izin saat sukses.
      *
      * @param  array<string, mixed>  $body

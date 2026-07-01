@@ -253,6 +253,91 @@ class ProjectCache
         return $data;
     }
 
+    /**
+     * Detail satu project by id. Endpoint mengembalikan `data` sebagai list;
+     * project berada di elemen pertama. Dipakai di project-show/-edit/-preview.
+     *
+     * @return array<string, mixed>
+     */
+    public function projectFor(int $id): array
+    {
+        return $this->rememberFlexible([self::TAG_PROJECTS], "project:{$id}", [self::TTL_USER, self::TTL_USER * 4], function () use ($id) {
+            $response = $this->externalRead(timeout: 15)->get($this->apiBase.'/projects/'.$id);
+
+            if ($response->failed()) {
+                throw new \RuntimeException('project status '.$response->status());
+            }
+
+            return collect($response->json('data') ?? [])->first() ?? [];
+        });
+    }
+
+    /**
+     * Pencarian perusahaan terpaginasi (live, tanpa cache — driven user input).
+     * Mengembalikan payload penuh (data + pagination).
+     *
+     * @param  array<string, mixed>  $params
+     * @return array<string, mixed>
+     */
+    public function searchCompanies(array $params): array
+    {
+        try {
+            $response = $this->externalRead(timeout: 15)->get($this->apiBase.'/companies/search', $params);
+
+            if ($response->failed()) {
+                throw new \RuntimeException('companies search status '.$response->status());
+            }
+
+            return (array) $response->json();
+        } catch (\Throwable $e) {
+            Log::warning('ProjectCache searchCompanies gagal', ['error' => $e->getMessage()]);
+
+            return [];
+        }
+    }
+
+    /**
+     * Pencarian dokumen admin sebuah project (live, tanpa cache).
+     * Mengembalikan payload penuh (caller cek field `status` & baca `data`).
+     *
+     * @param  array<string, mixed>  $params
+     * @return array<string, mixed>
+     */
+    public function searchDocs(array $params): array
+    {
+        try {
+            $response = $this->externalRead(timeout: 15)->get($this->apiBase.'/admin-docs/search', $params);
+
+            if ($response->failed()) {
+                throw new \RuntimeException('admin-docs search status '.$response->status());
+            }
+
+            return (array) $response->json();
+        } catch (\Throwable $e) {
+            Log::warning('ProjectCache searchDocs gagal', ['error' => $e->getMessage()]);
+
+            return [];
+        }
+    }
+
+    /**
+     * Daftar kategori dokumen admin (statis, di-cache global).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function docCategories(): array
+    {
+        return $this->rememberFlexible([self::TAG_PROJECTS], 'admin-doc-categories', [self::TTL_GLOBAL, self::TTL_GLOBAL * 4], function () {
+            $response = $this->externalRead(timeout: 15)->get($this->apiBase.'/admin-doc-categories', ['limit' => 1000]);
+
+            if ($response->failed()) {
+                throw new \RuntimeException('admin-doc-categories status '.$response->status());
+            }
+
+            return $response->json('data') ?? [];
+        });
+    }
+
     public function flushProjects(): void
     {
         Cache::tags([self::TAG_PROJECTS])->flush();

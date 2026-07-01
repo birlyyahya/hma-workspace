@@ -2,6 +2,9 @@
 
 
 use App\Models\User;
+use App\Services\DarCache;
+use App\Services\ProjectCache;
+use App\Services\ProjectWriter;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Livewire\Attributes\On;
@@ -38,37 +41,8 @@ new class extends Component {
     #[On('timelineLoad')]
     public function mount(){
 
-        // Dummy timelines
-        $response = Http::timeout(5)->retry(3)->get(config('services.api_project').'timelines/search?project_id='.$this->id)->json();
-
-        if($response['status'] !== 200) {
-            Toaster::error('Failed to load timelines. Please refresh the page.');
-
-            \Log::error('Timeline loading failed', [
-                'response_status' => $response['status'],
-                'response_message' => $response['message'] ?? 'No message',
-                'response_errors' => $response['errors'],
-            ]);
-            return;
-        }
-
-        $this->timelines = $response['data'] ?? [];
-
-        $response_dar = Http::timeout(5)->retry(3)->get(config('services.api_izin'). '/global/dar/list?project_id='.$this->id)->json();
-
-        if(!$response_dar['success']) {
-            Toaster::error('Failed to load activities. Please refresh the page.');
-
-            \Log::error('Activities loading failed', [
-                'response_status' => $response_dar['success'],
-                'response_message' => $response_dar['message'] ?? 'No message',
-                'response_errors' => $response_dar['errors'],
-            ]);
-            return;
-        }
-
-        $this->activities = $response_dar['data'] ?? [];
-
+        $this->timelines = app(ProjectCache::class)->timelines((int) $this->id);
+        $this->activities = app(DarCache::class)->tasks(['project_id' => (int) $this->id])['data'] ?? [];
 
         $start = collect($this->timelines)->min('start_date');
         $end = collect($this->timelines)->max('end_date');
@@ -185,23 +159,20 @@ new class extends Component {
 
         if ($this->editingTimelineId) {
 
-            $response = Http::patch(
-                config('services.api_project') . 'timelines/' . $this->editingTimelineId,
-                [
-                    'user_id' => $this->user_id,
-                    'project_id' => $this->id,
-                    'title' => $this->form_title,
-                    'start_date' => $this->form_start_date,
-                    'end_date' => $this->form_end_date,
-                ]
-            );
+            $result = app(ProjectWriter::class)->updateTimeline((int) $this->editingTimelineId, [
+                'user_id' => $this->user_id,
+                'project_id' => $this->id,
+                'title' => $this->form_title,
+                'start_date' => $this->form_start_date,
+                'end_date' => $this->form_end_date,
+            ]);
 
-            if ($response->failed()) {
+            if (! $result['ok']) {
                 Toaster::error('Failed to update timeline.');
 
                 \Log::error('Timeline update failed', [
-                    'status' => $response->status(),
-                    'body' => $response->body(),
+                    'status' => $result['status'],
+                    'body' => $result['body'],
                 ]);
 
                 return;
@@ -219,7 +190,7 @@ new class extends Component {
             Toaster::success('Timeline updated successfully!');
 
         } else {
-            $response = Http::post(config('services.api_project').'timelines', [
+            $result = app(ProjectWriter::class)->createTimeline([
                 'user_id' => $this->user_id,
                 'project_id' => $this->id,
                 'title' => $this->form_title,
@@ -227,17 +198,16 @@ new class extends Component {
                 'end_date' => $this->form_end_date,
             ]);
 
-            if ($response['status'] !== 201) {
+            if (! $result['ok']) {
                 Toaster::error('Failed to create timeline. Please try again.');
                 \Log::error('Timeline creation failed', [
-                    'response_status' => $response['status'],
-                    'response_message' => $response['message'] ?? 'No message',
-                    'response_errors' => $response['errors'],
+                    'response_status' => $result['status'],
+                    'response_body' => $result['body'],
                 ]);
                 return;
             }
             $this->timelines[] = [
-                'id' => $response['data']['id'],
+                'id' => $result['body']['data']['id'] ?? null,
                 'title' => $this->form_title,
                 'start_date' => $this->form_start_date,
                 'end_date' => $this->form_end_date,
@@ -272,15 +242,14 @@ new class extends Component {
             return;
         }
 
-        $response = Http::delete(config('services.api_project').'timelines/'.$this->deletingTimelineId);
+        $result = app(ProjectWriter::class)->deleteTimeline((int) $this->deletingTimelineId);
 
-        if($response['status'] !== 200) {
+        if (! $result['ok']) {
             Toaster::error('Failed to delete timeline. Please try again.');
 
             \Log::error('Timeline deletion failed', [
-                'response_status' => $response['status'],
-                'response_message' => $response['message'] ?? 'No message',
-                'response_errors' => $response['errors'],
+                'response_status' => $result['status'],
+                'response_body' => $result['body'],
             ]);
             return;
         }

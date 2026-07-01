@@ -1,11 +1,9 @@
 <?php
 
 use App\Models\User;
-use App\Services\ProjectCache;
+use App\Services\ProjectWriter;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Livewire\Volt\Component;
 use Masmerise\Toaster\Toaster;
@@ -116,34 +114,24 @@ new class extends Component {
             return;
         }
 
-        try {
-            $response = Http::post(config('services.api_project').'project-teams', [
-                'project_id' => $this->id,
-                'user_id' => $userId,
-            ]);
+        $result = app(ProjectWriter::class)->createTeam((int) $this->id, $userId);
 
-            if ($response->json('status') === 201) {
-                $user = User::with('role')->find($response->json('data.user_id'));
+        if ($result['ok']) {
+            $user = User::with('role')->find($result['body']['data']['user_id'] ?? null);
 
-                if ($user && ! $this->internal->contains('id', $user->id)) {
-                    $this->internal->push($user);
-                    $this->internals = collect($this->internals)
-                        ->push($response->json('data'))
-                        ->all();
+            if ($user && ! $this->internal->contains('id', $user->id)) {
+                $this->internal->push($user);
+                $this->internals = collect($this->internals)
+                    ->push($result['body']['data'])
+                    ->all();
 
-                    app(ProjectCache::class)->flushUser($userId);
-
-                    $this->dispatch('projectLoad');
-                    Toaster::success('Anggota berhasil ditambahkan');
-                    return;
-                }
+                $this->dispatch('projectLoad');
+                Toaster::success('Anggota berhasil ditambahkan');
+                return;
             }
-
-            Toaster::error('Gagal menambahkan anggota');
-        } catch (\Throwable $th) {
-            Toaster::error('Gagal menambahkan anggota');
-            Log::error('Failed to invite internal', ['error' => $th->getMessage()]);
         }
+
+        Toaster::error('Gagal menambahkan anggota');
     }
 
     public function confirmDeleteInternal(int $id): void
@@ -188,29 +176,22 @@ new class extends Component {
             return;
         }
 
-        try {
-            $response = Http::delete(config('services.api_project')."project-teams/{$teamId}");
+        $result = app(ProjectWriter::class)->deleteTeam((int) $teamId, (int) $id);
 
-            if ($response->json('status') === 200) {
-                $this->internal = collect($this->internal)
-                    ->reject(fn ($user) => $user->id === $id)
-                    ->values();
+        if ($result['ok']) {
+            $this->internal = collect($this->internal)
+                ->reject(fn ($user) => $user->id === $id)
+                ->values();
 
-                $this->internals = collect($this->internals)
-                    ->reject(fn ($item) => (int) ($item['user_id'] ?? 0) === $id)
-                    ->values()
-                    ->all();
+            $this->internals = collect($this->internals)
+                ->reject(fn ($item) => (int) ($item['user_id'] ?? 0) === $id)
+                ->values()
+                ->all();
 
-                app(ProjectCache::class)->flushUser($id);
-
-                $this->dispatch('projectLoad');
-                Toaster::success('Anggota berhasil dihapus');
-            } else {
-                Toaster::error('Gagal menghapus anggota');
-            }
-        } catch (\Throwable $th) {
+            $this->dispatch('projectLoad');
+            Toaster::success('Anggota berhasil dihapus');
+        } else {
             Toaster::error('Gagal menghapus anggota');
-            Log::error('Failed to remove internal', ['error' => $th->getMessage()]);
         }
 
         $this->reset('deletingInternalId', 'deletingInternalName');
@@ -231,27 +212,21 @@ new class extends Component {
 
         $previous = $this->timduk;
 
-        try {
-            $this->timduk = collect($this->timduk)->push(trim($this->nameTimduk))->toArray();
-            $this->nameTimduk = null;
+        $this->timduk = collect($this->timduk)->push(trim($this->nameTimduk))->toArray();
+        $this->nameTimduk = null;
 
-            $response = Http::patch(config('services.api_project').'projects/'.$this->id, [
-                'support_teams' => $this->timduk,
-            ]);
+        $result = app(ProjectWriter::class)->updateProject((int) $this->id, [
+            'support_teams' => $this->timduk,
+        ]);
 
-            if ($response->json('status') === 200) {
-                $this->dispatch('projectLoad');
-                Toaster::success('Tim pendukung berhasil ditambahkan');
-                return;
-            }
-
-            $this->timduk = $previous;
-            Toaster::error('Gagal menambahkan tim pendukung');
-        } catch (\Throwable $th) {
-            $this->timduk = $previous;
-            Toaster::error('Gagal menambahkan tim pendukung');
-            Log::error('Failed to add timduk', ['error' => $th->getMessage()]);
+        if ($result['ok']) {
+            $this->dispatch('projectLoad');
+            Toaster::success('Tim pendukung berhasil ditambahkan');
+            return;
         }
+
+        $this->timduk = $previous;
+        Toaster::error('Gagal menambahkan tim pendukung');
     }
 
     public function confirmDeleteTimduk(string $name): void
@@ -284,27 +259,21 @@ new class extends Component {
         $name = $this->deletingTimdukName;
         $previous = $this->timduk;
 
-        try {
-            $this->timduk = collect($this->timduk)
-                ->reject(fn ($n) => $n === $name)
-                ->values()
-                ->toArray();
+        $this->timduk = collect($this->timduk)
+            ->reject(fn ($n) => $n === $name)
+            ->values()
+            ->toArray();
 
-            $response = Http::patch(config('services.api_project').'projects/'.$this->id, [
-                'support_teams' => $this->timduk,
-            ]);
+        $result = app(ProjectWriter::class)->updateProject((int) $this->id, [
+            'support_teams' => $this->timduk,
+        ]);
 
-            if ($response->json('status') === 200) {
-                $this->dispatch('projectLoad');
-                Toaster::success('Tim pendukung berhasil dihapus');
-            } else {
-                $this->timduk = $previous;
-                Toaster::error('Gagal menghapus tim pendukung');
-            }
-        } catch (\Throwable $th) {
+        if ($result['ok']) {
+            $this->dispatch('projectLoad');
+            Toaster::success('Tim pendukung berhasil dihapus');
+        } else {
             $this->timduk = $previous;
             Toaster::error('Gagal menghapus tim pendukung');
-            Log::error('Failed to remove timduk', ['error' => $th->getMessage()]);
         }
 
         $this->reset('deletingTimdukName');

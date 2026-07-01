@@ -1,6 +1,9 @@
 <?php
 
+use App\Services\IzinCache;
+use App\Services\IzinWriter;
 use Flux\Flux;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
@@ -15,75 +18,37 @@ class extends Component {
     public $signature;
     public $drawSign;
 
-    public function getUserProperty (){
-
-        if(Cache::get('ttd_user_' . Auth::user()->id)){
-            return Cache::get('ttd_user_' . Auth::user()->id);
-        }
-
-        try{
-            $response = Http::get(config('services.api_izin') . '/global/user/get-user/'.Auth::user()->username)->json();
-            if ($response['success']) {
-                Cache::remember(
-                'ttd_user_' . Auth::user()->id,now()->addMonths(6), // key unik per user
-                function () use ($response) {
-                    return $response['data']['signature'];
-                }
-            );
-            return $response['data']['signature'];
-            }else {
-                Toaster::error('Failed to fetch user data from API.');
-            }
-
-            }catch(Exception $e){
-            Toaster::error($e->getMessage() ?? '');
-            \Log::error('User API failed', [
-                'body'   => $e->getMessage(),
-            ]);
-            return [];
-        }
-
-
+    public function getUserProperty()
+    {
+        return app(IzinCache::class)->userSignature(Auth::user()->username);
     }
 
-    public function save(){
-        $signatureBase64 = "data:" . $this->signature->getMimeType() . ";base64," . base64_encode(file_get_contents($this->signature->getRealPath()));
-        $response = Http::post(config('services.api_izin') . '/global/user/update-signature/'.Auth::user()->username, [
-            "base64" => $signatureBase64
-        ])->json();
+    public function save()
+    {
+        $signatureBase64 = 'data:'.$this->signature->getMimeType().';base64,'.base64_encode(file_get_contents($this->signature->getRealPath()));
 
-        if($response['success']){
+        $result = app(IzinWriter::class)->updateSignature(Auth::user()->username, $signatureBase64);
+
+        if ($result['ok']) {
             Toaster::success('Signature berhasil diupdate!');
-            Cache::forget('ttd_user_' . Auth::user()->id);
             Flux::modal('upload-signature')->close();
             $this->user = $this->signature;
         } else {
             Toaster::error('Gagal mengupdate signature. Silakan coba lagi.');
-            \Log::error('User update failed', [
-                'status' => $response['status'] ?? null,
-                'body'   => $response['message'] ?? 'No message',
-            ]);
-            return;
         }
     }
-    public function saveDraw(){
-        $response = Http::post(config('services.api_izin') . '/global/user/update-signature/'.Auth::user()->username, [
-            "base64" => $this->signature
-        ])->json();
 
-        if($response['success']){
+    public function saveDraw()
+    {
+        $result = app(IzinWriter::class)->updateSignature(Auth::user()->username, $this->signature);
+
+        if ($result['ok']) {
             Toaster::success('Signature berhasil diupdate!');
-            Cache::forget('ttd_user_' . Auth::user()->id);
             Flux::modal('upload-signature')->close();
             $this->user = $this->drawSign;
             $this->signature = null;
         } else {
             Toaster::error('Gagal mengupdate signature. Silakan coba lagi.');
-            \Log::error('User update failed', [
-                'status' => $response['status'] ?? null,
-                'body'   => $response['message'] ?? 'No message',
-            ]);
-            return;
         }
     }
 

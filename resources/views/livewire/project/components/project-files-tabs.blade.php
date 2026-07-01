@@ -1,8 +1,9 @@
 <?php
 
 use App\Livewire\Forms\FilesForm;
+use App\Services\ProjectCache;
+use App\Services\ProjectWriter;
 use Flux\Flux;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -69,11 +70,6 @@ new class extends Component
         return view('components.placeholder.ph_project_files_tabs');
     }
 
-    protected function endpoint(string $path): string
-    {
-        return rtrim((string) config('services.api_project'), '/').'/'.ltrim($path, '/');
-    }
-
     protected function fileBaseUrl(): string
     {
         return rtrim((string) config('services.url_project'), '/');
@@ -95,18 +91,12 @@ new class extends Component
 
     protected function fetchAllFiles(): array
     {
-        try {
-            $response = Http::timeout(15)->retry(2, 200)->get($this->endpoint('admin-docs/search'), [
-                'project_id' => $this->id,
-                'limit' => 10000,
-                'sortBy' => 'created_at',
-                'sortOrder' => 'desc',
-            ])->json();
-        } catch (\Throwable $e) {
-            Log::error('Gagal memuat dokumen project', ['project_id' => $this->id, 'error' => $e->getMessage()]);
-
-            return ['ok' => false, 'data' => []];
-        }
+        $response = app(ProjectCache::class)->searchDocs([
+            'project_id' => $this->id,
+            'limit' => 10000,
+            'sortBy' => 'created_at',
+            'sortOrder' => 'desc',
+        ]);
 
         if (($response['status'] ?? null) !== 200) {
             return ['ok' => false, 'data' => []];
@@ -254,15 +244,7 @@ new class extends Component
 
     public function getCategoryProperty(): array
     {
-        try {
-            $response = Http::timeout(15)->retry(2, 200)->get($this->endpoint('admin-doc-categories'), ['limit' => 1000])->json();
-        } catch (\Throwable $e) {
-            Log::error('Gagal memuat kategori dokumen', ['error' => $e->getMessage()]);
-
-            return [];
-        }
-
-        return $response['data'] ?? [];
+        return app(ProjectCache::class)->docCategories();
     }
 
     public function finalizeChunkUpload(array $payload): array
@@ -274,15 +256,16 @@ new class extends Component
             'original_name' => ['required', 'string'],
         ])->validate();
 
-        $response = Http::timeout(120)->post($this->endpoint('admin-docs'), [
+        $result = app(ProjectWriter::class)->uploadDoc([
             'title' => $data['title'],
             'admin_doc_category_id' => $data['admin_doc_category_id'],
             'project_id' => $this->id,
             'filename' => $data['filename'],
             'file' => $data['filename'],
             'original_name' => $data['original_name'],
-        ])->json();
-        if (($response['status'] ?? null) === 201) {
+        ]);
+
+        if ($result['ok']) {
             Toaster::success('File berhasil diupload');
             try {
                 $this->mount();
@@ -290,13 +273,13 @@ new class extends Component
                 // non-blocking
             }
         } else {
-            Toaster::error(collect($response['errors'] ?? [])
+            Toaster::error(collect($result['body']['errors'] ?? [])
                 ->flatten()
                 ->join("\n")
             );
         }
 
-        return $response;
+        return $result['body'];
     }
 
     public function confirmDelete(int $id): void

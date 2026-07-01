@@ -17,6 +17,8 @@ class IzinCache
 
     private const TTL_SPD = 300;
 
+    private const TTL_SIGNATURE = 604800;
+
     private const TAG = 'izin';
 
     public function __construct(private string $apiBase) {}
@@ -210,6 +212,29 @@ class IzinCache
 
             return $response->json() ?? [];
         }, ['data' => []]);
+    }
+
+    /**
+     * Tanda tangan tersimpan milik user. Data berada di BE izin
+     * (endpoint /global/user/get-user/{username}). Jarang berubah, jadi
+     * di-cache lama; diinvalidasi via flushUser() saat tanda tangan diperbarui.
+     */
+    public function userSignature(string $username): ?string
+    {
+        return $this->rememberFlexible([self::TAG, "izin:user:{$username}"], "izin:signature:{$username}", [self::TTL_SIGNATURE, self::TTL_SIGNATURE], function () use ($username) {
+            $response = Http::timeout(5)
+                ->retry(2, 200, function ($e) {
+                    return $e instanceof \Illuminate\Http\Client\ConnectionException
+                        || (method_exists($e, 'response') && optional($e->response)->serverError());
+                }, throw: false)
+                ->get($this->apiBase.'/global/user/get-user/'.$username);
+
+            if (! $response->successful() || ! ($response->json('success') ?? false)) {
+                throw new \RuntimeException('user signature status '.$response->status());
+            }
+
+            return $response->json('data.signature');
+        }, null);
     }
 
     public function flush(): void

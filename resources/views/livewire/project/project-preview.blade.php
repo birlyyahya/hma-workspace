@@ -1,8 +1,7 @@
 <?php
 
+use App\Services\ProjectCache;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 
@@ -15,31 +14,15 @@ class extends Component {
 
     public function mount(): void
     {
-        try {
-            $apiProject = rtrim(config('services.api_project'), '/');
-            $response = Http::get($apiProject.'/projects/'.$this->id)->json();
-            $data = $response['data'] ?? null;
+        $project = app(ProjectCache::class)->projectFor((int) $this->id);
 
-            if (is_array($data) && array_is_list($data)) {
-                $data = $data[0] ?? null;
-            }
-
-            if (! is_array($data)) {
-                $this->error = 'Project tidak ditemukan.';
-
-                return;
-            }
-
-            $this->project = $data;
-        } catch (\Throwable $e) {
-            $this->error = 'Gagal memuat data project.';
-            Log::error('Project preview API failed', [
-                'id' => $this->id,
-                'message' => $e->getMessage(),
-            ]);
-        } finally {
-            $this->loading = false;
+        if (empty($project)) {
+            $this->error = 'Project tidak ditemukan.';
+        } else {
+            $this->project = $project;
         }
+
+        $this->loading = false;
     }
 
     public function getStatusColorProperty(): string
