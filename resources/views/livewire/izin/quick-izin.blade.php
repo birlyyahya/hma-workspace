@@ -1,11 +1,11 @@
 <?php
 
 use App\Services\IzinCache;
+use App\Services\IzinWriter;
+use App\Services\RemoteImageFetcher;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 use Masmerise\Toaster\Toaster;
@@ -89,34 +89,23 @@ class extends Component {
     {
         $this->validate();
 
-        try {
-            $response = Http::timeout(8)
-                ->post(config('services.api_izin').'/global/izin/create-izin-saya', [
-                    'start_date' => $this->start_date,
-                    'end_date' => $this->end_date,
-                    'start_time' => $this->start_time,
-                    'end_time' => $this->end_time,
-                    'alasan' => $this->alasan,
-                    'deskripsi' => $this->deskripsi,
-                    'username' => Auth::user()->username,
-                ])->json();
-        } catch (\Throwable $e) {
-            Log::error('QuickIzin create connection error', ['message' => $e->getMessage()]);
-            Toaster::error('Gagal menghubungi server izin. Silakan coba lagi.');
+        $result = app(IzinWriter::class)->createIzin([
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'start_time' => $this->start_time,
+            'end_time' => $this->end_time,
+            'alasan' => $this->alasan,
+            'deskripsi' => $this->deskripsi,
+            'username' => Auth::user()->username,
+        ]);
 
-            return;
-        }
-
-        if (! ($response['success'] ?? false)) {
+        if (! $result['ok']) {
             Toaster::error('Gagal mengajukan izin. Silakan coba lagi.');
 
             return;
         }
 
-        $this->createdIzinId = $this->resolveCreatedIzinId($response);
-        $cache = app(IzinCache::class);
-        $cache->flushUser(Auth::user()->username);
-        $cache->flushGroup();
+        $this->createdIzinId = $this->resolveCreatedIzinId($result['body']);
         $this->dispatch('izinAdded');
         Toaster::success('Izin berhasil diajukan!');
         $this->step = 'success';
@@ -134,20 +123,14 @@ class extends Component {
             return (int) $id;
         }
 
-        try {
-            $latest = Http::timeout(5)->get(config('services.api_izin').'/global/izin/list', [
-                'username' => Auth::user()->username,
-                'page' => 1,
-                'per_page' => 1,
-                'sort_order' => 'desc',
-            ])->json();
+        $latest = app(IzinCache::class)->list([
+            'username' => Auth::user()->username,
+            'page' => 1,
+            'per_page' => 1,
+            'sort_order' => 'desc',
+        ]);
 
-            return (int) (data_get($latest, 'data.0.id') ?? 0) ?: null;
-        } catch (\Throwable $e) {
-            Log::warning('QuickIzin resolve latest izin failed', ['message' => $e->getMessage()]);
-
-            return null;
-        }
+        return (int) (data_get($latest, 'data.0.id') ?? 0) ?: null;
     }
 
     public function downloadPdf()
@@ -195,23 +178,7 @@ class extends Component {
 
     protected function convertImageToBase64(?string $url): ?string
     {
-        if (! $url) {
-            return null;
-        }
-
-        try {
-            $imageContent = Http::timeout(5)->get($url)->body();
-
-            if (! $imageContent) {
-                return null;
-            }
-
-            $mimeType = finfo_buffer(finfo_open(FILEINFO_MIME_TYPE), $imageContent);
-
-            return 'data:'.$mimeType.';base64,'.base64_encode($imageContent);
-        } catch (\Throwable) {
-            return null;
-        }
+        return app(RemoteImageFetcher::class)->toDataUri($url);
     }
 }; ?>
 
