@@ -1,10 +1,9 @@
 <?php
 
 use App\Services\ProjectCache;
+use App\Services\ProjectWriter;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
@@ -24,48 +23,24 @@ new #[Lazy] class extends Component {
             return;
         }
 
-        try {
-            $response = Http::delete(
-                rtrim((string) config('services.api_project'), '/').'/projects/'.$this->id
-            );
+        $result = app(ProjectWriter::class)->deleteProject((int) $this->id);
 
-            if ($response->successful()) {
-                app(ProjectCache::class)->flushProjects();
+        if ($result['ok']) {
+            Toaster::success('Proyek berhasil dihapus');
+            $this->redirect(route('projects'), navigate: true);
 
-                Toaster::success('Proyek berhasil dihapus');
-                $this->redirect(route('projects'), navigate: true);
-                return;
-            }
-
-            Toaster::error($response->json('message') ?? 'Gagal menghapus proyek');
-        } catch (\Throwable $e) {
-            Toaster::error('Gagal menghapus proyek');
-            Log::error('Failed to delete project', ['id' => $this->id, 'error' => $e->getMessage()]);
+            return;
         }
+
+        Toaster::error($result['body']['message'] ?? 'Gagal menghapus proyek');
     }
 
     protected function fetchProject(): void
     {
-        try {
-            $response = Http::timeout(15)->retry(2, 200)->get(
-                rtrim((string) config('services.api_project'), '/').'/projects/'.$this->id
-            )->json();
+        $project = app(ProjectCache::class)->projectFor((int) $this->id);
 
-            // Ambil data dari cache
-        //     $getCacheProject = app(ProjectCache::class)->allProjects();
-
-        //    $project = array_filter($getCacheProject, function ($project) {
-        //         return $project['id'] == $this->id;
-        //     });
-
-        //     $project = reset($project);
-        //     $this->project = collect($project);
-
-            if (($response['status'] ?? null) === 200) {
-                $this->project = collect($response['data'])->first();
-            }
-        } catch (\Throwable $e) {
-            Log::error('Failed to load project', ['id' => $this->id, 'error' => $e->getMessage()]);
+        if (! empty($project)) {
+            $this->project = $project;
         }
     }
 

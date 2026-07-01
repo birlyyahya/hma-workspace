@@ -2,9 +2,8 @@
 
 use App\Models\User;
 use App\Services\ProjectCache;
+use App\Services\ProjectWriter;
 use Livewire\Volt\Component;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Masmerise\Toaster\Toaster;
 
 new class extends Component
@@ -41,40 +40,31 @@ new class extends Component
 
     public function fetchProject(): void
     {
-        try {
-            $response = Http::timeout(15)->retry(2, 200)->get(
-                rtrim((string) config('services.api_project'), '/').'/projects/'.$this->id
-            )->json();
+        $project = app(ProjectCache::class)->projectFor((int) $this->id);
 
-            $project = collect($response['data'] ?? [])->first();
-
-            if (! $project) {
-                $this->notFound = true;
-                $this->loading = false;
-                return;
-            }
-
-            $this->name              = (string) ($project['name'] ?? '');
-            $this->code              = (string) ($project['code'] ?? '');
-            $this->contract_number   = (string) ($project['contract_number'] ?? '');
-            $this->contract_date     = $this->normalizeDate($project['contract_date'] ?? null);
-            $this->client            = (string) ($project['client'] ?? '');
-            $this->ppk               = (string) ($project['ppk'] ?? '');
-            $this->value             = (string) ($project['value'] ?? '');
-            $this->status            = (string) ($project['status'] ?? 'WAITING');
-            $this->start_date        = $this->normalizeDate($project['start_date'] ?? null);
-            $this->end_date          = $this->normalizeDate($project['end_date'] ?? null);
-            $this->maintenance_date  = $this->normalizeDate($project['maintenance_date'] ?? null);
-            $this->project_leader_id = (string) ($project['project_leader_id'] ?? '');
-            $this->company_id        = (string) ($project['company_id'] ?? '');
-            $this->support_teams     = array_values($project['support_teams'] ?? []);
-
-            $this->loading = false;
-        } catch (\Throwable $e) {
-            Log::error('Failed to load project for edit', ['id' => $this->id, 'error' => $e->getMessage()]);
+        if (empty($project)) {
             $this->notFound = true;
             $this->loading = false;
+
+            return;
         }
+
+        $this->name              = (string) ($project['name'] ?? '');
+        $this->code              = (string) ($project['code'] ?? '');
+        $this->contract_number   = (string) ($project['contract_number'] ?? '');
+        $this->contract_date     = $this->normalizeDate($project['contract_date'] ?? null);
+        $this->client            = (string) ($project['client'] ?? '');
+        $this->ppk               = (string) ($project['ppk'] ?? '');
+        $this->value             = (string) ($project['value'] ?? '');
+        $this->status            = (string) ($project['status'] ?? 'WAITING');
+        $this->start_date        = $this->normalizeDate($project['start_date'] ?? null);
+        $this->end_date          = $this->normalizeDate($project['end_date'] ?? null);
+        $this->maintenance_date  = $this->normalizeDate($project['maintenance_date'] ?? null);
+        $this->project_leader_id = (string) ($project['project_leader_id'] ?? '');
+        $this->company_id        = (string) ($project['company_id'] ?? '');
+        $this->support_teams     = array_values($project['support_teams'] ?? []);
+
+        $this->loading = false;
     }
 
     protected function normalizeDate(?string $value): string
@@ -189,27 +179,14 @@ new class extends Component
     }
 
     /**
-     * The external API returns HTTP 200 even on logical failure, signalling
-     * the real outcome through the `status` field in the response body.
-     */
-    protected function apiSucceeded(\Illuminate\Http\Client\Response $response): bool
-    {
-        $status = $response->json('status');
-
-        if ($status === null) {
-            return $response->successful();
-        }
-
-        return in_array((int) $status, [200, 201], true);
-    }
-
-    /**
      * Build a toast message from the API's field-level validation errors,
      * falling back to the API message or a generic message.
+     *
+     * @param  array<string, mixed>  $body
      */
-    protected function apiErrorMessage(\Illuminate\Http\Client\Response $response, string $fallback): string
+    protected function apiErrorMessage(array $body, string $fallback): string
     {
-        $messages = collect($response->json('errors'))
+        $messages = collect($body['errors'] ?? [])
             ->flatten()
             ->filter()
             ->all();
@@ -218,7 +195,7 @@ new class extends Component
             return implode("\n", $messages);
         }
 
-        return $response->json('message') ?? $fallback;
+        return $body['message'] ?? $fallback;
     }
 
     /**
@@ -247,7 +224,7 @@ new class extends Component
         try {
             $this->validate();
 
-            $response = Http::patch(config('services.api_project').'projects/'.$this->id, [
+            $result = app(ProjectWriter::class)->updateProject((int) $this->id, [
                 'name'              => $this->name,
                 'code'              => $this->code,
                 'contract_number'   => $this->contract_number,
@@ -262,20 +239,17 @@ new class extends Component
                 'project_leader_id' => (int) $this->project_leader_id,
                 'company_id'        => (int) $this->company_id,
                 'support_teams'     => $this->support_teams,
-                ]);
+            ]);
 
-
-            if ($this->apiSucceeded($response)) {
-                app(ProjectCache::class)->flushProjects();
-
+            if ($result['ok']) {
                 Toaster::success('Proyek berhasil diperbarui!');
                 $this->redirect(route('projects.show', $this->id), navigate: true);
                 return;
             }
 
-            $this->mergeApiErrors($response->json('errors'));
+            $this->mergeApiErrors($result['body']['errors'] ?? null);
 
-            Toaster::error($this->apiErrorMessage($response, 'Gagal memperbarui proyek. Coba lagi.'));
+            Toaster::error($this->apiErrorMessage($result['body'], 'Gagal memperbarui proyek. Coba lagi.'));
         } finally {
             $this->submitting = false;
         }

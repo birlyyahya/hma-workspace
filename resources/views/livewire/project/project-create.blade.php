@@ -2,8 +2,8 @@
 
 use App\Models\User;
 use App\Services\ProjectCache;
+use App\Services\ProjectWriter;
 use Livewire\Volt\Component;
-use Illuminate\Support\Facades\Http;
 use Masmerise\Toaster\Toaster;
 
 new class extends Component
@@ -141,9 +141,9 @@ new class extends Component
      * Build a toast message from the API's field-level validation errors,
      * falling back to the API message or a generic message.
      */
-    protected function apiErrorMessage(\Illuminate\Http\Client\Response $response, string $fallback): string
+    protected function apiErrorMessage(array $body, string $fallback): string
     {
-        $messages = collect($response->json('errors'))
+        $messages = collect($body['errors'] ?? [])
             ->flatten()
             ->filter()
             ->all();
@@ -152,7 +152,7 @@ new class extends Component
             return implode("\n", $messages);
         }
 
-        return $response->json('message') ?? $fallback;
+        return $body['message'] ?? $fallback;
     }
 
     /**
@@ -199,12 +199,10 @@ new class extends Component
 
             $payload['support_teams'] = $this->support_teams;
 
-            $response = Http::post(config('services.api_project').'projects', $payload);
+            $result = app(ProjectWriter::class)->createProject($payload);
 
-            if ((int) $response->json('status') === 201) {
-                app(ProjectCache::class)->flushProjects();
-
-                $id = $response->json('data.id') ?? $response->json('data.0.id');
+            if ($result['ok']) {
+                $id = $result['body']['data']['id'] ?? $result['body']['data'][0]['id'] ?? null;
                 Toaster::success('Proyek berhasil dibuat!');
 
                 if ($id) {
@@ -215,9 +213,9 @@ new class extends Component
                 return;
             }
 
-            $this->mergeApiErrors($response->json('errors'));
+            $this->mergeApiErrors($result['body']['errors'] ?? null);
 
-            Toaster::error($this->apiErrorMessage($response, 'Gagal membuat proyek. Coba lagi.'));
+            Toaster::error($this->apiErrorMessage($result['body'], 'Gagal membuat proyek. Coba lagi.'));
         } finally {
             $this->submitting = false;
         }
