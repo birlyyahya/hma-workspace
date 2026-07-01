@@ -1,15 +1,19 @@
 <?php
 
+use App\Services\DarCache;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Volt\Component;
 
 new class extends Component {
 
     public function getTasksProperty()
     {
-        $response = Http::get(config('services.api_izin'). '/global/dar/list?user_id='.Auth::user()->id.'&limit=1000000&status=1')->json();
-
-        return $response['data'] ?? [];
+        return app(DarCache::class)->tasks([
+            'user_id' => Auth::user()->id,
+            'limit' => 1000000,
+            'status' => 1,
+        ])['data'] ?? [];
     }
 
 
