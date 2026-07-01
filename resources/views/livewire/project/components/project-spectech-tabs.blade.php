@@ -2,8 +2,8 @@
 
 use App\Livewire\Forms\SpectechForm;
 use App\Services\ProjectCache;
+use App\Services\ProjectWriter;
 use Flux\Flux;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
@@ -114,15 +114,14 @@ new class extends Component {
 
         $id = $this->deletingId;
 
-        try {
-            Http::delete(rtrim((string) config('services.api_project'), '/').'/activity-categories/'.$id);
+        $result = app(ProjectWriter::class)->deleteSpectechCategory((int) $id, (int) $this->id);
 
+        if ($result['ok']) {
             $this->afterMutation();
             $this->loadSpectech();
             Toaster::success('Spectech berhasil dihapus');
-        } catch (\Throwable $e) {
+        } else {
             Toaster::error('Gagal menghapus spectech');
-            Log::error('Failed to delete spectech', ['id' => $id, 'error' => $e->getMessage()]);
         }
 
         $this->reset('deletingId', 'deletingName');

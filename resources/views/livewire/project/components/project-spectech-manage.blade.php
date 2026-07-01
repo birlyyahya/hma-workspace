@@ -1,9 +1,8 @@
 <?php
 
 use App\Services\ProjectCache;
+use App\Services\ProjectWriter;
 use Flux\Flux;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
@@ -120,26 +119,20 @@ new class extends Component {
             ], $this->drafts),
         ];
 
-        try {
-            // TODO: endpoint bulk belum tersedia di BEPM. Payload sudah disiapkan
-            // sesuai kontrak per-item agar tinggal dihubungkan saat API siap.
-            $response = Http::post($this->endpoint('bulk'), $payload);
+        // TODO: endpoint bulk belum tersedia di BEPM. Payload sudah disiapkan
+        // sesuai kontrak per-item agar tinggal dihubungkan saat API siap.
+        $result = app(ProjectWriter::class)->bulkSpectech((int) $this->id, $payload);
 
-            if (! $response->successful()) {
-                Toaster::error(getErrorMessages($response->json('errors') ?? []) ?: 'Gagal menyimpan spektek');
-                $this->logApiFailure('bulk-store', $response);
-                return;
-            }
-
-            $count = count($this->drafts);
-            $this->finishMutation();
-
-            Toaster::success($count.' spektek berhasil ditambahkan');
-            Flux::modal('manageSpectech')->close();
-        } catch (\Throwable $e) {
-            Toaster::error('Gagal menyimpan spektek');
-            Log::error('Failed to bulk store spectech', ['project_id' => $this->id, 'error' => $e->getMessage()]);
+        if (! $result['ok']) {
+            Toaster::error(getErrorMessages($result['body']['errors'] ?? []) ?: 'Gagal menyimpan spektek');
+            return;
         }
+
+        $count = count($this->drafts);
+        $this->finishMutation();
+
+        Toaster::success($count.' spektek berhasil ditambahkan');
+        Flux::modal('manageSpectech')->close();
     }
 
     /**
@@ -156,30 +149,23 @@ new class extends Component {
             ],
         );
 
-        try {
-            // TODO: endpoint import belum tersedia. Backend menerima file mentah,
-            // melakukan parsing baris & membuat spektek secara massal.
-            $response = Http::attach(
-                'file',
-                $this->importFile->get(),
-                $this->importFile->getClientOriginalName(),
-            )->post($this->endpoint('import'), ['project_id' => $this->id]);
+        // TODO: endpoint import belum tersedia. Backend menerima file mentah,
+        // melakukan parsing baris & membuat spektek secara massal.
+        $result = app(ProjectWriter::class)->importSpectech((int) $this->id, [
+            'contents' => $this->importFile->get(),
+            'name' => $this->importFile->getClientOriginalName(),
+        ]);
 
-            if (! $response->successful()) {
-                Toaster::error(getErrorMessages($response->json('errors') ?? []) ?: 'Gagal mengimpor file');
-                $this->logApiFailure('import', $response);
-                return;
-            }
-
-            $this->reset('importFile');
-            $this->finishMutation();
-
-            Toaster::success('Spektek berhasil diimpor');
-            Flux::modal('manageSpectech')->close();
-        } catch (\Throwable $e) {
-            Toaster::error('Gagal mengimpor file');
-            Log::error('Failed to import spectech', ['project_id' => $this->id, 'error' => $e->getMessage()]);
+        if (! $result['ok']) {
+            Toaster::error(getErrorMessages($result['body']['errors'] ?? []) ?: 'Gagal mengimpor file');
+            return;
         }
+
+        $this->reset('importFile');
+        $this->finishMutation();
+
+        Toaster::success('Spektek berhasil diimpor');
+        Flux::modal('manageSpectech')->close();
     }
 
     protected function finishMutation(): void
@@ -199,20 +185,6 @@ new class extends Component {
         $this->draftType = 'hardware';
         $this->manageTab = 'manual';
         $this->resetErrorBag();
-    }
-
-    protected function endpoint(string $suffix): string
-    {
-        return rtrim((string) config('services.api_project'), '/').'/activity-categories/'.$suffix;
-    }
-
-    protected function logApiFailure(string $context, \Illuminate\Http\Client\Response $response): void
-    {
-        Log::error('Spectech manage API failed: '.$context, [
-            'status' => $response->status(),
-            'body'   => $response->json('message') ?? 'No message',
-            'error'  => $response->json('errors') ?? 'No error',
-        ]);
     }
 
     #[Computed]
