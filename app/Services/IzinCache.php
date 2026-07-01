@@ -157,6 +157,61 @@ class IzinCache
         });
     }
 
+    /**
+     * Cache daftar izin terfilter/paginasi (endpoint /global/izin/list).
+     * Key di-derive dari query agar tiap kombinasi filter punya cache sendiri.
+     *
+     * @param  array<string, mixed>  $query
+     * @return array<string, mixed>
+     */
+    public function list(array $query): array
+    {
+        $key = 'izin:list:'.md5((string) json_encode($query));
+
+        return $this->rememberFlexible([self::TAG], $key, [self::TTL_DASHBOARD, self::TTL_DASHBOARD * 4], function () use ($query) {
+            $response = Http::timeout(5)
+                ->retry(2, 200, function ($e) {
+                    return $e instanceof \Illuminate\Http\Client\ConnectionException
+                        || (method_exists($e, 'response') && optional($e->response)->serverError());
+                }, throw: false)
+                ->get($this->apiBase.'/global/izin/list', $query);
+
+            if (! $response->successful()) {
+                throw new \RuntimeException('izin list status '.$response->status());
+            }
+
+            return $response->json() ?? [];
+        }, ['data' => []]);
+    }
+
+    /**
+     * Cache daftar SPD terfilter/paginasi (endpoint /global/dar/activity/list-spd).
+     * Key di-derive dari params. Berbeda dari spdListAll()/spdListForUser() yang
+     * dipakai widget report — method ini melayani halaman list & preview SPD.
+     *
+     * @param  array<string, mixed>  $params
+     * @return array<string, mixed>
+     */
+    public function spdList(array $params): array
+    {
+        $key = 'izin:spd:'.md5((string) json_encode($params));
+
+        return $this->rememberFlexible([self::TAG], $key, [self::TTL_SPD, self::TTL_SPD * 4], function () use ($params) {
+            $response = Http::timeout(5)
+                ->retry(2, 200, function ($e) {
+                    return $e instanceof \Illuminate\Http\Client\ConnectionException
+                        || (method_exists($e, 'response') && optional($e->response)->serverError());
+                }, throw: false)
+                ->get($this->apiBase.'/global/dar/activity/list-spd', $params);
+
+            if (! $response->successful()) {
+                throw new \RuntimeException('izin spd list status '.$response->status());
+            }
+
+            return $response->json() ?? [];
+        }, ['data' => []]);
+    }
+
     public function flush(): void
     {
         Cache::tags([self::TAG])->flush();

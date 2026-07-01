@@ -1,11 +1,10 @@
 <?php
 
 use App\Services\IzinCache;
+use App\Services\RemoteImageFetcher;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 use Masmerise\Toaster\Toaster;
@@ -70,44 +69,7 @@ new class extends Component {
     #[On('izinAdded')]
     public function fetchData(): void
     {
-        try {
-            $response = Http::timeout(5)
-                ->retry(3)
-                ->get(config('services.api_izin').'/global/izin/list', $this->buildQuery());
-
-            if (! $response->successful()) {
-                Log::error('Izin API failed', [
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-                $this->data = [];
-
-                return;
-            }
-
-            $json = $response->json();
-
-
-
-            if (! ($json['success'] ?? false)) {
-                Toaster::error('Failed to fetch izin data from API.');
-                Log::error('Izin API returned error', [
-                    'message' => $json['message'] ?? null,
-                    'error' => $json['error'] ?? null,
-                ]);
-                $this->data = $json ?? [];
-
-                return;
-            }
-
-            $this->data = $json;
-        } catch (\Throwable $e) {
-            Toaster::error($e->getMessage() ?: 'Connection error while fetching izin data.');
-            Log::error('Izin API connection error', [
-                'message' => $e->getMessage(),
-            ]);
-            $this->data = [];
-        }
+        $this->data = app(IzinCache::class)->list($this->buildQuery());
     }
 
     public function generatePDF(int $id)
@@ -180,23 +142,7 @@ new class extends Component {
 
     protected function convertImageToBase64(?string $url): ?string
     {
-        if (! $url) {
-            return null;
-        }
-
-        try {
-            $imageContent = Http::timeout(15)->retry(2, 200)->get($url)->body();
-
-            if (! $imageContent) {
-                return null;
-            }
-
-            $mimeType = finfo_buffer(finfo_open(FILEINFO_MIME_TYPE), $imageContent);
-
-            return 'data:'.$mimeType.';base64,'.base64_encode($imageContent);
-        } catch (\Throwable) {
-            return null;
-        }
+        return app(RemoteImageFetcher::class)->toDataUri($url, 15);
     }
 }; ?>
 

@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Services\DarCache;
 use App\Services\DarWriter;
 use App\Services\IzinCache;
+use App\Services\IzinWriter;
 use App\Services\ProjectCache;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
@@ -33,6 +34,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(DarWriter::class, fn ($app) => new DarWriter(
             rtrim((string) config('services.api_izin'), '/'),
             $app->make(DarCache::class),
+        ));
+
+        $this->app->singleton(IzinWriter::class, fn ($app) => new IzinWriter(
+            rtrim((string) config('services.api_izin'), '/'),
+            $app->make(IzinCache::class),
         ));
     }
 
