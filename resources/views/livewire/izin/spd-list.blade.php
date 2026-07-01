@@ -1,10 +1,12 @@
 <?php
 
 use App\Models\User;
+use App\Services\IzinCache;
+use App\Services\IzinWriter;
+use App\Services\RemoteImageFetcher;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Flux\Flux;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
@@ -173,40 +175,26 @@ new class extends Component {
     {
         $this->loading = true;
 
-        try {
-            $apiIzin = rtrim(config('services.api_izin'), '/');
+        $params = [
+            'page' => $this->page,
+            'perPage' => $this->perPage,
+            'search' => $this->search,
+        ];
 
-            $params = [
-                'page' => $this->page,
-                'perPage' => $this->perPage,
-                'search' => $this->search,
-            ];
-
-            if ($this->startDateFilter !== '') {
-                $params['start_date'] = $this->startDateFilter;
-            }
-
-            if ($this->endDateFilter !== '') {
-                $params['end_date'] = $this->endDateFilter;
-            }
-
-            if (!Auth::user()->hasPermission('spd.view.all')) {
-                $params['user_id'] = Auth::user()->id;
-            }
-
-            $response = Http::timeout(5)
-                ->retry(2, 200)
-                ->get($apiIzin.'/global/dar/activity/list-spd', $params)
-                ->json();
-
-            $this->list = $response ?? ['data' => []];
-        } catch (\Throwable $e) {
-            Toaster::error('Server SPD error, silakan coba lagi.');
-            Log::error('SPD list API failed', ['message' => $e->getMessage()]);
-            $this->list = ['data' => []];
-        } finally {
-            $this->loading = false;
+        if ($this->startDateFilter !== '') {
+            $params['start_date'] = $this->startDateFilter;
         }
+
+        if ($this->endDateFilter !== '') {
+            $params['end_date'] = $this->endDateFilter;
+        }
+
+        if (! Auth::user()->hasPermission('spd.view.all')) {
+            $params['user_id'] = Auth::user()->id;
+        }
+
+        $this->list = app(IzinCache::class)->spdList($params);
+        $this->loading = false;
     }
 
     public function updatedSearch(): void
@@ -288,52 +276,40 @@ new class extends Component {
     {
         $this->validate();
 
+        $payload = [
+            'user_id' => $this->userId,
+            'number' => $this->number,
+            'task' => $this->task,
+            'department' => $this->department,
+            'destination' => $this->destination,
+            'address' => $this->address,
+            'start_date' => $this->startDate,
+            'end_date' => $this->endDate,
+            'is_submitted' => $this->isSubmitted ? 1 : 0,
+            'is_approved' => $this->isSubmitted && $this->isApproved ? 1 : 0,
+        ];
+
+        $file = $this->attachment
+            ? [
+                'contents' => file_get_contents($this->attachment->getRealPath()),
+                'name' => $this->attachment->getClientOriginalName(),
+            ]
+            : null;
+
+        $result = app(IzinWriter::class)->saveSpd($this->editingId, $payload, $file);
+
+        if (! $result['ok']) {
+            Toaster::error(getErrorMessages($result['body']['errors'] ?? []) ?: ($result['body']['message'] ?? 'Gagal menyimpan SPD.'));
+
+            return;
+        }
+
         try {
-            $apiIzin = rtrim(config('services.api_izin'), '/');
-
-            $request = Http::asMultipart()->timeout(60);
-
-            if ($this->attachment) {
-                $request = $request->attach(
-                    'attachment',
-                    file_get_contents($this->attachment->getRealPath()),
-                    $this->attachment->getClientOriginalName(),
-                );
-            }
-
-            $payload = [
-                'user_id' => $this->userId,
-                'number' => $this->number,
-                'task' => $this->task,
-                'department' => $this->department,
-                'destination' => $this->destination,
-                'address' => $this->address,
-                'start_date' => $this->startDate,
-                'end_date' => $this->endDate,
-                'is_submitted' => $this->isSubmitted ? 1 : 0,
-                'is_approved' => $this->isSubmitted && $this->isApproved ? 1 : 0,
-            ];
-
-            if ($this->editingId) {
-                $payload['_method'] = 'PUT';
-                $response = $request->post($apiIzin . '/global/dar/activity/update-spd/' . $this->editingId, $payload);
-            } else {
-                $response = $request->post($apiIzin . '/global/dar/activity/create-spd', $payload);
-            }
-            $body = $response->json();
-
-            if (! ($body['success'] ?? false)) {
-                Toaster::error(getErrorMessages($body['errors'] ?? []) ?: ($body['message'] ?? 'Gagal menyimpan SPD.'));
-                Log::error('SPD save failed', ['body' => $body]);
-
-                return;
-            }
-
-            $user = User::find($response['data']['user_id']);
+            $user = User::find($result['body']['data']['user_id']);
 
             $message = 'SPD sudah disetujui silahkan cek email anda';
             // kirim ke service
-            NotificationService::send($user, $message, $response['data']);
+            NotificationService::send($user, $message, $result['body']['data']);
 
             Toaster::success($this->editingId ? 'SPD berhasil diperbarui.' : 'SPD berhasil dibuat.');
             Flux::modal('spd-form-modal')->close();
@@ -363,24 +339,18 @@ new class extends Component {
             return;
         }
 
-        try {
-            $apiIzin = rtrim(config('services.api_izin'), '/');
-            $response = Http::delete($apiIzin . '/global/dar/activity/delete-spd/' . $this->pendingDeleteId)->json();
+        $result = app(IzinWriter::class)->deleteSpd($this->pendingDeleteId);
 
-            if (! ($response['success'] ?? false)) {
-                Toaster::error($response['message'] ?? 'Gagal menghapus SPD.');
+        if (! $result['ok']) {
+            Toaster::error($result['body']['message'] ?? 'Gagal menghapus SPD.');
 
-                return;
-            }
-
-            Toaster::success('SPD berhasil dihapus.');
-            $this->pendingDeleteId = null;
-            Flux::modal('spd-delete-modal')->close();
-            $this->fetchList();
-        } catch (\Throwable $e) {
-            Toaster::error('Server error saat menghapus SPD.');
-            Log::error('SPD delete exception', ['message' => $e->getMessage()]);
+            return;
         }
+
+        Toaster::success('SPD berhasil dihapus.');
+        $this->pendingDeleteId = null;
+        Flux::modal('spd-delete-modal')->close();
+        $this->fetchList();
     }
 
     public function downloadPdf(int $id)
@@ -425,31 +395,7 @@ new class extends Component {
             return null;
         }
 
-        $ext = strtolower(pathinfo(parse_url($url, PHP_URL_PATH) ?: '', PATHINFO_EXTENSION));
-
-        if (! in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
-            return null;
-        }
-
-        try {
-            $response = Http::timeout(15)->retry(2, 200)->get($url);
-
-            if (! $response->successful()) {
-                return null;
-            }
-
-            $body = $response->body();
-            $mime = finfo_buffer(finfo_open(FILEINFO_MIME_TYPE), $body) ?: 'image/png';
-
-            return [
-                'data' => 'data:' . $mime . ';base64,' . base64_encode($body),
-                'mime' => $mime,
-            ];
-        } catch (\Throwable $e) {
-            Log::warning('SPD attachment fetch failed', ['url' => $url, 'message' => $e->getMessage()]);
-
-            return null;
-        }
+        return app(RemoteImageFetcher::class)->toImageData($url);
     }
 
     protected function resetForm(): void
