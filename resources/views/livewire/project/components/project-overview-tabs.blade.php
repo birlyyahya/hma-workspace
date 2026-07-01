@@ -93,7 +93,7 @@ new class extends Component {
                                     </span>
                                 </div>
                                 <h1 class="mt-2 text-xl font-semibold leading-snug line-clamp-2">
-                                    {{ $project['name'] }}
+                                    {{ Str::upper($project['name']) }}
                                 </h1>
                                 <p class="mt-1 text-sm text-white/80">
                                     {{ $project['company_name'] }}

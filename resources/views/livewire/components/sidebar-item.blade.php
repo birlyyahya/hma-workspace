@@ -51,7 +51,7 @@ new class extends Component {
                 wire:navigate>
                 <div class="flex-1 min-w-0 max-w-39 overflow-hidden">
                     <div class="truncate">
-                        {{ $project['code'] }} - {{ $project['name'] }}
+                        {{ $project['code'] }} - {{ ucwords(Str::lower($project['name'])) }}
                     </div>
                 </div>
             </flux:sidebar.item>

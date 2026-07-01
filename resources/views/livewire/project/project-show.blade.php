@@ -187,7 +187,7 @@ new #[Lazy] class extends Component {
                                 </span>
                             </div>
                             <h1 class="mt-2 text-lg sm:text-xl font-bold text-zinc-900 leading-snug line-clamp-2">
-                                {{ $this->project['name'] ?? '-' }}
+                                {{ ucwords(Str::lower($this->project['name'])) ?? '-' }}
                             </h1>
 
                             {{-- Quick meta row --}}

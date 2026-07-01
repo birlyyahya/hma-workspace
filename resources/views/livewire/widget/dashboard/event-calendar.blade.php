@@ -213,10 +213,10 @@ new class extends Component
                     <button type="button" wire:click="goToday" class="px-3 py-1.5 text-xs font-medium text-zinc-600 rounded-lg hover:bg-zinc-100 transition">
                         Hari ini
                     </button>
-                    <button type="button" wire:click="prevMonth" class="size-8 flex items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 transition">
+                    <button type="button" wire:click="prevMonth" class="cursor-pointer size-8 flex items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 transition">
                         <flux:icon name="chevron-left" class="size-4" />
                     </button>
-                    <button type="button" wire:click="nextMonth" class="size-8 flex items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 transition">
+                    <button type="button" wire:click="nextMonth" class="cursor-pointer size-8 flex items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 transition">
                         <flux:icon name="chevron-right" class="size-4" />
                     </button>
                 </div>
@@ -242,7 +242,7 @@ new class extends Component
                     $hasEvent = isset($this->eventDates[$dateString]);
                     @endphp
 
-                    <button type="button" wire:click="selectDate('{{ $dateString }}')" wire:key="d-{{ $dateString }}" class="relative size-11 m-auto flex items-center justify-center rounded-full transition
+                    <button type="button" wire:click="selectDate('{{ $dateString }}')" wire:key="d-{{ $dateString }}" class="relative cursor-pointer size-11 m-auto flex items-center justify-center rounded-full transition
                             {{ $isSelected ? 'bg-violet-600 text-white font-semibold shadow-sm shadow-violet-200'
                                 : ($isToday ? 'ring-1 ring-violet-400 text-violet-700 font-semibold'
                                 : 'text-zinc-700 hover:bg-zinc-100') }}">
