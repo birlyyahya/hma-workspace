@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\IzinCache;
+use App\Services\RemoteImageFetcher;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Livewire\Attributes\Layout;
@@ -55,23 +56,7 @@ class extends Component {
 
      private function convertImageToBase64($url)
     {
-        if (!$url) return null;
-
-        try {
-            $imageContent = Http::timeout(5)->get($url)->body();
-
-            if (!$imageContent) return null;
-
-            $mimeType = finfo_buffer(
-                finfo_open(FILEINFO_MIME_TYPE),
-                $imageContent
-            );
-
-            return 'data:' . $mimeType . ';base64,' . base64_encode($imageContent);
-
-        } catch (\Exception $e) {
-            return null;
-        }
+        return app(RemoteImageFetcher::class)->toDataUri($url);
     }
 
 }; ?>
