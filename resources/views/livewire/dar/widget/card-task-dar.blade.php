@@ -34,6 +34,12 @@ new class extends Component {
 
     public bool $loading = true;
 
+    public int $perPage = 21;
+    public int $page = 1;
+    public bool $hasMore = true;
+    public bool $loadingMore = false;
+    public ?int $total = 0;
+
     public ?int $pendingDeleteId = null;
     public string $pendingDeleteName = '';
 
@@ -135,63 +141,137 @@ new class extends Component {
         }
     }
 
+    /**
+     * Bangun query param untuk endpoint list DAR, termasuk halaman aktif.
+     *
+     * @return array<string, mixed>
+     */
+    private function taskParams(): array
+    {
+        $params = [
+            'perPage' => $this->perPage,
+            'page' => $this->page,
+        ];
+
+        if ($this->search !== '') {
+            $params['search'] = $this->search;
+        }
+
+        if (Auth::user()->viewScopeFor('dar') === 'all') {
+            if ($this->userFilter !== '') {
+                $params['team_user'] = $this->userFilter;
+            }
+        } else {
+            $params['team_user'] = Auth::id();
+        }
+
+        if ($this->projectFilter !== '') {
+            $params['project_id'] = $this->projectFilter;
+        }
+
+        return $params;
+    }
+
+    /**
+     * Muat ulang dari halaman pertama (dipicu filter, search, atau setelah write).
+     */
     #[On('updatedCardTaskDar')]
     public function fetchTasks(): void
     {
         $this->loading = true;
+        $this->page = 1;
+        $this->hasMore = true;
 
         try {
-            $params = ['perPage' => 2000];
-
-            if ($this->search !== '') {
-                $params['search'] = $this->search;
-            }
-
-            if (Auth::user()->viewScopeFor('dar') === 'all') {
-                if ($this->userFilter !== '') {
-                    $params['team_user'] = $this->userFilter;
-                }
-            } else {
-                $params['team_user'] = Auth::id();
-            }
-
-            if ($this->projectFilter !== '') {
-                $params['project_id'] = $this->projectFilter;
-            }
-
-            $response = app(DarCache::class)->tasks($params);
+            $response = app(DarCache::class)->tasks($this->taskParams());
+            $response['total'] = (int) ($response['total'] ?? 0);
 
             $this->tasks = $this->trimTasks($response['data'] ?? []);
-
-            if ($this->projectFilter === '' && $this->search === '') {
-                $this->accessibleProjectIds = collect($this->tasks)
-                    ->pluck('project_id')
-                    ->filter()
-                    ->unique()
-                    ->values()
-                    ->toArray();
-            }
-
-            $commenterIds = collect($this->tasks)
-                ->flatMap(fn ($task) => collect($task['comments'] ?? [])->pluck('user_id'))
-                ->filter()
-                ->unique()
-                ->values();
-
-            $this->commentUsers = User::whereIn('id', $commenterIds)
-                ->get(['id', 'name'])
-                ->keyBy('id')
-                ->map(fn ($user) => ['id' => $user->id, 'name' => $user->name])
-                ->toArray();
+            $this->total = $response['total'];
+            $this->syncPagination($response);
+            $this->hydrateDerivedState();
         } catch (\Throwable $e) {
             $this->tasks = [];
             $this->commentUsers = [];
+            $this->hasMore = false;
+            $this->total = 0;
             Toaster::error('Server DAR Error, silahkan coba lagi atau menghubungi tim IT');
             Log::error('DAR list API failed', ['message' => $e->getMessage()]);
         } finally {
             $this->loading = false;
             $this->dispatch('dar-tasks-updated');
         }
+    }
+
+    /**
+     * Ambil halaman berikutnya dan tempelkan ke daftar (infinite scroll).
+     */
+    public function loadMore(): void
+    {
+        if ($this->loadingMore || $this->loading || ! $this->hasMore) {
+            return;
+        }
+
+        $this->loadingMore = true;
+        $this->page++;
+
+        try {
+            $response = app(DarCache::class)->tasks($this->taskParams());
+
+            $this->tasks = collect($this->tasks)
+                ->concat($this->trimTasks($response['data'] ?? []))
+                ->keyBy('id')
+                ->values()
+                ->all();
+
+            $this->syncPagination($response);
+            $this->hydrateDerivedState();
+        } catch (\Throwable $e) {
+            $this->page--;
+            Toaster::error('Server DAR Error, silahkan coba lagi atau menghubungi tim IT');
+            Log::error('DAR loadMore API failed', ['message' => $e->getMessage()]);
+        } finally {
+            $this->loadingMore = false;
+            $this->dispatch('dar-tasks-updated');
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $response
+     */
+    private function syncPagination(array $response): void
+    {
+        $current = (int) ($response['current_page'] ?? $this->page);
+        $last = (int) ($response['last_page'] ?? $current);
+
+        $this->hasMore = $current < $last;
+    }
+
+    /**
+     * Turunkan state pendukung (project yang bisa difilter + nama commenter) dari task termuat.
+     */
+    private function hydrateDerivedState(): void
+    {
+        if ($this->projectFilter === '' && $this->search === '') {
+            $this->accessibleProjectIds = collect($this->tasks)
+                ->pluck('project_id')
+                ->filter()
+                ->unique()
+                ->values()
+                ->toArray();
+        }
+
+        $commenterIds = collect($this->tasks)
+            ->flatMap(fn ($task) => collect($task['comments'] ?? [])->pluck('user_id'))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $this->commentUsers = User::whereIn('id', $commenterIds)
+            ->get(['id', 'name'])
+            ->keyBy('id')
+            ->map(fn ($user) => ['id' => $user->id, 'name' => $user->name])
+            ->toArray();
     }
 
     public function projectData(): array
@@ -201,9 +281,7 @@ new class extends Component {
 
     public function visibleTasks(): \Illuminate\Support\Collection
     {
-        return collect($this->tasks)
-            ->sortBy('status')
-            ->values();
+        return collect($this->tasks)->values();
     }
 
     public function teamUser($users): array
@@ -500,16 +578,28 @@ new class extends Component {
 
             {{-- Status pills dengan counter --}}
             <div class="flex flex-wrap items-center gap-2">
-                @foreach ($statusOptions as $key => $opt)
-                    <button type="button" @click="status = '{{ $key }}'; filter()"
-                        class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 transition"
-                        :class="status === '{{ $key }}' ? '{{ $opt['active'] }} shadow-sm' : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'">
-                        <span>{{ $opt['label'] }}</span>
-                        <span class="rounded-full px-1.5 text-[10px] font-bold"
-                            :class="status === '{{ $key }}' ? 'bg-white/25' : 'bg-slate-100'"
-                            x-text="counts['{{ $key }}'] ?? 0"></span>
-                    </button>
-                @endforeach
+              @foreach ($statusOptions as $key => $opt)
+    <button
+        type="button"
+        @click="status = '{{ $key }}'; filter()"
+        class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 transition"
+        :class="status === '{{ $key }}'
+            ? '{{ $opt['active'] }} shadow-sm'
+            : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'">
+
+        <span>{{ $opt['label'] }}</span>
+
+        <span
+            class="rounded-full px-1.5 text-[10px] font-bold"
+            :class="status === '{{ $key }}' ? 'bg-white/25' : 'bg-slate-100'"
+            @if($key === 'all')
+                x-text="$wire.total"
+            @else
+                x-text="counts['{{ $key }}'] ?? 0"
+            @endif
+        ></span>
+    </button>
+@endforeach
             </div>
         </header>
 
@@ -704,6 +794,17 @@ new class extends Component {
                 @if (! empty($this->tasks))
                 <div x-show="visible === 0" x-cloak class="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600">
                     Tidak ada tugas pada filter ini.
+                </div>
+                @endif
+
+                {{-- Infinite scroll: sentinel dipantau IntersectionObserver (Alpine x-intersect) --}}
+                @if ($hasMore)
+                <div wire:key="dar-scroll-sentinel" x-intersect.margin.300px="$wire.loadMore()"
+                    class="col-span-full flex items-center justify-center py-4 text-sm text-slate-500">
+                    <span wire:loading.flex wire:target="loadMore" class="items-center gap-2">
+                        <flux:icon name="arrow-path" class="h-4 w-4 animate-spin" />
+                        Memuat lebih banyak...
+                    </span>
                 </div>
                 @endif
             </div>

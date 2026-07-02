@@ -25,7 +25,7 @@ beforeEach(function () {
     app(DarCache::class)->flush();
 });
 
-test('fetchTasks loads tasks and visibleTasks returns them sorted by status', function () {
+test('fetchTasks loads tasks and visibleTasks preserves the API order', function () {
     Http::fake(['*global/dar/list*' => Http::response([
         'data' => [
             cardDarActivity(['activity' => 'Closed task', 'status' => 4]),
@@ -41,7 +41,73 @@ test('fetchTasks loads tasks and visibleTasks returns them sorted by status', fu
 
     $statuses = collect($component->instance()->visibleTasks())->pluck('status')->all();
 
-    expect($statuses)->toBe([1, 2, 4]);
+    expect($statuses)->toBe([4, 1, 2]);
+});
+
+test('fetchTasks requests the first page with perPage 20', function () {
+    Http::fake(['*global/dar/list*' => Http::response(['data' => []])]);
+
+    Volt::actingAs(User::factory()->create())
+        ->test('dar.widget.card-task-dar');
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'global/dar/list')
+        && ($request->data()['perPage'] ?? null) === 20
+        && ($request->data()['page'] ?? null) === 1);
+});
+
+test('hasMore reflects the paginator meta from the API', function () {
+    Http::fake(['*global/dar/list*' => Http::response([
+        'data' => [cardDarActivity()],
+        'current_page' => 1, 'last_page' => 3,
+    ])]);
+
+    $component = Volt::actingAs(User::factory()->create())
+        ->test('dar.widget.card-task-dar');
+
+    expect($component->get('hasMore'))->toBeTrue();
+});
+
+test('loadMore appends the next page and stops when the last page is reached', function () {
+    Http::fakeSequence('*global/dar/list*')
+        ->push([
+            'data' => [cardDarActivity(['id' => 1]), cardDarActivity(['id' => 2])],
+            'current_page' => 1, 'last_page' => 2,
+        ])
+        ->push([
+            'data' => [cardDarActivity(['id' => 3]), cardDarActivity(['id' => 4])],
+            'current_page' => 2, 'last_page' => 2,
+        ]);
+
+    $component = Volt::actingAs(User::factory()->create())
+        ->test('dar.widget.card-task-dar');
+
+    expect($component->get('tasks'))->toHaveCount(2)
+        ->and($component->get('hasMore'))->toBeTrue();
+
+    $component->call('loadMore');
+
+    expect($component->get('tasks'))->toHaveCount(4)
+        ->and($component->get('page'))->toBe(2)
+        ->and($component->get('hasMore'))->toBeFalse();
+});
+
+test('loadMore is a no-op once there are no more pages', function () {
+    Http::fake(['*global/dar/list*' => Http::response([
+        'data' => [cardDarActivity(['id' => 1])],
+        'current_page' => 1, 'last_page' => 1,
+    ])]);
+
+    $component = Volt::actingAs(User::factory()->create())
+        ->test('dar.widget.card-task-dar');
+
+    expect($component->get('hasMore'))->toBeFalse();
+
+    Http::fake(); // fail loudly if another request goes out
+
+    $component->call('loadMore');
+
+    expect($component->get('page'))->toBe(1)
+        ->and($component->get('tasks'))->toHaveCount(1);
 });
 
 test('tasks are trimmed so the heavy comment files never reach the component state', function () {
