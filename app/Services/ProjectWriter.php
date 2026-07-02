@@ -45,7 +45,12 @@ class ProjectWriter
             $response = $this->externalWrite(timeout: 10)->post($this->apiBase.'/projects', $payload);
             $body = (array) $response->json();
 
-            return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), fn () => $this->cache->flushProjects());
+            return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), fn () => $this->cache->flushProjects(), [
+                'name' => 'project',
+                'event' => 'created',
+                'description' => 'Membuat project baru',
+                'properties' => ['name' => $payload['name'] ?? null],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('createProject', $e);
         }
@@ -63,7 +68,12 @@ class ProjectWriter
             $response = $this->externalWrite(timeout: 10)->patch($this->apiBase.'/projects/'.$id, $payload);
             $body = (array) $response->json();
 
-            return $this->result($this->statusSucceeded($response->status(), $body), $body, $response->status(), fn () => $this->cache->flushProjects());
+            return $this->result($this->statusSucceeded($response->status(), $body), $body, $response->status(), fn () => $this->cache->flushProjects(), [
+                'name' => 'project',
+                'event' => 'updated',
+                'description' => "Memperbarui project #{$id}",
+                'properties' => ['id' => $id],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('updateProject', $e, ['id' => $id]);
         }
@@ -80,7 +90,12 @@ class ProjectWriter
             $response = $this->externalWrite(timeout: 10)->delete($this->apiBase.'/projects/'.$id);
             $body = (array) $response->json();
 
-            return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushProjects());
+            return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushProjects(), [
+                'name' => 'project',
+                'event' => 'deleted',
+                'description' => "Menghapus project #{$id}",
+                'properties' => ['id' => $id],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('deleteProject', $e, ['id' => $id]);
         }
@@ -100,7 +115,12 @@ class ProjectWriter
             $response = $this->externalWrite(timeout: 10)->post($this->apiBase.'/timelines', $payload);
             $body = (array) $response->json();
 
-            return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), fn () => $this->cache->flushProjects());
+            return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), fn () => $this->cache->flushProjects(), [
+                'name' => 'project',
+                'event' => 'created',
+                'description' => 'Menambah timeline project',
+                'properties' => ['project_id' => $payload['project_id'] ?? null],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('createTimeline', $e);
         }
@@ -118,7 +138,12 @@ class ProjectWriter
             $response = $this->externalWrite(timeout: 10)->patch($this->apiBase.'/timelines/'.$id, $payload);
             $body = (array) $response->json();
 
-            return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushProjects());
+            return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushProjects(), [
+                'name' => 'project',
+                'event' => 'updated',
+                'description' => "Memperbarui timeline #{$id}",
+                'properties' => ['id' => $id],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('updateTimeline', $e, ['id' => $id]);
         }
@@ -135,7 +160,12 @@ class ProjectWriter
             $response = $this->externalWrite(timeout: 10)->delete($this->apiBase.'/timelines/'.$id);
             $body = (array) $response->json();
 
-            return $this->result((int) ($body['status'] ?? 0) === 200, $body, $response->status(), fn () => $this->cache->flushProjects());
+            return $this->result((int) ($body['status'] ?? 0) === 200, $body, $response->status(), fn () => $this->cache->flushProjects(), [
+                'name' => 'project',
+                'event' => 'deleted',
+                'description' => "Menghapus timeline #{$id}",
+                'properties' => ['id' => $id],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('deleteTimeline', $e, ['id' => $id]);
         }
@@ -157,7 +187,12 @@ class ProjectWriter
             ]);
             $body = (array) $response->json();
 
-            return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), fn () => $this->cache->flushUser($userId));
+            return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), fn () => $this->cache->flushUser($userId), [
+                'name' => 'project',
+                'event' => 'created',
+                'description' => "Menambah anggota tim ke project #{$projectId}",
+                'properties' => ['project_id' => $projectId, 'user_id' => $userId],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('createTeam', $e, ['project_id' => $projectId, 'user_id' => $userId]);
         }
@@ -174,7 +209,12 @@ class ProjectWriter
             $response = $this->externalWrite(timeout: 10)->delete($this->apiBase.'/project-teams/'.$teamId);
             $body = (array) $response->json();
 
-            return $this->result((int) ($body['status'] ?? 0) === 200, $body, $response->status(), fn () => $this->cache->flushUser($userId));
+            return $this->result((int) ($body['status'] ?? 0) === 200, $body, $response->status(), fn () => $this->cache->flushUser($userId), [
+                'name' => 'project',
+                'event' => 'deleted',
+                'description' => 'Menghapus anggota tim project',
+                'properties' => ['team_id' => $teamId, 'user_id' => $userId],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('deleteTeam', $e, ['team_id' => $teamId, 'user_id' => $userId]);
         }
@@ -217,7 +257,12 @@ class ProjectWriter
             $response = $this->externalWrite(timeout: 10)->delete($this->apiBase.'/companies/'.$id);
             $body = (array) $response->json();
 
-            return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushCompanies());
+            return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushCompanies(), [
+                'name' => 'perusahaan',
+                'event' => 'deleted',
+                'description' => "Menghapus perusahaan #{$id}",
+                'properties' => ['id' => $id],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('deleteCompany', $e, ['id' => $id]);
         }
@@ -236,7 +281,12 @@ class ProjectWriter
             $response = $this->externalWrite(timeout: 10)->delete($this->apiBase.'/activity-categories/'.$id);
             $body = (array) $response->json();
 
-            return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushSpectech($projectId));
+            return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushSpectech($projectId), [
+                'name' => 'project',
+                'event' => 'deleted',
+                'description' => "Menghapus kategori spektek #{$id} (project #{$projectId})",
+                'properties' => ['id' => $id, 'project_id' => $projectId],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('deleteSpectechCategory', $e, ['id' => $id, 'project_id' => $projectId]);
         }
@@ -254,7 +304,12 @@ class ProjectWriter
             $response = $this->externalWrite(timeout: 30)->post($this->apiBase.'/activity-categories/bulk', $payload);
             $body = (array) $response->json();
 
-            return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushSpectech($projectId));
+            return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushSpectech($projectId), [
+                'name' => 'project',
+                'event' => 'updated',
+                'description' => "Menyimpan spektek project #{$projectId}",
+                'properties' => ['project_id' => $projectId],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('bulkSpectech', $e, ['project_id' => $projectId]);
         }
@@ -274,7 +329,12 @@ class ProjectWriter
                 ->post($this->apiBase.'/activity-categories/import', ['project_id' => $projectId]);
             $body = (array) $response->json();
 
-            return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushSpectech($projectId));
+            return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushSpectech($projectId), [
+                'name' => 'project',
+                'event' => 'updated',
+                'description' => "Mengimpor spektek project #{$projectId}",
+                'properties' => ['project_id' => $projectId],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('importSpectech', $e, ['project_id' => $projectId]);
         }
@@ -295,9 +355,37 @@ class ProjectWriter
             $response = $this->externalWrite(timeout: 120)->post($this->apiBase.'/admin-docs', $payload);
             $body = (array) $response->json();
 
-            return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status());
+            return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), null, [
+                'name' => 'project',
+                'event' => 'created',
+                'description' => 'Mengunggah dokumen admin project',
+                'properties' => ['project_id' => $payload['project_id'] ?? null],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('uploadDoc', $e);
+        }
+    }
+
+    /**
+     * Hapus dokumen admin project. Sukses = body.status === 200 atau HTTP 2xx.
+     *
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function deleteDoc(int $id): array
+    {
+        try {
+            $response = $this->externalWrite(timeout: 30)->delete($this->apiBase.'/admin-docs/'.$id);
+            $body = (array) $response->json();
+            $ok = (int) ($body['status'] ?? 0) === 200 || $response->successful();
+
+            return $this->result($ok, $body, $response->status(), null, [
+                'name' => 'project',
+                'event' => 'deleted',
+                'description' => "Menghapus dokumen admin project #{$id}",
+                'properties' => ['id' => $id],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->fail('deleteDoc', $e, ['id' => $id]);
         }
     }
 
@@ -323,7 +411,12 @@ class ProjectWriter
             $response = $request->post($url, $payload);
             $body = (array) $response->json();
 
-            return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushCompanies());
+            return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushCompanies(), [
+                'name' => 'perusahaan',
+                'event' => $id !== null ? 'updated' : 'created',
+                'description' => $id !== null ? "Memperbarui perusahaan #{$id}" : 'Membuat perusahaan baru',
+                'properties' => ['id' => $id, 'name' => $payload['name'] ?? null],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('saveCompany', $e, ['id' => $id]);
         }
@@ -347,22 +440,40 @@ class ProjectWriter
     }
 
     /**
-     * Bangun struktur hasil; jalankan invalidasi cache saat sukses.
+     * Bangun struktur hasil; jalankan invalidasi cache & catat activity saat sukses.
      *
      * @param  array<string, mixed>  $body
+     * @param  array{name: string, event: string, description: string, properties?: array<string, mixed>}|null  $log
      * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
      */
-    private function result(bool $ok, array $body, ?int $status, ?callable $onSuccess = null): array
+    private function result(bool $ok, array $body, ?int $status, ?callable $onSuccess = null, ?array $log = null): array
     {
         if ($ok) {
             if ($onSuccess !== null) {
                 $onSuccess();
+            }
+
+            if ($log !== null) {
+                $this->logActivity($log);
             }
         } else {
             Log::warning('ProjectWriter write non-success', ['status' => $status, 'body' => $body]);
         }
 
         return ['ok' => $ok, 'body' => $body, 'status' => $status, 'error' => null];
+    }
+
+    /**
+     * Catat activity untuk operasi domain eksternal (tanpa subject Eloquent lokal).
+     *
+     * @param  array{name: string, event: string, description: string, properties?: array<string, mixed>}  $log
+     */
+    private function logActivity(array $log): void
+    {
+        activity($log['name'])
+            ->event($log['event'])
+            ->withProperties($log['properties'] ?? [])
+            ->log($log['description']);
     }
 
     /**

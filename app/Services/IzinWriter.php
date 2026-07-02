@@ -44,7 +44,12 @@ class IzinWriter
 
             $body = (array) $response->json();
 
-            return $this->result((bool) ($body['success'] ?? false), $body, $response->status());
+            return $this->result((bool) ($body['success'] ?? false), $body, $response->status(), [
+                'name' => 'izin',
+                'event' => 'created',
+                'description' => 'Mengajukan izin baru',
+                'properties' => ['jenis' => $payload['jenis_izin'] ?? $payload['jenis'] ?? null],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('createIzin', $e);
         }
@@ -79,7 +84,12 @@ class IzinWriter
 
             $body = (array) $response->json();
 
-            return $this->result((bool) ($body['success'] ?? false), $body, $response->status());
+            return $this->result((bool) ($body['success'] ?? false), $body, $response->status(), [
+                'name' => 'izin',
+                'event' => $id !== null ? 'updated' : 'created',
+                'description' => $id !== null ? "Memperbarui SPD #{$id}" : 'Membuat SPD baru',
+                'properties' => ['id' => $id],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('saveSpd', $e, ['id' => $id]);
         }
@@ -99,7 +109,12 @@ class IzinWriter
             $body = (array) $response->json();
             $ok = $response->successful() || (bool) ($body['success'] ?? false);
 
-            return $this->result($ok, $body, $response->status());
+            return $this->result($ok, $body, $response->status(), [
+                'name' => 'izin',
+                'event' => 'deleted',
+                'description' => "Menghapus SPD #{$id}",
+                'properties' => ['id' => $id],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('deleteSpd', $e, ['id' => $id]);
         }
@@ -124,6 +139,12 @@ class IzinWriter
 
             if ($ok) {
                 $this->cache->flushUser($username);
+                $this->logActivity([
+                    'name' => 'izin',
+                    'event' => 'updated',
+                    'description' => "Memperbarui tanda tangan ({$username})",
+                    'properties' => ['username' => $username],
+                ]);
             } else {
                 Log::warning('IzinWriter updateSignature non-success', ['status' => $response->status(), 'body' => $body]);
             }
@@ -135,20 +156,38 @@ class IzinWriter
     }
 
     /**
-     * Bangun struktur hasil; flush cache Izin saat sukses.
+     * Bangun struktur hasil; flush cache Izin & catat activity saat sukses.
      *
      * @param  array<string, mixed>  $body
+     * @param  array{name: string, event: string, description: string, properties?: array<string, mixed>}|null  $log
      * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
      */
-    private function result(bool $ok, array $body, ?int $status): array
+    private function result(bool $ok, array $body, ?int $status, ?array $log = null): array
     {
         if ($ok) {
             $this->cache->flush();
+
+            if ($log !== null) {
+                $this->logActivity($log);
+            }
         } else {
             Log::warning('IzinWriter write non-success', ['status' => $status, 'body' => $body]);
         }
 
         return ['ok' => $ok, 'body' => $body, 'status' => $status, 'error' => null];
+    }
+
+    /**
+     * Catat activity untuk operasi domain eksternal (tanpa subject Eloquent lokal).
+     *
+     * @param  array{name: string, event: string, description: string, properties?: array<string, mixed>}  $log
+     */
+    private function logActivity(array $log): void
+    {
+        activity($log['name'])
+            ->event($log['event'])
+            ->withProperties($log['properties'] ?? [])
+            ->log($log['description']);
     }
 
     /**

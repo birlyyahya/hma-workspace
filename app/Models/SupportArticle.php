@@ -2,12 +2,25 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsModelActivity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
 class SupportArticle extends Model
 {
+    use LogsModelActivity;
+
+    protected function activityLogName(): string
+    {
+        return 'knowledge';
+    }
+
+    protected function activityLabel(): string
+    {
+        return 'Artikel';
+    }
+
     protected $fillable = [
         'user_id',
         'title',

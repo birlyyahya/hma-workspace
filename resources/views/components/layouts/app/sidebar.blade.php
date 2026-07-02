@@ -47,6 +47,11 @@
                 <flux:sidebar.item icon="book-open" :href="route('knowledge.articles')" :current="request()->routeIs('knowledge.articles')" wire:navigate>
                     Knowledge Hub
                 </flux:sidebar.item>
+                @can('viewActivityLog')
+                <flux:sidebar.item icon="clipboard-document-list" :href="route('activitylog-ui.dashboard')" :current="request()->routeIs('activitylog-ui.*')">
+                    Activity Log
+                </flux:sidebar.item>
+                @endcan
             </flux:sidebar.group>
         </flux:sidebar.nav>
 

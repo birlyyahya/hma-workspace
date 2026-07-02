@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Forms;
 
+use App\Services\ProjectWriter;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Validate;
@@ -58,10 +59,11 @@ class FilesForm extends Form
         return $this->uploadedFilename ?: Http::timeout(30)->post($adminDocsEndpoint, []);
     }
 
-    public function delete($id)
+    /**
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function delete($id): array
     {
-        $response = Http::delete(config('services.api_project').'admin-docs/'.$id);
-
-        return $response;
+        return app(ProjectWriter::class)->deleteDoc((int) $id);
     }
 }

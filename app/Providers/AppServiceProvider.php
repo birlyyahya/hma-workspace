@@ -59,6 +59,10 @@ class AppServiceProvider extends ServiceProvider
             return $user->hasRole('super-admin') || $user->hasPermission('view.pulse');
         });
 
+        Gate::define('viewActivityLog', function (User $user) {
+            return $user->hasRole('super-admin') || $user->hasPermission('activitylog.view');
+        });
+
         if (app()->environment('production')) {
             if (config('app.url')) {
                 URL::forceRootUrl(config('app.url'));

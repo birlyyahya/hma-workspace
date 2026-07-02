@@ -304,9 +304,9 @@ new class extends Component
         }
 
         $id = $this->deletingId;
-        $response = $this->form->delete($id);
+        $result = $this->form->delete($id);
 
-        if (($response['status'] ?? null) === 200) {
+        if ($result['ok']) {
             $this->reset('deletingId', 'deletingName');
             Flux::modal('delete-file-modal')->close();
             $this->mount();
@@ -317,8 +317,9 @@ new class extends Component
 
         Toaster::error('Hapus file gagal');
         Log::error('File delete failed', [
-            'status' => $response->status(),
-            'body' => $response->body(),
+            'status' => $result['status'],
+            'error' => $result['error'],
+            'body' => $result['body'],
         ]);
 
         $this->reset('deletingId', 'deletingName');

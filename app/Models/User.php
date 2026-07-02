@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsModelActivity;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,7 +14,25 @@ use Illuminate\Support\Str;
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, LogsModelActivity, Notifiable;
+
+    protected function activityLogName(): string
+    {
+        return 'user';
+    }
+
+    protected function activityLabel(): string
+    {
+        return 'User';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function activityLogExcept(): array
+    {
+        return ['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'];
+    }
 
     /**
      * The attributes that are mass assignable.

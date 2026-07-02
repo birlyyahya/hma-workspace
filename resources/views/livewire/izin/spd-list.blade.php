@@ -289,12 +289,21 @@ new class extends Component {
             'is_approved' => $this->isSubmitted && $this->isApproved ? 1 : 0,
         ];
 
-        $file = $this->attachment
-            ? [
-                'contents' => file_get_contents($this->attachment->getRealPath()),
-                'name' => $this->attachment->getClientOriginalName(),
-            ]
-            : null;
+        $file = null;
+
+        if ($this->attachment) {
+            $path = $this->attachment->getRealPath();
+            $contents = $path ? file_get_contents($path) : false;
+
+            if ($contents !== false && $contents !== '') {
+                $file = [
+                    'contents' => $contents,
+                    'name' => $this->attachment->getClientOriginalName(),
+                ];
+            }
+        }
+
+        $isUpdate = $this->editingId !== null;
 
         $result = app(IzinWriter::class)->saveSpd($this->editingId, $payload, $file);
 
@@ -304,20 +313,35 @@ new class extends Component {
             return;
         }
 
+        if (($payload['is_approved'] ?? 0) === 1) {
+            $this->notifyApproved($result['body']['data'] ?? []);
+        }
+
+        Toaster::success($isUpdate ? 'SPD berhasil diperbarui.' : 'SPD berhasil dibuat.');
+        Flux::modal('spd-form-modal')->close();
+        $this->resetForm();
+        $this->fetchList();
+    }
+
+    /**
+     * Kirim notifikasi persetujuan (best-effort). Kegagalan notifikasi tidak
+     * boleh menggagalkan proses simpan SPD yang sudah berhasil di sisi API.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function notifyApproved(array $data): void
+    {
         try {
-            $user = User::find($result['body']['data']['user_id']);
+            $userId = $data['user_id'] ?? $this->userId;
+            $user = $userId ? User::find($userId) : null;
 
-            $message = 'SPD sudah disetujui silahkan cek email anda';
-            // kirim ke service
-            NotificationService::send($user, $message, $result['body']['data']);
+            if (! $user) {
+                return;
+            }
 
-            Toaster::success($this->editingId ? 'SPD berhasil diperbarui.' : 'SPD berhasil dibuat.');
-            Flux::modal('spd-form-modal')->close();
-            $this->resetForm();
-            $this->fetchList();
+            NotificationService::send($user, 'SPD Anda sudah disetujui, silakan cek email Anda.', $data);
         } catch (\Throwable $e) {
-            Toaster::error('Terjadi kesalahan saat menyimpan SPD.');
-            Log::error('SPD save exception', ['message' => $e->getMessage()]);
+            Log::error('SPD notify exception', ['message' => $e->getMessage()]);
         }
     }
 
@@ -365,7 +389,7 @@ new class extends Component {
 
         $user = User::find($row['user_id'] ?? null);
         $role = $user->role;
-        $attachmentImage = $this->fetchAttachmentImage($this->spd['attachment_url'] ?? null);
+        $attachmentImage = $this->fetchAttachmentImage($row['attachment_url'] ?? null);
 
 
         $pdf = Pdf::loadView('pdf.spd-pdf', [
@@ -743,7 +767,15 @@ new class extends Component {
 
 {{-- ── Form modal (create / edit) ── --}}
 <flux:modal name="spd-form-modal" class="min-w-2xl overflow-auto md:min-w-3xl lg:min-w-4xl">
-    <form wire:submit="saveSpd" class="space-y-5">
+    <form
+        wire:submit="saveSpd"
+        class="space-y-5"
+        x-data="{ uploading: false }"
+        x-on:livewire-upload-start.window="uploading = true"
+        x-on:livewire-upload-finish.window="uploading = false"
+        x-on:livewire-upload-error.window="uploading = false"
+        x-on:livewire-upload-cancel.window="uploading = false"
+    >
         <div class="flex items-start gap-3 border-b border-zinc-100 pb-4">
             <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-zinc-100 text-zinc-700">
                 <flux:icon name="paper-airplane" class="h-5 w-5" />
@@ -933,9 +965,10 @@ new class extends Component {
                 <flux:modal.close>
                     <flux:button variant="ghost" type="button">Batal</flux:button>
                 </flux:modal.close>
-                <flux:button type="submit" variant="primary" icon="check" wire:loading.attr="disabled" wire:target="saveSpd">
-                    <span wire:loading.remove wire:target="saveSpd">{{ $editingId ? 'Simpan Perubahan' : 'Buat SPD' }}</span>
-                    <span wire:loading wire:target="saveSpd">Menyimpan...</span>
+                <flux:button type="submit" variant="primary" icon="check" wire:loading.attr="disabled" wire:target="saveSpd" x-bind:disabled="uploading">
+                    <span x-show="uploading">Mengunggah lampiran...</span>
+                    <span x-show="!uploading" wire:loading.remove wire:target="saveSpd">{{ $editingId ? 'Simpan Perubahan' : 'Buat SPD' }}</span>
+                    <span x-show="!uploading" wire:loading wire:target="saveSpd">Menyimpan...</span>
                 </flux:button>
             </div>
         </div>

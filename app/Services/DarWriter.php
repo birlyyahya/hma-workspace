@@ -43,7 +43,12 @@ class DarWriter
 
             $body = (array) $response->json();
 
-            return $this->result((bool) ($body['success'] ?? false), $body, $response->status());
+            return $this->result((bool) ($body['success'] ?? false), $body, $response->status(), [
+                'name' => 'dar',
+                'event' => 'updated',
+                'description' => "Memperbarui aktivitas DAR #{$id}",
+                'properties' => ['id' => $id],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('updateActivity', $e, ['id' => $id]);
         }
@@ -64,7 +69,12 @@ class DarWriter
 
             $body = (array) $response->json();
 
-            return $this->result((bool) ($body['success'] ?? false), $body, $response->status());
+            return $this->result((bool) ($body['success'] ?? false), $body, $response->status(), [
+                'name' => 'dar',
+                'event' => 'updated',
+                'description' => "Mengubah status aktivitas DAR #{$id}",
+                'properties' => ['id' => $id, 'status' => $status],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('updateStatus', $e, ['id' => $id, 'status' => $status]);
         }
@@ -93,7 +103,12 @@ class DarWriter
 
             $payload = (array) $response->json();
 
-            return $this->result((bool) ($payload['success'] ?? false), $payload, $response->status());
+            return $this->result((bool) ($payload['success'] ?? false), $payload, $response->status(), [
+                'name' => 'dar',
+                'event' => 'created',
+                'description' => "Menambah komentar pada aktivitas DAR #{$activityId}",
+                'properties' => ['activity_id' => $activityId],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('addComment', $e, ['activity_id' => $activityId]);
         }
@@ -114,7 +129,12 @@ class DarWriter
 
             $payload = (array) $response->json();
 
-            return $this->result((bool) ($payload['success'] ?? false), $payload, $response->status());
+            return $this->result((bool) ($payload['success'] ?? false), $payload, $response->status(), [
+                'name' => 'dar',
+                'event' => 'updated',
+                'description' => "Memperbarui komentar DAR #{$commentId}",
+                'properties' => ['comment_id' => $commentId],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('updateComment', $e, ['comment_id' => $commentId]);
         }
@@ -133,7 +153,12 @@ class DarWriter
 
             $body = (array) $response->json();
 
-            return $this->result((bool) ($body['success'] ?? false), $body, $response->status());
+            return $this->result((bool) ($body['success'] ?? false), $body, $response->status(), [
+                'name' => 'dar',
+                'event' => 'deleted',
+                'description' => "Menghapus komentar DAR #{$commentId}",
+                'properties' => ['comment_id' => $commentId],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('deleteComment', $e, ['comment_id' => $commentId]);
         }
@@ -153,27 +178,50 @@ class DarWriter
             $body = (array) $response->json();
             $ok = $response->successful() || (bool) ($body['success'] ?? false);
 
-            return $this->result($ok, $body, $response->status());
+            return $this->result($ok, $body, $response->status(), [
+                'name' => 'dar',
+                'event' => 'deleted',
+                'description' => "Menghapus aktivitas DAR #{$id}",
+                'properties' => ['id' => $id],
+            ]);
         } catch (\Throwable $e) {
             return $this->fail('deleteActivity', $e, ['id' => $id]);
         }
     }
 
     /**
-     * Bangun struktur hasil; flush cache DAR saat sukses.
+     * Bangun struktur hasil; flush cache DAR & catat activity saat sukses.
      *
      * @param  array<string, mixed>  $body
+     * @param  array{name: string, event: string, description: string, properties?: array<string, mixed>}|null  $log
      * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
      */
-    private function result(bool $ok, array $body, ?int $status): array
+    private function result(bool $ok, array $body, ?int $status, ?array $log = null): array
     {
         if ($ok) {
             $this->cache->flush();
+
+            if ($log !== null) {
+                $this->logActivity($log);
+            }
         } else {
             Log::warning('DarWriter write non-success', ['status' => $status, 'body' => $body]);
         }
 
         return ['ok' => $ok, 'body' => $body, 'status' => $status, 'error' => null];
+    }
+
+    /**
+     * Catat activity untuk operasi domain eksternal (tanpa subject Eloquent lokal).
+     *
+     * @param  array{name: string, event: string, description: string, properties?: array<string, mixed>}  $log
+     */
+    private function logActivity(array $log): void
+    {
+        activity($log['name'])
+            ->event($log['event'])
+            ->withProperties($log['properties'] ?? [])
+            ->log($log['description']);
     }
 
     /**

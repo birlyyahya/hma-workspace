@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsModelActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,7 +10,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Department extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsModelActivity;
+
+    protected function activityLogName(): string
+    {
+        return 'user';
+    }
+
+    protected function activityLabel(): string
+    {
+        return 'Departemen';
+    }
 
     protected $fillable = [
         'code',

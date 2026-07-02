@@ -19,7 +19,9 @@
         "livewire/flux": "^2.9.0",
         "livewire/volt": "^1.10",
         "masmerise/livewire-toaster": "^2.9",
-        "predis/predis": "*"
+        "muhammadsadeeq/laravel-activitylog-ui": "^2.0",
+        "predis/predis": "*",
+        "spatie/laravel-activitylog": "^5.0"
     },
     "require-dev": {
         "barryvdh/laravel-debugbar": "^4.3",
