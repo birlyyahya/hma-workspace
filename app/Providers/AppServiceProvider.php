@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\User;
 use App\Services\DarCache;
 use App\Services\DarWriter;
 use App\Services\IzinCache;
@@ -53,6 +54,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+
+        Gate::define('viewPulse', function (User $user) {
+            return $user->hasRole('super-admin') || $user->hasPermission('view.pulse');
+        });
+
         if (app()->environment('production')) {
             if (config('app.url')) {
                 URL::forceRootUrl(config('app.url'));
