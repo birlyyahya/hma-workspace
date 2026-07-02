@@ -49,11 +49,6 @@ return [
         'timeout' => (int) env('BEPM_TIMEOUT', 3),
     ],
 
-    'darbe' => [
-        'base' => env('API_IZIN'),
-        'timeout' => (int) env('DARBE_TIMEOUT', 3),
-    ],
-
     'api_izin_register_endpoint' => env('API_IZIN_REGISTER_ENDPOINT'),
 
     'whatsapp_gateway' => [
