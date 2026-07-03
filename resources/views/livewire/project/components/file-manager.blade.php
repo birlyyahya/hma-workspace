@@ -169,7 +169,8 @@ new class extends Component
         $rows = collect($this->allDocs())
             ->map(function (array $doc) {
                 $url = (string) data_get($doc, 'files.url', '');
-                $legacy = ! str_starts_with($url, $this->rootPrefix());
+                $path = Str::after($url, '/storage/');
+                $legacy = ! str_starts_with($path, $this->rootPrefix());
                 $name = $legacy
                     ? (string) ($doc['title'] ?? basename($url))
                     : basename($url);
@@ -178,7 +179,7 @@ new class extends Component
                 return [
                     'id' => $doc['id'],
                     'name' => $name,
-                    'key' => $url,
+                    'key' => $path,
                     'legacy' => $legacy,
                     'ext' => $ext,
                     'category' => $this->categoryOf($ext),
@@ -445,8 +446,8 @@ new class extends Component
         }
 
         $docs = $this->docsUnderPrefix($this->rootPrefix().$folder->path().'/');
-
         if ($docs === [] && ! $folder->children()->exists()) {
+            dd( $this->allDocs());
             $folder->delete();
             Toaster::success('Folder dihapus');
 
@@ -465,15 +466,17 @@ new class extends Component
         if ($folder === null || $folder->status !== null) {
             return;
         }
-
         $items = collect($this->docsUnderPrefix($this->rootPrefix().$folder->path().'/'))
             ->map(fn (array $doc) => [
                 'doc_id' => (int) $doc['id'],
-                'key' => (string) data_get($doc, 'files.url', ''),
+                'key' => ltrim(Str::after(
+                    parse_url((string) data_get($doc, 'files.url', ''), PHP_URL_PATH)
+                    ?: (string) data_get($doc, 'files.url', ''),
+                    '/storage/'
+                    ), '/'),
             ])
             ->values()
             ->all();
-
         $folder->update(['status' => 'deleting']);
 
         DeleteProjectFilesJob::dispatch((int) $this->id, $items, $folder->id);
@@ -589,11 +592,13 @@ new class extends Component
 
         if ($this->deleteOne($row)) {
             Toaster::success('File dihapus');
+            $this->dispatch('file-uploaded');
+            app(ProjectCache::class)->flushDocs((int) $this->id);
         } else {
             Toaster::error('Hapus file gagal');
         }
 
-        app(ProjectCache::class)->flushDocs((int) $this->id);
+
     }
 
     // ------------------------------------------------------------------- bulk
@@ -716,7 +721,13 @@ new class extends Component
     protected function docsUnderPrefix(string $prefix): array
     {
         return collect($this->allDocs())
-            ->filter(fn (array $doc) => str_starts_with((string) data_get($doc, 'files.url', ''), $prefix))
+            ->filter(function (array $doc) use ($prefix) {
+                $url = (string) data_get($doc, 'files.url', '');
+
+                $path = ltrim(Str::after(parse_url($url, PHP_URL_PATH) ?: $url, '/storage/'), '/');
+
+                return str_starts_with($path, $prefix);
+            })
             ->values()
             ->all();
     }
