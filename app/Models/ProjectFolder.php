@@ -21,6 +21,7 @@ class ProjectFolder extends Model
         'project_id',
         'parent_id',
         'name',
+        'status',
         'created_by',
     ];
 
