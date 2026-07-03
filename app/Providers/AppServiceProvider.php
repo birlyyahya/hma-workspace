@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\User;
 use App\Services\CaCache;
+use App\Services\CaWriter;
 use App\Services\DarCache;
 use App\Services\DarWriter;
 use App\Services\IzinCache;
@@ -54,6 +55,11 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(CaCache::class, fn () => new CaCache(
             rtrim((string) config('services.api_ca'), '/')
+        ));
+
+        $this->app->singleton(CaWriter::class, fn ($app) => new CaWriter(
+            rtrim((string) config('services.api_ca'), '/'),
+            $app->make(CaCache::class),
         ));
     }
 

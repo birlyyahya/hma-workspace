@@ -1,9 +1,110 @@
 <?php
 
+use App\Services\CaCache;
+use App\Services\CaWriter;
+use Flux\Flux;
 use Livewire\Volt\Component;
+use Livewire\WithFileUploads;
+use Masmerise\Toaster\Toaster;
 
 new class extends Component {
-    //
+    use WithFileUploads;
+
+    public array $caPlBalance = [];
+    public array $chart = [];
+    public array $caKegiatanBalance = [];
+
+    /** @var array<int, string> */
+    public array $categories = [];
+
+    // Form Catat / Edit Pengeluaran
+    public ?int $editingId = null;
+    public $jumlah;
+    public $kategori;
+    public $deskripsi;
+    public $tanggal;
+    public $bukti;
+
+    public function mount(): void
+    {
+        $this->refreshDashboard();
+    }
+
+    public function transaksiCaPl(): array
+    {
+        return app(CaCache::class)->transaksiCaPlActive($this->caPlBalance['kode_ca'] ?? '') ?? [];
+    }
+
+    /**
+     * Aturan validasi. Bukti wajib saat mencatat baru, opsional saat mengedit
+     * (agar pengguna tak perlu unggah ulang bila hanya mengubah nominal/kategori).
+     *
+     * @return array<string, mixed>
+     */
+    protected function rules(): array
+    {
+        return [
+            'jumlah' => ['required', 'integer', 'min:1'],
+            'kategori' => ['required', 'string'],
+            'deskripsi' => ['nullable', 'string'],
+            'tanggal' => ['required', 'date'],
+            'bukti' => [$this->editingId ? 'nullable' : 'required', 'file', 'mimes:jpg,png,pdf', 'max:2048'],
+        ];
+    }
+
+    public function saveExpense(): void
+    {
+        $this->validate();
+
+        $payload = [
+            'jumlah' => (int) $this->jumlah,
+            'kategori' => $this->kategori,
+            'deskripsi' => $this->deskripsi,
+            'tanggal' => $this->tanggal,
+            'direction' => 'keluar',
+            'user_id' => Auth::id(),
+        ];
+
+        if ($this->bukti) {
+            $payload['bukti'] = [
+                'contents' => $this->bukti->get(),
+                'name' => $this->bukti->getClientOriginalName(),
+            ];
+        }
+
+        $kode = $this->caPlBalance['kode_ca'] ?? '';
+        $isEdit = $this->editingId !== null;
+
+        $result = $isEdit
+            ? app(CaWriter::class)->updateTransactionCaPl($kode, $this->editingId, $payload)
+            : app(CaWriter::class)->createTransactionCaPl($kode, $payload);
+
+        if (! $result['ok']) {
+            Toaster::error($result['error'] ?? ($result['body']['message'] ?? 'Gagal menyimpan pengeluaran.'));
+
+            return;
+        }
+
+        $this->refreshDashboard();
+        $this->resetForm();
+        Flux::modal('catat-pengeluaran')->close();
+        Toaster::success($isEdit ? 'Pengeluaran diperbarui.' : 'Pengeluaran tersimpan.');
+    }
+
+    public function resetForm(): void
+    {
+        $this->reset(['editingId', 'jumlah', 'kategori', 'deskripsi', 'tanggal', 'bukti']);
+        $this->resetValidation();
+    }
+
+    private function refreshDashboard(): void
+    {
+        $response = app(CaCache::class)->dashboard(Auth::id());
+        $this->caPlBalance = $response['card_left'] ?? [];
+        $this->chart = $response['chart'] ?? [];
+        $this->caKegiatanBalance = $response['card_right'] ?? [];
+        $this->categories = $response['categories'] ?? ['Transport', 'Akomodasi', 'Konsumsi', 'ATK', 'Komunikasi', 'Lain-lain'];
+    }
 }; ?>
 
 <div class="space-y-4">
@@ -21,22 +122,25 @@ new class extends Component {
                         <div class="flex items-center gap-2">
                             <p class="text-sm text-zinc-500 dark:text-zinc-400">Total Balance</p>
                             <flux:badge size="sm" color="green">active</flux:badge>
-                            <flux:badge size="sm" color="zinc">Periode #1</flux:badge>
+                            <flux:badge size="sm" color="zinc">{{ $this->caPlBalance['kode_ca'] ?? 'N/A' }}</flux:badge>
                         </div>
 
                         <h2 class="text-4xl font-semibold tabular-nums text-zinc-900 dark:text-white">
-                            Rp 0
+                            Rp {{ number_format($this->caPlBalance['sisa_saldo'] ?? 0, 0, ',', '.') }}
                         </h2>
 
                         <p class="text-sm text-zinc-500 dark:text-zinc-400">
-                            CA PL &bull; Float Rp 0 &bull; Dibuka &mdash;
+                            Dibuka &mdash;
                         </p>
                     </div>
 
                     <div class="flex gap-2">
-                        <flux:button size="sm" variant="primary" icon="minus-circle">
-                            Catat Pengeluaran
-                        </flux:button>
+                         <flux:modal.trigger name="catat-pengeluaran">
+                             <flux:button size="sm" variant="primary" icon="minus-circle"
+                                 x-on:click="$wire.editingId = null; $wire.jumlah = null; $wire.kategori = ''; $wire.deskripsi = ''; $wire.tanggal = ''; $wire.bukti = null;">
+                                 Catat Pengeluaran
+                             </flux:button>
+                         </flux:modal.trigger>
 
                         <flux:modal.trigger name="topup-laporan">
                             <flux:button size="sm" variant="outline" icon="arrow-up-tray">Top up</flux:button>
@@ -45,14 +149,9 @@ new class extends Component {
                 </div>
 
                 {{-- CHART (data statik; wiring API dilakukan manual) --}}
-                <div wire:ignore
-                    x-data="{ chart: null }"
-                    x-init="
+                <div wire:ignore x-data="{ chart: null }" x-init="
                         chart = new ApexCharts($refs.caChart, {
-                            series: [
-                                { name: 'Income', data: [0,0,0,0,0,0,0,0,0,0,0,0] },
-                                { name: 'Expense', data: [0,0,0,0,0,0,0,0,0,0,0,0] },
-                            ],
+                             series: @js($this->chart['series'] ?? []),
                             chart: { height: 280, type: 'area', toolbar: { show: false } },
                             dataLabels: { enabled: false },
                             stroke: { curve: 'smooth', width: 3 },
@@ -75,7 +174,7 @@ new class extends Component {
                         <flux:badge size="sm" color="blue">Opening periode</flux:badge>
                     </div>
                     <h3 class="text-2xl font-semibold mt-2 tabular-nums text-zinc-900 dark:text-white">
-                        Rp 0
+                        Rp {{ number_format($this->caPlBalance['income'] ?? 0, 0, ',', '.') }}
                     </h3>
                     <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Saldo awal periode aktif</p>
                 </div>
@@ -86,7 +185,7 @@ new class extends Component {
                         <flux:badge size="sm" color="red">Pengeluaran</flux:badge>
                     </div>
                     <h3 class="text-2xl font-semibold mt-2 tabular-nums text-zinc-900 dark:text-white">
-                        Rp 0
+                        Rp {{ number_format($this->caPlBalance['expense'] ?? 0, 0, ',', '.') }}
                     </h3>
                     <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Total pengeluaran periode aktif</p>
                 </div>
@@ -100,11 +199,29 @@ new class extends Component {
             <div class="p-6 space-y-4 border-b border-zinc-200 dark:border-zinc-700">
                 <div class="flex justify-between items-center">
                     <h3 class="font-semibold text-zinc-900 dark:text-white">Dompet Kegiatan</h3>
-                    <span class="text-sm text-zinc-400">0 dompet</span>
+                    <span class="text-sm text-zinc-400">{{ $this->caKegiatanBalance['jumlah_dompet'] ?? 0 }} dompet</span>
                 </div>
-
-                <p class="text-sm text-zinc-400 text-center py-2">Belum ada dompet kegiatan</p>
-
+                @forelse (collect($this->caKegiatanBalance['data'] ?? [])->take(4) as $item)
+                <a wire:key="dompet-{{ $item['kode_ca'] }}" href="{{ route('cashadvance.dompet-show', $item['kode_ca']) }}" wire:navigate class="flex items-center justify-between -mx-2 px-2 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <flux:avatar :name="$item['judul_kegiatan']" color="{{ $item['status'] ?? 'closed' === 'closed' ? 'zinc' : 'blue' }}" size="sm" />
+                        <div class="text-left min-w-0">
+                            <p class="text-sm font-medium truncate text-zinc-900 dark:text-white">{{ $item['judul_kegiatan'] }}</p>
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-xs text-zinc-500">{{ $item['kode_ca'] }}</span>
+                                @if ($item['status'] ?? 'closed' === 'closed')
+                                <flux:badge size="sm" color="zinc">closed</flux:badge>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-sm font-medium tabular-nums {{ $item['sisa_saldo'] < 0 ? 'text-red-600' : 'text-zinc-900 dark:text-white' }}">
+                        Rp {{ number_format($item['sisa_saldo'], 0, ',', '.') }}
+                    </p>
+                </a>
+                @empty
+                <p class="text-sm text-zinc-400">Belum ada dompet kegiatan.</p>
+                @endforelse
                 <flux:modal.trigger name="buat-kegiatan">
                     <flux:button variant="outline" class="w-full" icon="plus">Create new card</flux:button>
                 </flux:modal.trigger>
@@ -114,10 +231,39 @@ new class extends Component {
             <div class="p-6 space-y-4">
                 <p class="text-sm text-zinc-500 dark:text-zinc-400">Pengeluaran per kategori &mdash; periode aktif</p>
                 <h3 class="text-2xl font-semibold tabular-nums text-zinc-900 dark:text-white">
-                    Rp 0
+                    Rp {{ number_format($this->caKegiatanBalance['total_pengeluaran'] ?? 0, 0, ',', '.') }}
                 </h3>
+                @php
+                // Kelas literal lengkap agar Tailwind men-generate-nya (jangan dirangkai dinamis).
+                $palette = [
+                ['bg' => 'bg-orange-500/20', 'border' => 'border-orange-500'],
+                ['bg' => 'bg-blue-500/20', 'border' => 'border-blue-500'],
+                ['bg' => 'bg-purple-500/20', 'border' => 'border-purple-500'],
+                ['bg' => 'bg-pink-500/20', 'border' => 'border-pink-500'],
+                ['bg' => 'bg-green-500/20', 'border' => 'border-green-500'],
+                ['bg' => 'bg-teal-500/20', 'border' => 'border-teal-500'],
+                ];
+                @endphp
+                @if (!empty($this->caKegiatanBalance['total_pengeluaran']))
+                <div class="h-10 rounded bg-zinc-100 dark:bg-zinc-800 overflow-hidden flex">
+                    @foreach ($this->caKegiatanBalance['kategori_pengeluaran'] as $i => $row)
+                    @php $c = $palette[$i % count($palette)]; @endphp
+                    <div class="{{ $c['bg'] }} border-l-2 {{ $c['border'] }}" style="width: {{ max($row['persentase'], 2) }}%" wire:key="bar-{{ $row['nama'] }}"></div>
+                    @endforeach
+                </div>
 
+                <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                    @foreach ($this->caKegiatanBalance['kategori_pengeluaran'] as $i => $row)
+                    <p class="border-l-2 ps-2 {{ $palette[$i % count($palette)]['border'] }}" wire:key="legend-{{ $row['nama'] }}">
+                        {{ $row['nama'] ? 'Lainnya' : $row['nama'] }} • {{ $row['persentase'] }}%
+                    </p>
+                    @endforeach
+                </div>
+                @else
                 <p class="text-sm text-zinc-400">Belum ada pengeluaran pada periode ini.</p>
+                @endif
+
+
             </div>
         </div>
     </div>
@@ -165,29 +311,95 @@ new class extends Component {
                     </tr>
                 </thead>
                 <tbody>
+                    @forelse ($this->transaksiCaPl()['data'] ?? [] as $trx)
+                    <tr wire:key="trx-{{ $trx['dompet_id'] }}" class="border-t border-zinc-100 dark:border-zinc-800">
+                        <td class="px-3 py-3 md:px-6 whitespace-nowrap text-zinc-900 dark:text-white">{{ $trx['deskripsi'] }}</td>
+                        <td class="px-3 py-3 md:px-6 whitespace-nowrap">{{ $trx['kategori'] ?? '-' }}</td>
+                        <td class="px-3 py-3 md:px-6 whitespace-nowrap">{{ \Carbon\Carbon::parse($trx['created_at'])->translatedFormat('d/m/Y h:i') }}</td>
+                        <td class="px-3 py-3 md:px-6 whitespace-nowrap">
+                            <flux:badge size="sm" :color="$trx['jenis'] === 'pemasukan' ? 'green' : 'red'">
+                                {{ ucfirst($trx['jenis']) }}
+                            </flux:badge>
+                        </td>
+                        <td class="px-3 py-3 md:px-6 text-right whitespace-nowrap tabular-nums {{ $trx['jenis'] === 'pemasukan' ? 'text-green-600' : 'text-red-600' }}">
+                            {{ $trx['jenis'] === 'pemasukan' ? '+' : '−' }} Rp {{ number_format($trx['jumlah'], 0, ',', '.') }}
+                        </td>
+                        <td class="px-3 py-3 md:px-6 text-right whitespace-nowrap tabular-nums {{ $trx['saldo_setelah'] < 0 ? 'text-red-600' : '' }}">
+                            Rp {{ number_format($trx['saldo_setelah'], 0, ',', '.') }}
+                        </td>
+                        <td class="px-3 py-3 md:px-6 text-center whitespace-nowrap">
+                            @if ($trx['bukti'] ?? false)
+                            <flux:button size="sm" variant="ghost" icon="paper-clip" />
+                            @else
+                            <span class="text-zinc-300">-</span>
+                            @endif
+                        </td>
+                        <td class="px-3 py-3 md:px-6 text-center whitespace-nowrap">
+                            <div class="flex items-center justify-center gap-1">
+                                <flux:modal.trigger name="catat-pengeluaran">
+                                    <flux:button size="sm" variant="ghost" icon="pencil-square" type="button"
+                                        x-on:click="
+                                            $wire.editingId = {{ $trx['dompet_id'] }};
+                                            $wire.jumlah = {{ (int) $trx['jumlah'] }};
+                                            $wire.kategori = @js($trx['kategori'] ?? '');
+                                            $wire.deskripsi = @js($trx['deskripsi'] ?? '');
+                                            $wire.tanggal = @js(\Carbon\Carbon::parse($trx['created_at'])->toDateString());
+                                            $wire.bukti = null;
+                                        " />
+                                </flux:modal.trigger>
+                                <flux:button size="sm" variant="ghost" icon="trash" class="text-red-600" wire:click="deleteTransaction({{ $trx['dompet_id'] }})" wire:confirm="Hapus transaksi ini?" />
+                            </div>
+                        </td>
+                    </tr>
+                    @empty
                     <tr>
                         <td colspan="8" class="px-6 py-8 text-center text-zinc-400">Belum ada transaksi pada periode aktif</td>
                     </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
     </div>
 
-    {{-- ================= MODAL: CATAT PENGELUARAN ================= --}}
-    <flux:modal name="catat-pengeluaran" class="w-lg">
-        <form class="space-y-6">
+    {{-- ================= MODAL: CATAT / EDIT PENGELUARAN ================= --}}
+    <flux:modal name="catat-pengeluaran" class="w-lg" @close="$wire.resetForm()">
+        <form wire:submit.prevent="saveExpense" class="space-y-6">
             <div>
-                <flux:heading size="lg">Catat Pengeluaran</flux:heading>
+                <flux:heading size="lg">
+                    <span x-show="! $wire.editingId">Catat Pengeluaran</span>
+                    <span x-show="$wire.editingId" x-cloak>Edit Pengeluaran</span>
+                </flux:heading>
                 <flux:text class="mt-1">Arah transaksi terkunci sebagai pengeluaran (keluar).</flux:text>
             </div>
 
-            <flux:input type="number" label="Nominal" prefix="Rp" placeholder="0" />
-            <flux:select label="Kategori" placeholder="Pilih kategori" />
-            <flux:textarea label="Deskripsi" placeholder="Keterangan pengeluaran" rows="2" />
-            <flux:input type="date" label="Tanggal" />
-            <flux:input type="file" label="Bukti (wajib &mdash; jpg, png, pdf)" />
+            <flux:input wire:model="jumlah" type="number" label="Nominal" prefix="Rp" placeholder="0" />
 
-            <flux:button type="submit" variant="primary" class="w-full">Simpan Pengeluaran</flux:button>
+            <flux:select wire:model="kategori" label="Kategori" placeholder="Pilih kategori">
+                @foreach ($categories as $cat)
+                    <flux:select.option value="{{ $cat }}">{{ $cat }}</flux:select.option>
+                @endforeach
+            </flux:select>
+
+            <flux:textarea wire:model="deskripsi" label="Deskripsi" placeholder="Keterangan pengeluaran" rows="2" />
+            <flux:input wire:model="tanggal" type="date" label="Tanggal" />
+
+            <div>
+                <flux:input wire:model="bukti" type="file" accept=".jpg,.jpeg,.png,.pdf"
+                    label="Bukti (jpg, png, pdf &mdash; maks 2MB)" />
+                <span wire:loading wire:target="bukti" class="mt-1 block text-xs text-zinc-500 animate-pulse">
+                    Mengunggah bukti&hellip;
+                </span>
+                <flux:text x-show="$wire.editingId" x-cloak class="mt-1 text-xs">
+                    Kosongkan bila tidak mengganti bukti.
+                </flux:text>
+            </div>
+
+            <flux:button type="submit" variant="primary" class="w-full"
+                wire:loading.attr="disabled" wire:target="bukti,saveExpense">
+                <span wire:loading.remove wire:target="bukti,saveExpense">Simpan Pengeluaran</span>
+                <span wire:loading wire:target="bukti" class="animate-pulse">Menunggu unggahan&hellip;</span>
+                <span wire:loading wire:target="saveExpense" class="animate-pulse">Menyimpan&hellip;</span>
+            </flux:button>
         </form>
     </flux:modal>
 
