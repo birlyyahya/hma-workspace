@@ -317,7 +317,7 @@ new #[Lazy] class extends Component {
                 </div>
 
                 <div x-show="active === 'file'" wire:key="files-{{ $this->id }}" x-transition.opacity.duration.150ms>
-                    <livewire:project.components.project-files-tabs lazy :id="$this->id" />
+                    <livewire:project.components.file-manager lazy :id="$this->id" />
                 </div>
             </div>
         </div>
