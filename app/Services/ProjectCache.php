@@ -24,6 +24,8 @@ class ProjectCache
 
     private const TAG_SPECTECH = 'spectech';
 
+    private const TAG_DOCS = 'project-docs';
+
     public function __construct(private string $apiBase) {}
 
     /**
@@ -323,6 +325,36 @@ class ProjectCache
     }
 
     /**
+     * Seluruh dokumen sebuah project (SWR + tag per-project) — sumber daftar
+     * file di file manager. Di-flush oleh flushDocs() setiap ada write dokumen.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function documentsFor(int $projectId): array
+    {
+        return $this->rememberFlexible([self::TAG_DOCS, "docs:project:{$projectId}"], "docs:project:{$projectId}", [self::TTL_USER, self::TTL_USER * 4], function () use ($projectId) {
+            try {
+                $response = $this->externalRead(timeout: 15)->get($this->apiBase.'/admin-docs/search', [
+                    'project_id' => $projectId,
+                    'limit' => 10000,
+                    'sortBy' => 'created_at',
+                    'sortOrder' => 'desc',
+                ]);
+
+                if ($response->failed()) {
+                    throw new \RuntimeException('admin-docs search status '.$response->status());
+                }
+
+                return $response->json('data') ?? [];
+            } catch (\Throwable $e) {
+                Log::warning('ProjectCache documentsFor gagal', ['project_id' => $projectId, 'error' => $e->getMessage()]);
+
+                throw $e;
+            }
+        });
+    }
+
+    /**
      * Daftar kategori dokumen admin (statis, di-cache global).
      *
      * @return array<int, array<string, mixed>>
@@ -367,5 +399,10 @@ class ProjectCache
     public function flushCompanies(): void
     {
         Cache::tags([self::TAG_COMPANIES])->flush();
+    }
+
+    public function flushDocs(int $projectId): void
+    {
+        Cache::tags(["docs:project:{$projectId}"])->flush();
     }
 }

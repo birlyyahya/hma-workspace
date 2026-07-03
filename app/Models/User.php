@@ -120,6 +120,31 @@ class User extends Authenticatable implements MustVerifyEmail
         return 'own';
     }
 
+    /**
+     * User boleh mengakses sebuah project BEPM bila ia leader-nya, tergabung
+     * di tim internal, atau punya view scope 'all' untuk modul project —
+     * aturan yang sama dengan canViewProject di halaman project-show.
+     *
+     * @param  array<string, mixed>  $project  payload project dari ProjectCache::projectFor()
+     */
+    public function canAccessProject(array $project): bool
+    {
+        if ($this->viewScopeFor('project') === 'all') {
+            return true;
+        }
+
+        if (empty($project)) {
+            return false;
+        }
+
+        $isLeader = (int) ($project['project_leader_id'] ?? 0) === (int) $this->id;
+
+        $isMember = collect($project['support_team_internals'] ?? [])
+            ->contains(fn ($member) => (int) ($member['user_id'] ?? 0) === (int) $this->id);
+
+        return $isLeader || $isMember;
+    }
+
     public function assigments()
     {
         return $this->hasMany(TaskAssignments::class, 'user_id');
