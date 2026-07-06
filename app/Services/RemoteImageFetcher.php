@@ -40,6 +40,33 @@ class RemoteImageFetcher
     }
 
     /**
+     * Ambil aset biner mentah (mis. lampiran PDF) untuk digabung ke PDF lain,
+     * atau null bila fetch gagal / kosong.
+     */
+    public function toRawBytes(?string $url, int $timeout = 20): ?string
+    {
+        if (! $url) {
+            return null;
+        }
+
+        try {
+            $response = $this->externalRead(timeout: $timeout)->get($url);
+
+            if (! $response->successful()) {
+                return null;
+            }
+
+            $body = $response->body();
+
+            return $body !== '' ? $body : null;
+        } catch (\Throwable $e) {
+            Log::warning('RemoteImageFetcher raw fetch failed', ['url' => $url, 'message' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
+    /**
      * Ambil lampiran gambar (validasi ekstensi dulu) dan kembalikan data URI + mime,
      * atau null bila URL bukan gambar / fetch gagal.
      *

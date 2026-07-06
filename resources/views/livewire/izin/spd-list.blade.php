@@ -3,8 +3,7 @@
 use App\Models\User;
 use App\Services\IzinCache;
 use App\Services\IzinWriter;
-use App\Services\RemoteImageFetcher;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\SpdPdfComposer;
 use Carbon\Carbon;
 use Flux\Flux;
 use Illuminate\Support\Facades\Log;
@@ -409,38 +408,16 @@ new class extends Component {
         }
 
         $user = User::find($row['user_id'] ?? null);
-        $role = $user->role;
-        $attachmentImage = $this->fetchAttachmentImage($row['attachment_url'] ?? null);
 
-
-        $pdf = Pdf::loadView('pdf.spd-pdf', [
-            'spd' => $row,
-            'user' => $user,
-            'role' => $role,
-            'attachmentImage' => $attachmentImage,
-        ])->setPaper('A4', 'portrait');
+        $pdfBytes = app(SpdPdfComposer::class)->render($row, $user);
 
         $filename = 'SPD-' . str_pad((string) $id, 4, '0', STR_PAD_LEFT) . '.pdf';
 
         return response()->streamDownload(
-            fn () => print ($pdf->output()),
+            fn () => print ($pdfBytes),
             $filename,
+            ['Content-Type' => 'application/pdf'],
         );
-    }
-
-    /**
-     * Fetch attachment and convert to base64 data URI if it's an image,
-     * so DomPDF can render it as the second page.
-     *
-     * @return array{data:string,mime:string}|null
-     */
-    protected function fetchAttachmentImage(?string $url): ?array
-    {
-        if (! $url) {
-            return null;
-        }
-
-        return app(RemoteImageFetcher::class)->toImageData($url);
     }
 
     protected function resetForm(): void
