@@ -271,7 +271,7 @@ new class extends Component {
         $this->department = (string) ($row['department'] ?? '');
         $this->destination = (string) ($row['destination'] ?? '');
         $this->address = (string) ($row['address'] ?? '');
-        $this->masaTugas = (string) ($row['start_date'] ?? '');
+        $this->masaTugas = (string) ($row['date'] ?? '');
         $this->isSubmitted = (bool) ($row['is_submitted'] ?? false);
         $this->isApproved = (bool) ($row['is_approved'] ?? false);
         $this->attachment = null;
@@ -606,7 +606,7 @@ new class extends Component {
                         <td class="px-5 py-3.5 text-zinc-700">
                             <div class="flex items-start gap-1.5 text-xs">
                                 <flux:icon name="calendar" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" />
-                                <span class="line-clamp-2 max-w-40">{{ strip_tags($spd['start_date'] ?? '') ?: '—' }}</span>
+                                <span class="line-clamp-2 max-w-40">{{ strip_tags($spd['date'] ?? '') ?: '—' }}</span>
                             </div>
                         </td>
                         <td class="px-5 py-3.5">
