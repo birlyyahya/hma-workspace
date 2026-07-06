@@ -66,6 +66,23 @@ if (! function_exists('isImageFile')) {
     }
 }
 
+if (! function_exists('project_storage_year')) {
+    /**
+     * Tahun project untuk layout penyimpanan MinIO
+     * (projects/{tahun}/{id}/...). Diambil dari start_date; fallback berurutan
+     * ke contract_date lalu created_at. Satu sumber kebenaran dipakai oleh
+     * controller upload maupun komponen file-manager agar path selalu sama.
+     *
+     * @param  array<string, mixed>  $project
+     */
+    function project_storage_year(array $project): string
+    {
+        $date = $project['start_date'] ?? $project['contract_date'] ?? $project['created_at'] ?? null;
+
+        return $date ? \Illuminate\Support\Carbon::parse($date)->format('Y') : 'tanpa-tahun';
+    }
+}
+
 if (! function_exists('colorFromSeed')) {
     function colorFromSeed($seed)
     {

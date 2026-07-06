@@ -42,7 +42,8 @@ class ProjectFileUploadController extends Controller
                 ->path();
         }
 
-        $prefix = "projects/{$project}/".($folderPath !== '' ? $folderPath.'/' : '');
+        $year = project_storage_year($this->cache->projectFor($project));
+        $prefix = "projects/{$year}/{$project}/".($folderPath !== '' ? $folderPath.'/' : '');
         $key = $this->uniqueKey($project, $prefix, $filename);
 
         $uploadId = $this->storage->initiateMultipart($key, (string) $request->validated('mime'));

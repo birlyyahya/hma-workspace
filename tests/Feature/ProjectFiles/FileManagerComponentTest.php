@@ -20,10 +20,10 @@ beforeEach(fn () => Livewire::withoutLazyLoading());
 function fakeBepmForFileManager(int $leaderId, ?array $docs = null): void
 {
     $docs ??= [
-        ['id' => 1, 'title' => 'laporan', 'created_at' => '2026-06-01T00:00:00Z', 'admin_doc_category_id' => 7, 'files' => ['url' => 'projects/5/laporan.pdf', 'size' => '2 MB']],
-        ['id' => 2, 'title' => 'kontrak', 'created_at' => '2026-06-02T00:00:00Z', 'admin_doc_category_id' => 7, 'files' => ['url' => 'projects/5/Kontrak/kontrak.pdf', 'size' => '1 MB']],
+        ['id' => 1, 'title' => 'laporan', 'created_at' => '2026-06-01T00:00:00Z', 'admin_doc_category_id' => 7, 'files' => ['url' => 'projects/2026/5/laporan.pdf', 'size' => '2 MB']],
+        ['id' => 2, 'title' => 'kontrak', 'created_at' => '2026-06-02T00:00:00Z', 'admin_doc_category_id' => 7, 'files' => ['url' => 'projects/2026/5/Kontrak/kontrak.pdf', 'size' => '1 MB']],
         ['id' => 3, 'title' => 'Dokumen Lama', 'created_at' => '2026-05-01T00:00:00Z', 'admin_doc_category_id' => 7, 'files' => ['url' => 'uploads/old-doc.pdf', 'size' => '3 MB']],
-        ['id' => 4, 'title' => 'foto', 'created_at' => '2026-06-03T00:00:00Z', 'admin_doc_category_id' => 7, 'files' => ['url' => 'projects/5/foto.png', 'size' => '500 KB']],
+        ['id' => 4, 'title' => 'foto', 'created_at' => '2026-06-03T00:00:00Z', 'admin_doc_category_id' => 7, 'files' => ['url' => 'projects/2026/5/foto.png', 'size' => '500 KB']],
     ];
 
     Http::fake([
@@ -31,6 +31,7 @@ function fakeBepmForFileManager(int $leaderId, ?array $docs = null): void
             'status' => 200,
             'data' => [[
                 'id' => 5,
+                'start_date' => '2026-01-01',
                 'project_leader_id' => $leaderId,
                 'support_team_internals' => [],
             ]],
@@ -142,10 +143,14 @@ test('an intruder cannot create folders even by calling the action directly', fu
     expect(ProjectFolder::query()->where('project_id', 5)->exists())->toBeFalse();
 });
 
-test('renaming a file dispatches MoveProjectFilesJob with the new key', function () {
-    Queue::fake();
+test('renaming a file moves the object synchronously in MinIO', function () {
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id);
+
+    mock(ProjectFileStorage::class)
+        ->shouldReceive('move')
+        ->once()
+        ->with('projects/2026/5/laporan.pdf', 'projects/2026/5/laporan-final.pdf');
 
     Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
@@ -153,32 +158,31 @@ test('renaming a file dispatches MoveProjectFilesJob with the new key', function
         ->set('renameDocName', 'laporan-final')
         ->call('renameDoc')
         ->assertHasNoErrors();
-
-    Queue::assertPushed(MoveProjectFilesJob::class, function (MoveProjectFilesJob $job) {
-        return $job->projectId === 5
-            && $job->items[0]['from_key'] === 'projects/5/laporan.pdf'
-            && $job->items[0]['to_key'] === 'projects/5/laporan-final.pdf';
-    });
 });
 
 test('a legacy file cannot be renamed', function () {
-    Queue::fake();
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id);
+
+    mock(ProjectFileStorage::class)->shouldNotReceive('move');
 
     Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
         ->call('startRenameDoc', 3)
         ->assertSet('renamingDocId', null);
-
-    Queue::assertNothingPushed();
 });
 
-test('renaming a folder locks it and dispatches the move job with re-prefixed keys', function () {
+test('renaming a non-empty folder locks it and dispatches the move job with prefixes', function () {
     Queue::fake();
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id);
     $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak']);
+
+    mock(ProjectFileStorage::class)
+        ->shouldReceive('listUnder')
+        ->once()
+        ->with('projects/2026/5/Kontrak/')
+        ->andReturn(['projects/2026/5/Kontrak/kontrak.pdf']);
 
     Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
@@ -191,10 +195,36 @@ test('renaming a folder locks it and dispatches the move job with re-prefixed ke
 
     Queue::assertPushed(MoveProjectFilesJob::class, function (MoveProjectFilesJob $job) use ($folder) {
         return $job->folderId === $folder->id
-            && $job->folderUpdate === ['name' => 'Kontrak 2026']
-            && $job->items[0]['from_key'] === 'projects/5/Kontrak/kontrak.pdf'
-            && $job->items[0]['to_key'] === 'projects/5/Kontrak 2026/kontrak.pdf';
+            && $job->oldPrefix === 'projects/2026/5/Kontrak/'
+            && $job->newPrefix === 'projects/2026/5/Kontrak 2026/'
+            && $job->folderUpdate === ['name' => 'Kontrak 2026'];
     });
+});
+
+test('renaming an empty folder updates it directly without dispatching a job', function () {
+    Queue::fake();
+    $leader = User::factory()->create();
+    fakeBepmForFileManager(leaderId: $leader->id);
+    $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kosong']);
+
+    mock(ProjectFileStorage::class)
+        ->shouldReceive('listUnder')
+        ->once()
+        ->with('projects/2026/5/Kosong/')
+        ->andReturn([]);
+
+    Volt::actingAs($leader)
+        ->test('project.components.file-manager', ['id' => 5])
+        ->call('startRenameFolder', $folder->id)
+        ->set('renameFolderName', 'Kosong Baru')
+        ->call('renameFolder')
+        ->assertHasNoErrors();
+
+    $folder->refresh();
+    expect($folder->name)->toBe('Kosong Baru')
+        ->and($folder->status)->toBeNull();
+
+    Queue::assertNothingPushed();
 });
 
 test('deleting a file removes the BEPM record first and then the MinIO object', function () {
@@ -204,7 +234,7 @@ test('deleting a file removes the BEPM record first and then the MinIO object', 
     mock(ProjectFileStorage::class)
         ->shouldReceive('deleteObject')
         ->once()
-        ->with('projects/5/laporan.pdf');
+        ->with('projects/2026/5/laporan.pdf');
 
     Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
@@ -258,29 +288,24 @@ test('deleting a folder with files locks it and dispatches DeleteProjectFilesJob
 
     Queue::assertPushed(DeleteProjectFilesJob::class, function (DeleteProjectFilesJob $job) use ($folder) {
         return $job->folderId === $folder->id
-            && $job->items === [['doc_id' => 2, 'key' => 'projects/5/Kontrak/kontrak.pdf']];
+            && $job->items === [['doc_id' => 2, 'key' => 'projects/2026/5/Kontrak/kontrak.pdf']];
     });
 });
 
-test('bulk move dispatches one job for the selected non-legacy files', function () {
-    Queue::fake();
+test('bulk move moves each selected non-legacy file synchronously and skips legacy', function () {
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id);
     $target = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Arsip']);
+
+    $storage = mock(ProjectFileStorage::class);
+    $storage->shouldReceive('move')->once()->with('projects/2026/5/laporan.pdf', 'projects/2026/5/Arsip/laporan.pdf');
+    $storage->shouldReceive('move')->once()->with('projects/2026/5/foto.png', 'projects/2026/5/Arsip/foto.png');
 
     Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
         ->set('selected', ['1', '3', '4'])
         ->set('moveSelectedTargetId', $target->id)
         ->call('moveSelected');
-
-    Queue::assertPushed(MoveProjectFilesJob::class, function (MoveProjectFilesJob $job) {
-        $toKeys = array_column($job->items, 'to_key');
-
-        return count($job->items) === 2
-            && in_array('projects/5/Arsip/laporan.pdf', $toKeys, true)
-            && in_array('projects/5/Arsip/foto.png', $toKeys, true);
-    });
 });
 
 test('preview uses a presigned url for MinIO files', function () {
@@ -290,7 +315,7 @@ test('preview uses a presigned url for MinIO files', function () {
     mock(ProjectFileStorage::class)
         ->shouldReceive('presignedGetUrl')
         ->once()
-        ->with('projects/5/laporan.pdf', (int) config('uploads.project_files.presign_ttl'))
+        ->with('projects/2026/5/laporan.pdf', (int) config('uploads.project_files.presign_ttl'))
         ->andReturn('https://minio/presigned/laporan.pdf');
 
     Volt::actingAs($leader)

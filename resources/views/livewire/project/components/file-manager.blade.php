@@ -32,6 +32,8 @@ new class extends Component
 
     public bool $forbidden = false;
 
+    public string $projectYear = 'tanpa-tahun';
+
     public ?int $currentFolderId = null;
 
     public string $search = '';
@@ -85,6 +87,7 @@ new class extends Component
     {
         $project = app(ProjectCache::class)->projectFor((int) $this->id);
 
+        $this->projectYear = project_storage_year($project);
         $this->forbidden = ! (Auth::user()?->canAccessProject($project) ?? false);
     }
 
@@ -137,7 +140,7 @@ new class extends Component
 
     protected function rootPrefix(): string
     {
-        return 'projects/'.(int) $this->id.'/';
+        return 'projects/'.$this->projectYear.'/'.(int) $this->id.'/';
     }
 
     protected function currentPrefix(): string
@@ -370,7 +373,7 @@ new class extends Component
             return;
         }
 
-        $this->dispatchFolderMove($folder, ['name' => $newName], $this->replacedPrefixFor($folder, name: $newName));
+        $this->applyFolderChange($folder, ['name' => $newName], $this->replacedPrefixFor($folder, name: $newName));
         $this->reset('renamingFolderId', 'renameFolderName');
         Flux::modal('rename-folder-modal')->close();
     }
@@ -432,7 +435,7 @@ new class extends Component
         }
 
         $newParentPath = $target !== null ? $target->path().'/' : '';
-        $this->dispatchFolderMove($folder, ['parent_id' => $targetId], $this->rootPrefix().$newParentPath.$folder->name.'/');
+        $this->applyFolderChange($folder, ['parent_id' => $targetId], $this->rootPrefix().$newParentPath.$folder->name.'/');
         $this->reset('movingFolderId', 'moveFolderTargetId');
         Flux::modal('move-folder-modal')->close();
     }
@@ -447,7 +450,6 @@ new class extends Component
 
         $docs = $this->docsUnderPrefix($this->rootPrefix().$folder->path().'/');
         if ($docs === [] && ! $folder->children()->exists()) {
-            dd( $this->allDocs());
             $folder->delete();
             Toaster::success('Folder dihapus');
 
@@ -554,11 +556,20 @@ new class extends Component
             return;
         }
 
-        MoveProjectFilesJob::dispatch((int) $this->id, [$this->moveItemFor($row, $newKey)]);
+        try {
+            app(ProjectFileStorage::class)->move($row['key'], $newKey);
+        } catch (\Throwable $e) {
+            Log::error('file-manager: rename objek gagal', ['from' => $row['key'], 'to' => $newKey, 'error' => $e->getMessage()]);
+            Toaster::error('Rename gagal di storage');
+
+            return;
+        }
+
+        // TODO(BEPM): update path dokumen di admin-docs saat endpoint tersedia.
 
         $this->reset('renamingDocId', 'renameDocName');
         Flux::modal('rename-file-modal')->close();
-        Toaster::success('Rename diproses di background');
+        Toaster::success('File di-rename');
     }
 
     public function confirmDeleteDoc(int $docId): void
@@ -645,8 +656,9 @@ new class extends Component
 
         $prefix = $this->rootPrefix().($target !== null ? $target->path().'/' : '');
         $rows = collect($this->files)->whereIn('id', array_map('intval', $this->selected));
-        $items = [];
+        $storage = app(ProjectFileStorage::class);
         $skippedLegacy = 0;
+        $failed = 0;
 
         foreach ($rows as $row) {
             if ($row['legacy']) {
@@ -657,22 +669,29 @@ new class extends Component
 
             $newKey = $this->availableKey($prefix, $row['name']);
 
-            if ($newKey !== $row['key']) {
-                $items[] = $this->moveItemFor($row, $newKey);
+            if ($newKey === $row['key']) {
+                continue;
+            }
+
+            try {
+                $storage->move($row['key'], $newKey);
+            } catch (\Throwable $e) {
+                Log::warning('file-manager: pindah objek gagal', ['from' => $row['key'], 'to' => $newKey, 'error' => $e->getMessage()]);
+                $failed++;
             }
         }
 
-        if ($items !== []) {
-            MoveProjectFilesJob::dispatch((int) $this->id, $items);
-        }
+        // TODO(BEPM): update path dokumen di admin-docs saat endpoint tersedia.
 
         $this->reset('selected', 'moveSelectedTargetId');
         Flux::modal('move-selected-modal')->close();
 
-        if ($skippedLegacy > 0) {
-            Toaster::warning("{$skippedLegacy} file lama dilewati (tidak bisa dipindah), sisanya diproses di background");
+        if ($failed > 0) {
+            Toaster::error("{$failed} file gagal dipindahkan");
+        } elseif ($skippedLegacy > 0) {
+            Toaster::warning("{$skippedLegacy} file lama dilewati (tidak bisa dipindah), sisanya berhasil dipindah");
         } else {
-            Toaster::success('Pemindahan diproses di background');
+            Toaster::success('File berhasil dipindah');
         }
     }
 
@@ -759,25 +778,6 @@ new class extends Component
     }
 
     /**
-     * @param  array<string, mixed>  $row
-     * @return array{doc_id: int, from_key: string, to_key: string, title: string, category_id: ?int}
-     */
-    protected function moveItemFor(array $row, string $newKey): array
-    {
-        $categoryId = $row['category_id'] !== null
-            ? (int) $row['category_id']
-            : (int) (collect(app(ProjectCache::class)->docCategories())->first()['id'] ?? 0);
-
-        return [
-            'doc_id' => (int) $row['id'],
-            'from_key' => $row['key'],
-            'to_key' => $newKey,
-            'title' => $row['title'] !== '' ? $row['title'] : pathinfo(basename($newKey), PATHINFO_FILENAME),
-            'category_id' => $categoryId,
-        ];
-    }
-
-    /**
      * Prefix baru subtree folder setelah rename (nama diganti, parent tetap).
      */
     protected function replacedPrefixFor(ProjectFolder $folder, string $name): string
@@ -788,33 +788,35 @@ new class extends Component
     }
 
     /**
-     * Kunci folder, susun item pemindahan untuk seluruh file di subtree, lalu
-     * serahkan ke MoveProjectFilesJob (folderUpdate diterapkan job saat sukses).
+     * Terapkan rename/pindah folder.
+     *
+     * Folder tanpa file fisik → cukup perbarui record folder (path anak
+     * dihitung dari parent, jadi tak ada objek S3 yang perlu dipindah).
+     * Folder berisi file → kunci folder lalu pindahkan objek S3 di background
+     * (Storage::move per file). Sinkronisasi path ke BEPM DITAHAN sampai
+     * endpoint update path dokumen tersedia — lihat MoveProjectFilesJob.
      *
      * @param  array{name?: string, parent_id?: ?int}  $folderUpdate
      */
-    protected function dispatchFolderMove(ProjectFolder $folder, array $folderUpdate, string $newPrefix): void
+    protected function applyFolderChange(ProjectFolder $folder, array $folderUpdate, string $newPrefix): void
     {
         $oldPrefix = $this->rootPrefix().$folder->path().'/';
 
-        $items = collect($this->docsUnderPrefix($oldPrefix))
-            ->map(function (array $doc) use ($oldPrefix, $newPrefix) {
-                $key = (string) data_get($doc, 'files.url', '');
-                $row = [
-                    'id' => $doc['id'],
-                    'key' => $key,
-                    'title' => (string) ($doc['title'] ?? ''),
-                    'category_id' => data_get($doc, 'admin_doc_category_id'),
-                ];
+        // Daftar objek diambil langsung dari MinIO (bukan cache BEPM) agar
+        // rename beruntun tetap benar. Folder tanpa objek fisik cukup update
+        // record; path anak dihitung dari parent jadi tak ada yang dipindah.
+        $hasObjects = app(ProjectFileStorage::class)->listUnder($oldPrefix) !== [];
 
-                return $this->moveItemFor($row, $newPrefix.substr($key, strlen($oldPrefix)));
-            })
-            ->values()
-            ->all();
+        if (! $hasObjects) {
+            $folder->update($folderUpdate);
+            Toaster::success('Folder diperbarui');
+
+            return;
+        }
 
         $folder->update(['status' => 'moving']);
 
-        MoveProjectFilesJob::dispatch((int) $this->id, $items, $folder->id, $folderUpdate);
+        MoveProjectFilesJob::dispatch((int) $this->id, $oldPrefix, $newPrefix, $folder->id, $folderUpdate);
         Toaster::success('Perubahan folder diproses di background');
     }
 
@@ -993,8 +995,10 @@ new class extends Component
                             <flux:button size="xs" icon="arrow-right-circle" variant="outline">Pindahkan</flux:button>
                         </flux:modal.trigger>
                         <flux:button size="xs" icon="trash" variant="danger" wire:click="deleteSelected"
-                            wire:confirm="Hapus {{ count($selected) }} file terpilih? Tindakan ini permanen.">
-                            Hapus
+                            wire:confirm="Hapus {{ count($selected) }} file terpilih? Tindakan ini permanen."
+                            wire:loading.attr="disabled" wire:target="deleteSelected">
+                            <span wire:loading.remove wire:target="deleteSelected">Hapus</span>
+                            <span wire:loading wire:target="deleteSelected">Menghapus…</span>
                         </flux:button>
                     </div>
                 </div>
@@ -1206,7 +1210,10 @@ new class extends Component
             </flux:field>
             <div class="flex gap-2">
                 <flux:modal.close><flux:button type="button" variant="ghost" class="flex-1">Batal</flux:button></flux:modal.close>
-                <flux:button type="submit" variant="primary" class="flex-1">Pindahkan</flux:button>
+                <flux:button type="submit" variant="primary" class="flex-1" wire:loading.attr="disabled" wire:target="moveSelected">
+                    <span wire:loading.remove wire:target="moveSelected">Pindahkan</span>
+                    <span wire:loading wire:target="moveSelected">Memindahkan…</span>
+                </flux:button>
             </div>
         </form>
     </flux:modal>
@@ -1215,7 +1222,7 @@ new class extends Component
         <form wire:submit="renameDoc" class="space-y-5">
             <flux:heading size="lg">Rename file</flux:heading>
             <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">
-                Ekstensi file dipertahankan; proses berjalan di background.
+                Ekstensi file dipertahankan.
             </flux:text>
             <flux:field>
                 <flux:label>Nama baru (tanpa ekstensi)</flux:label>
@@ -1224,7 +1231,10 @@ new class extends Component
             </flux:field>
             <div class="flex gap-2">
                 <flux:modal.close><flux:button type="button" variant="ghost" class="flex-1">Batal</flux:button></flux:modal.close>
-                <flux:button type="submit" variant="primary" class="flex-1">Rename</flux:button>
+                <flux:button type="submit" variant="primary" class="flex-1" wire:loading.attr="disabled" wire:target="renameDoc">
+                    <span wire:loading.remove wire:target="renameDoc">Rename</span>
+                    <span wire:loading wire:target="renameDoc">Menyimpan…</span>
+                </flux:button>
             </div>
         </form>
     </flux:modal>

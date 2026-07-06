@@ -152,6 +152,34 @@ class ProjectFileStorage
     }
 
     /**
+     * Pindahkan objek dalam bucket yang sama (copy + delete di sisi server,
+     * satu panggilan Flysystem). Melempar bila sumber tidak ada / gagal.
+     */
+    public function move(string $fromKey, string $toKey): void
+    {
+        try {
+            Storage::disk((string) config('uploads.project_files.disk'))->move($fromKey, $toKey);
+        } catch (\Throwable $e) {
+            throw $this->wrap('move', $e, ['from' => $fromKey, 'to' => $toKey]);
+        }
+    }
+
+    /**
+     * Object key sebenarnya di MinIO di bawah sebuah prefix (rekursif).
+     * Sumber otoritatif untuk operasi move — TIDAK bergantung pada cache BEPM.
+     *
+     * @return array<int, string>
+     */
+    public function listUnder(string $prefix): array
+    {
+        try {
+            return Storage::disk((string) config('uploads.project_files.disk'))->allFiles(rtrim($prefix, '/'));
+        } catch (\Throwable $e) {
+            throw $this->wrap('listUnder', $e, ['prefix' => $prefix]);
+        }
+    }
+
+    /**
      * Multipart upload menggantung yang lebih tua dari N jam.
      *
      * @return array<int, array{Key: string, UploadId: string, Initiated: \DateTimeInterface}>
