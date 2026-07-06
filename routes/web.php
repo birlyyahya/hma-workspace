@@ -23,6 +23,9 @@ Route::middleware('auth')->group(function () {
         Volt::route('/edit/{id}', 'project.project-edit')->name('projects.edit');
         Volt::route('/show/{id}', 'project.project-show')->name('projects.show');
         Volt::route('/preview/{id}', 'project.project-preview')->name('projects.preview');
+
+        // Mockup statis desain progress tahapan — hapus bersama view mockups/project-progress-mockup.blade.php jika dibatalkan
+        Route::view('/mockup-progress', 'mockups.project-progress-mockup')->name('projects.mockup-progress');
     });
 
     // DAR
