@@ -1029,6 +1029,24 @@ new class extends Component {
         syncing: false,
 
         init() {
+            this.whenQuillReady(() => this.mountEditor());
+        },
+
+        whenQuillReady(callback, tries = 0) {
+            if (window.Quill) {
+                callback();
+                return;
+            }
+
+            if (tries > 200) {
+                console.error('Quill editor gagal dimuat.');
+                return;
+            }
+
+            setTimeout(() => this.whenQuillReady(callback, tries + 1), 50);
+        },
+
+        mountEditor() {
             this.quill = new Quill(this.$refs.editor, {
                 theme: 'snow',
                 placeholder: this.$refs.editor.dataset.placeholder || '',
