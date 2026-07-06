@@ -1,10 +1,7 @@
 <?php
 
-use App\Models\User;
 use App\Services\IzinCache;
-use App\Services\SpdPdfComposer;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 
@@ -15,43 +12,12 @@ class extends Component {
 
     public ?array $spd = null;
 
-    public ?string $pdfPreview = null;
-
     public function mount(): void
-    {
-        $this->loadSpd();
-
-        if ($this->spd) {
-            $this->generatePdf();
-        }
-    }
-
-    protected function loadSpd(): void
     {
         $response = app(IzinCache::class)->spdList(['per_page' => 1000]);
 
         $rows = $response['data'] ?? [];
         $this->spd = collect($rows)->firstWhere('id', (int) $this->id);
-    }
-
-    /**
-     * Render PDF SPD (2 halaman utama + lampiran) lalu tampilkan sebagai data URI
-     * base64 di iframe. Di-cache per-versi data agar tidak render ulang tiap kunjungan.
-     */
-    public function generatePdf(): void
-    {
-        if (! $this->spd) {
-            return;
-        }
-
-        $key = 'spd-pdf-preview-'.$this->id.'-'.md5((string) json_encode($this->spd));
-
-        $this->pdfPreview = Cache::remember($key, now()->addHours(6), function () {
-            $user = User::find($this->spd['user_id'] ?? null);
-            $bytes = app(SpdPdfComposer::class)->render($this->spd, $user);
-
-            return 'data:application/pdf;base64,'.base64_encode($bytes);
-        });
     }
 }; ?>
 
@@ -107,17 +73,10 @@ class extends Component {
         </span>
     </div>
 
-    {{-- PDF preview (print & download tersedia dari kontrol bawaan viewer PDF) --}}
+    {{-- PDF preview via URL stream (bukan data URI — lampiran gambar bisa berukuran MB,
+         melebihi batas data-URL browser). Print & download dari kontrol bawaan viewer. --}}
     <div class="mx-auto max-w-[900px] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-        @if ($pdfPreview)
-        <iframe src="{{ $pdfPreview }}" class="h-[80vh] w-full" title="Preview SPD"></iframe>
-        @else
-        <div class="flex h-[60vh] flex-col items-center justify-center gap-3 text-zinc-400">
-            <flux:icon name="document-text" class="h-10 w-10" />
-            <span class="text-sm">PDF tidak dapat ditampilkan.</span>
-            <flux:button size="sm" variant="primary" wire:click="generatePdf">Muat ulang PDF</flux:button>
-        </div>
-        @endif
+        <iframe src="{{ route('izin.spd-pdf', $id) }}" class="h-[80vh] w-full" title="Preview SPD"></iframe>
     </div>
     @endif
 </div>
