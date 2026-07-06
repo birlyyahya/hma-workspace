@@ -879,10 +879,8 @@ class extends Component
                                 {{-- Description --}}
                                 <div>
                                     <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Description</label>
-                                    <div x-data="editorComponent(@entangle('editDescription'))" wire:ignore class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-                                        <textarea x-ref="editor" rows="6"
-                                            class="w-full resize-none border-0 bg-transparent px-4 py-3 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-0"
-                                            placeholder="Tulis deskripsi tugas..."></textarea>
+                                    <div x-data="editorComponent(@entangle('editDescription'))" wire:ignore class="dar-editor overflow-hidden rounded-xl border border-zinc-200 bg-white">
+                                        <div x-ref="editor"></div>
                                     </div>
                                 </div>
 
@@ -1334,7 +1332,31 @@ class extends Component
     </div>
 
     @assets
-    <script src="https://cdn.ckeditor.com/ckeditor5/35.1.0/classic/ckeditor.js"></script>
+    {{-- Quill di-bundle lewat resources/js/app.js (window.Quill), bukan CDN. --}}
+    <style>
+        .dar-editor .ql-toolbar.ql-snow {
+            border: none;
+            border-bottom: 1px solid #e4e4e7;
+            background: #fafafa;
+        }
+
+        .dar-editor .ql-container.ql-snow {
+            border: none;
+            font-family: inherit;
+            font-size: 0.875rem;
+        }
+
+        .dar-editor .ql-editor {
+            min-height: 150px;
+            max-height: 360px;
+            overflow-y: auto;
+        }
+
+        .dar-editor .ql-editor.ql-blank::before {
+            color: #a1a1aa;
+            font-style: normal;
+        }
+    </style>
     <script>
         function teamPicker() {
             return {
@@ -1367,26 +1389,68 @@ class extends Component
 
         function editorComponent(model) {
             return {
-                editor: null,
+                quill: null,
                 value: model,
-                init() {
-                    if (this.editor) return;
+                syncing: false,
 
-                    ClassicEditor
-                        .create(this.$refs.editor)
-                        .then(editor => {
-                            this.editor = editor;
-                            editor.setData(this.value || '');
-                            editor.model.document.on('change:data', () => {
-                                this.value = editor.getData();
-                            });
-                            this.$watch('value', (val) => {
-                                if (editor.getData() !== val) {
-                                    editor.setData(val || '');
-                                }
-                            });
-                        })
-                        .catch(error => console.error(error));
+                init() {
+                    this.whenQuillReady(() => this.mountEditor());
+                },
+
+                whenQuillReady(callback, tries = 0) {
+                    if (window.Quill) {
+                        callback();
+                        return;
+                    }
+
+                    if (tries > 200) {
+                        console.error('Quill editor gagal dimuat.');
+                        return;
+                    }
+
+                    setTimeout(() => this.whenQuillReady(callback, tries + 1), 50);
+                },
+
+                mountEditor() {
+                    if (this.quill) return;
+
+                    this.quill = new Quill(this.$refs.editor, {
+                        theme: 'snow',
+                        placeholder: 'Tulis deskripsi tugas...',
+                        modules: {
+                            toolbar: [
+                                [{ header: [2, 3, false] }],
+                                ['bold', 'italic', 'underline'],
+                                [{ list: 'ordered' }, { list: 'bullet' }],
+                                ['link'],
+                                ['clean'],
+                            ],
+                        },
+                    });
+
+                    if (this.value) {
+                        this.quill.clipboard.dangerouslyPasteHTML(this.value);
+                    }
+
+                    this.quill.on('text-change', () => {
+                        this.syncing = true;
+                        const html = this.quill.root.innerHTML;
+                        this.value = html === '<p><br></p>' ? '' : html;
+                        this.syncing = false;
+                    });
+
+                    this.$watch('value', (incoming) => {
+                        if (this.syncing) {
+                            return;
+                        }
+
+                        const current = this.quill.root.innerHTML;
+                        const next = incoming || '';
+
+                        if (next !== current && !(next === '' && current === '<p><br></p>')) {
+                            this.quill.clipboard.dangerouslyPasteHTML(next);
+                        }
+                    });
                 },
             };
         }
