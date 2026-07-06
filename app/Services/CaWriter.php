@@ -103,6 +103,26 @@ class CaWriter
         return $request->post($url, $payload);
     }
 
+
+    public function deleteTransactionCaPL(string $kode, int $id)
+    {
+        try {
+            $response = $this->externalWrite()->delete($this->apiBase."/ca/{$kode}/transaksi/{$id}");
+
+            $body = (array) $response->json();
+            $ok = $response->successful() || (bool) ($body['success'] ?? false);
+
+            return $this->result($ok, $body, $response->status(), [
+                'name' => 'ca',
+                'event' => 'deleted',
+                'description' => "Delete transaksi CA PL {$kode} #{$id}",
+                'properties' => ['kode' => $kode, 'id' => $id],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->fail('deleteTransaction', $e, ['kode' => $kode, 'id' => $id]);
+        }
+    }
+
     /**
      * Bangun struktur hasil; flush cache CA & catat activity saat sukses.
      *

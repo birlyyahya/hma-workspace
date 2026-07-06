@@ -25,6 +25,8 @@ new class extends Component {
     public $tanggal;
     public $bukti;
 
+    public $deleteTransactionId = null;
+
     public function mount(): void
     {
         $this->refreshDashboard();
@@ -104,6 +106,26 @@ new class extends Component {
         $this->chart = $response['chart'] ?? [];
         $this->caKegiatanBalance = $response['card_right'] ?? [];
         $this->categories = $response['categories'] ?? ['Transport', 'Akomodasi', 'Konsumsi', 'ATK', 'Komunikasi', 'Lain-lain'];
+    }
+
+    public function deleteTransactionCaPL(){
+        if (! $this->deleteTransactionId) {
+            Toaster::error('ID transaksi tidak valid.');
+            return;
+        }
+
+        $kode = $this->caPlBalance['kode_ca'] ?? '';
+        $result = app(CaWriter::class)->deleteTransactionCaPl($kode, $this->deleteTransactionId);
+
+        if (! $result['ok']) {
+            Toaster::error($result['error'] ?? ($result['body']['message'] ?? 'Gagal menghapus pengeluaran.'));
+            return;
+        }
+
+        $this->refreshDashboard();
+        $this->resetForm();
+        Flux::modal('hapus-pengeluaran')->close();
+        Toaster::success('Pengeluaran berhasil dihapus.');
     }
 }; ?>
 
@@ -339,7 +361,7 @@ new class extends Component {
                                 <flux:modal.trigger name="catat-pengeluaran">
                                     <flux:button size="sm" variant="ghost" icon="pencil-square" type="button"
                                         x-on:click="
-                                            $wire.editingId = {{ $trx['dompet_id'] }};
+                                            $wire.editingId = {{ $trx['id_transaksi'] }};
                                             $wire.jumlah = {{ (int) $trx['jumlah'] }};
                                             $wire.kategori = @js($trx['kategori'] ?? '');
                                             $wire.deskripsi = @js($trx['deskripsi'] ?? '');
@@ -347,7 +369,9 @@ new class extends Component {
                                             $wire.bukti = null;
                                         " />
                                 </flux:modal.trigger>
-                                <flux:button size="sm" variant="ghost" icon="trash" class="text-red-600" wire:click="deleteTransaction({{ $trx['dompet_id'] }})" wire:confirm="Hapus transaksi ini?" />
+                                <flux:modal.trigger name="hapus-pengeluaran">
+                                    <flux:button size="sm" variant="ghost" icon="trash" class="text-red-600" x-on:click="$wire.set('deleteTransactionId', {{ $trx['id_transaksi'] }})" />
+                                </flux:modal.trigger>
                             </div>
                         </td>
                     </tr>
@@ -470,5 +494,21 @@ new class extends Component {
 
             <flux:button type="submit" variant="primary" class="w-full">Buat Dompet</flux:button>
         </form>
+    </flux:modal>
+
+    <flux:modal name="hapus-pengeluaran" class="w-md">
+        <div class="space-y-6">
+            <div>
+                <flux:heading size="lg">Hapus Pengeluaran</flux:heading>
+                <flux:text class="mt-1">Apakah Anda yakin ingin menghapus pengeluaran ini? Tindakan ini tidak dapat dibatalkan.</flux:text>
+            </div>
+
+            <div class="flex justify-end gap-2">
+                <flux:modal.close>
+                    <flux:button variant="ghost">Batal</flux:button>
+                </flux:modal.close>
+                <flux:button variant="danger" icon="trash" wire:click='deleteTransactionCaPL'>Hapus</flux:button>
+            </div>
+        </div>
     </flux:modal>
 </div>
