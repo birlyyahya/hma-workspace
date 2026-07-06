@@ -3,6 +3,7 @@
 use App\Services\ProjectCache;
 use App\Services\ProjectWriter;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 function makeProjectWriter(): ProjectWriter
@@ -64,6 +65,23 @@ test('createTeam and deleteTeam follow BEPM body status codes', function () {
 
     expect($writer->createTeam(1, 42)['ok'])->toBeTrue()
         ->and($writer->deleteTeam(7, 42)['ok'])->toBeTrue();
+});
+
+test('createTeam and deleteTeam flush the project detail cache so team tab updates immediately', function () {
+    Http::fake([
+        '*/project-teams' => Http::response(['status' => 201, 'data' => ['user_id' => 42]], 200),
+        '*/project-teams/7' => Http::response(['status' => 200], 200),
+    ]);
+
+    $writer = makeProjectWriter();
+
+    Cache::tags(['projects'])->put('project:1', ['stale'], 300);
+    $writer->createTeam(1, 42);
+    expect(Cache::tags(['projects'])->get('project:1'))->toBeNull();
+
+    Cache::tags(['projects'])->put('project:1', ['stale'], 300);
+    $writer->deleteTeam(7, 42);
+    expect(Cache::tags(['projects'])->get('project:1'))->toBeNull();
 });
 
 test('createCompany posts multipart and succeeds on HTTP 2xx', function () {

@@ -187,7 +187,10 @@ class ProjectWriter
             ]);
             $body = (array) $response->json();
 
-            return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), fn () => $this->cache->flushUser($userId), [
+            return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), function () use ($userId): void {
+                $this->cache->flushUser($userId);
+                $this->cache->flushProjects();
+            }, [
                 'name' => 'project',
                 'event' => 'created',
                 'description' => "Menambah anggota tim ke project #{$projectId}",
@@ -209,7 +212,10 @@ class ProjectWriter
             $response = $this->externalWrite(timeout: 10)->delete($this->apiBase.'/project-teams/'.$teamId);
             $body = (array) $response->json();
 
-            return $this->result((int) ($body['status'] ?? 0) === 200, $body, $response->status(), fn () => $this->cache->flushUser($userId), [
+            return $this->result((int) ($body['status'] ?? 0) === 200, $body, $response->status(), function () use ($userId): void {
+                $this->cache->flushUser($userId);
+                $this->cache->flushProjects();
+            }, [
                 'name' => 'project',
                 'event' => 'deleted',
                 'description' => 'Menghapus anggota tim project',
