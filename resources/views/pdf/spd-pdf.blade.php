@@ -215,14 +215,18 @@ $bodyData = compact(
             margin-bottom: 0;
         }
 
+        .description {
+            text-align: justify;
+        }
+
         .closing {
-            margin-top: 18px;
+            margin-top: 10px;
             text-align: justify;
         }
 
         /* Issue */
         .issue {
-            margin-top: 22px;
+            margin-top: 12px;
             width: 50%;
             border-collapse: collapse;
             text-align: left;

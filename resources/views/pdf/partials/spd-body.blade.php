@@ -76,7 +76,7 @@
         </tr>
     </table>
 
-    <div class="closing">
+    <div class="description">
         Bilamana selesai menjalankan tugas, harap segera menyelesaikan dan melaporkan berkas-berkas
         administrasi (laporan petty cash dan activity report) selambat-lambatnya 1 (satu) hari setelah tanggal
         kepulangan.
