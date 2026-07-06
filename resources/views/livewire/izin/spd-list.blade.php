@@ -991,8 +991,7 @@ new class extends Component {
 </div>
 
 @assets
-<link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+{{-- Quill di-bundle lewat resources/js/app.js (window.Quill), bukan CDN. --}}
 <style>
     .spd-editor .ql-toolbar.ql-snow {
         border: none;
