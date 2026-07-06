@@ -1,23 +1,31 @@
 @php
 use Carbon\Carbon;
+use Illuminate\Support\Str;
+
+/**
+ * Field rich-text SPD dibuat lewat editor bullet/list-only. Batasi tag yang
+ * dirender agar aman (hanya list & inline dasar) lalu jatuhkan ke '-' bila kosong.
+ */
+$richText = function ($value, string $fallback = '-'): string {
+    $html = trim(strip_tags((string) $value, '<ul><ol><li><p><br><strong><em><b><i><u><s>'));
+
+    if ($html === '' || trim(strip_tags($html)) === '') {
+        return e($fallback);
+    }
+
+    return $html;
+};
 
 $username = data_get($user, 'name', '-');
 $role = data_get($role, 'name', '-');
-$task = data_get($spd, 'task', '-');
-$department = data_get($spd, 'department', '-');
-$destination = data_get($spd, 'destination', 'Terlampir');
-$address = data_get($spd, 'address', 'Terlampir');
-$startDate = data_get($spd, 'start_date');
-$endDate = data_get($spd, 'end_date');
+$task = $richText(data_get($spd, 'task'));
+$department = $richText(data_get($spd, 'department'));
+$destination = $richText(data_get($spd, 'destination'), 'Terlampir');
+$address = $richText(data_get($spd, 'address'), 'Terlampir');
+$masaTugas = $richText(data_get($spd, 'start_date'), '-');
 $createdAt = data_get($spd, 'created_at');
 $isSubmitted = (bool) data_get($spd, 'is_submitted', false);
 $isApproved = (bool) data_get($spd, 'is_approved', false);
-
-$masaTugas = '-';
-if ($startDate && $endDate) {
-$masaTugas = Carbon::parse($startDate)->locale('id')->translatedFormat('d F Y')
-. ' s/d ' . Carbon::parse($endDate)->locale('id')->translatedFormat('d F Y');
-}
 
 $tanggalDibuat = $createdAt
 ? Carbon::parse($createdAt)->locale('id')->translatedFormat('d F Y')
@@ -34,6 +42,11 @@ $refNo = "HMA/IT RnD/SPD/{$idPadded}/{$monthRoman}/{$year}";
 // Signatures
 $ttdAndrePath = public_path('img/ttd/ttd-andre.png');
 $ttdIrwanPath = public_path('img/ttd/ttd-irwan.png');
+
+$bodyData = compact(
+    'username', 'role', 'task', 'department', 'destination', 'address', 'masaTugas',
+    'tanggalDibuat', 'refNo', 'isSubmitted', 'isApproved', 'ttdAndrePath', 'ttdIrwanPath',
+);
 @endphp
 
 <!DOCTYPE html>
@@ -107,6 +120,28 @@ $ttdIrwanPath = public_path('img/ttd/ttd-irwan.png');
             padding-left: 14px;
         }
 
+        .header .stamp-cell {
+            width: 120px;
+            text-align: right;
+            vertical-align: top;
+        }
+
+        .header .stamp {
+            display: inline-block;
+            border: 2px solid #b91c1c;
+            border-radius: 4px;
+            color: #b91c1c;
+            font-size: 10pt;
+            font-weight: 700;
+            line-height: 1.15;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            text-align: center;
+            padding: 6px 10px;
+            transform: rotate(-8deg);
+            opacity: 0.9;
+        }
+
         .header .company .name {
             font-size: 20pt;
             font-weight: 700;
@@ -167,6 +202,20 @@ $ttdIrwanPath = public_path('img/ttd/ttd-irwan.png');
 
         table.detail .colon {
             width: 12px;
+        }
+
+        table.detail td.rich ul,
+        table.detail td.rich ol {
+            margin: 0;
+            padding-left: 18px;
+        }
+
+        table.detail td.rich p {
+            margin: 0 0 2px;
+        }
+
+        table.detail td.rich p:last-child {
+            margin-bottom: 0;
         }
 
         .closing {
@@ -283,142 +332,23 @@ $ttdIrwanPath = public_path('img/ttd/ttd-irwan.png');
     </style>
 </head>
 <body>
+    {{-- ── Halaman 1: SPD (TTD mengikuti checklist) ── --}}
+    @include('pdf.partials.spd-body', array_merge($bodyData, ['adminCopy' => false]))
+
+    {{-- ── Halaman 2: SPD Administrasi (TTD lengkap statis + stempel lampiran) ── --}}
+    <div class="page-break"></div>
+    @include('pdf.partials.spd-body', array_merge($bodyData, ['adminCopy' => true]))
+
+    {{-- ── Halaman 3+: Lampiran gambar (PDF digabung terpisah oleh service merge) ── --}}
+    @if (! empty($attachmentImage['data']))
+    <div class="page-break"></div>
     <div class="page">
-        <table class="header">
-            <tr>
-                <td class="logo">
-                    <img src="{{ public_path('img/logo/logo-hma2.png') }}" alt="HMA">
-                </td>
-                <td class="company">
-                    <div class="name">PT HANATEKINDO MULIA ABADI</div>
-                    <div class="info">
-                        Komplek Golden Fatmawati Blok J-10, Jl. RS. Fatmawati No.15, Jakarta Selatan 12420<br>
-                        Tel : (021) 750 8989 &nbsp;&nbsp;|&nbsp;&nbsp; Fax : (021) 750 7519<br>
-                        Web : www.hanatekindo.co.id &nbsp;&nbsp;|&nbsp;&nbsp; E-mail : info@hanatekindo.co.id
-                    </div>
-                </td>
-            </tr>
-        </table>
-        <hr class="divider">
-
-        <div class="title-block">
-            <div class="title">SURAT PERJALANAN DINAS</div>
-            <div class="ref">Ref. No : {{ $refNo }}</div>
-        </div>
-
-        <div class="intro">
-            Yang bertandatangan dibawah ini, Manager IT RnD PT. HANATEKINDO MULIA ABADI, menugaskan
-            karyawan kami dibawah ini :
-        </div>
-
-        <table class="detail">
-            <tr>
-                <td class="label">Nama</td>
-                <td class="colon">:</td>
-                <td>{{ $username }}</td>
-            </tr>
-            <tr>
-                <td class="label">Jabatan</td>
-                <td class="colon">:</td>
-                <td>{{ $role }}</td>
-            </tr>
-            <tr>
-                <td class="label">Melaksanakan tugas</td>
-                <td class="colon">:</td>
-                <td>{{ $task }}</td>
-            </tr>
-            <tr>
-                <td class="label">Satuan Kerja</td>
-                <td class="colon">:</td>
-                <td>{{ $department }}</td>
-            </tr>
-            <tr>
-                <td class="label">Tujuan/lokasi</td>
-                <td class="colon">:</td>
-                <td>{{ $destination }}</td>
-            </tr>
-            <tr>
-                <td class="label">Alamat</td>
-                <td class="colon">:</td>
-                <td>{{ $address }}</td>
-            </tr>
-            <tr>
-                <td class="label">Masa Tugas</td>
-                <td class="colon">:</td>
-                <td>{{ $masaTugas }}</td>
-            </tr>
-        </table>
-
-        <div class="closing">
-            Bilamana selesai menjalankan tugas, harap segera menyelesaikan dan melaporkan berkas-berkas
-            administrasi (laporan petty cash dan activity report) selambat-lambatnya 1 (satu) hari setelah tanggal
-            kepulangan.
-        </div>
-
-        <div class="closing">
-            Demikian Surat Perjalanan Dinas ini dibuat untuk dipergunakan semestinya.
-        </div>
-
-        <table class="issue">
-            <tr>
-                <td class="label" style="width: 50%;">Dikeluarkan di</td>
-                <td class="colon" style="width: 12px;">:</td>
-                <td>Jakarta</td>
-            </tr>
-            <tr>
-                <td class="label" style="width: 50%;">Tanggal</td>
-                <td class="colon" style="width: 12px;">:</td>
-                <td>{{ $tanggalDibuat }}</td>
-            </tr>
-        </table>
-
-        <div class="company-name">PT. HANATEKINDO MULIA ABADI</div>
-        <table class="sig-table">
-            <tr>
-                <td class="role">Diajukan Oleh,</td>
-                <td class="role" style="padding-left: 90px;">Menyetujui,</td>
-            </tr>
-            <tr>
-                <td class="sig-area">
-                    @if ($isSubmitted && file_exists($ttdAndrePath))
-                    <img class="ttd" src="{{ $ttdAndrePath }}" alt="TTD Andre">
-                    @endif
-                </td>
-                <td class="sig-area" style="padding-left: 90px;">
-                    @if ($isSubmitted && $isApproved && file_exists($ttdIrwanPath))
-                    <img class="ttd" src="{{ $ttdIrwanPath }}" alt="TTD Irwan">
-                    @endif
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <div class="name">Andre Lukmana Budhiarto</div>
-                    <div class="position">Manager IT RnD</div>
-                </td>
-                <td style="padding-left: 90px;">
-                    <div class="name">Ranap Irwan Rajagukguk</div>
-                    <div class="position">Direktur</div>
-                </td>
-            </tr>
-        </table>
-
-        <div class="cc">
-            <div class="label">Cc:</div>
-            <ul>
-                <li>- HRGA Dept</li>
-                <li>- Finance Dept</li>
-            </ul>
-        </div>
-
-        {{-- ── Lampiran (image attachment) ── --}}
-        @if (! empty($attachmentImage['data']))
-        <div class="page-break"></div>
         <div class="attachment-title">LAMPIRAN</div>
         <div class="attachment-wrap">
             <img src="{{ $attachmentImage['data'] }}" alt="Lampiran SPD">
         </div>
-        @endif
     </div>
+    @endif
 
 </body>
 </html>
