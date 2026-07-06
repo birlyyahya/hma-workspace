@@ -30,12 +30,11 @@ function fillSpdForm($component, User $target)
     return $component
         ->set('userId', $target->id)
         ->set('number', 1)
-        ->set('task', 'Survei instalasi')
+        ->set('task', '<ul><li>Survei instalasi</li></ul>')
         ->set('department', 'IT RnD')
         ->set('destination', 'Bandung')
         ->set('address', 'Jl. Merdeka No. 1')
-        ->set('startDate', '2026-07-10')
-        ->set('endDate', '2026-07-12');
+        ->set('masaTugas', '<p>10 Juli 2026 s/d 12 Juli 2026</p>');
 }
 
 test('creates an spd, resets the form, and does not notify when not approved', function () {
@@ -63,6 +62,39 @@ test('creates an spd, resets the form, and does not notify when not approved', f
 
     Mail::assertNothingQueued();
     Queue::assertNothingPushed();
+});
+
+test('maps the rich-text masa tugas into the start_date payload and clears end_date', function () {
+    $target = User::factory()->create();
+
+    mock(IzinWriter::class, function ($mock) use ($target) {
+        $mock->shouldReceive('saveSpd')
+            ->once()
+            ->withArgs(function ($id, $payload, $file) {
+                return $payload['start_date'] === '<p>10 Juli 2026 s/d 12 Juli 2026</p>'
+                    && $payload['end_date'] === ''
+                    && $payload['task'] === '<ul><li>Survei instalasi</li></ul>';
+            })
+            ->andReturn([
+                'ok' => true,
+                'body' => ['success' => true, 'data' => ['user_id' => $target->id]],
+                'status' => 200,
+                'error' => null,
+            ]);
+    });
+
+    fillSpdForm(Volt::actingAs(User::factory()->create())->test('izin.spd-list'), $target)
+        ->call('saveSpd')
+        ->assertHasNoErrors();
+});
+
+test('treats an empty rich-text editor value as a required-field error', function () {
+    $target = User::factory()->create();
+
+    fillSpdForm(Volt::actingAs(User::factory()->create())->test('izin.spd-list'), $target)
+        ->set('task', '<p><br></p>')
+        ->call('saveSpd')
+        ->assertHasErrors(['task' => 'required']);
 });
 
 test('updating an approved spd succeeds even when the response omits user_id', function () {
@@ -112,5 +144,5 @@ test('keeps the form open and shows no reset when the write fails', function () 
     fillSpdForm(Volt::actingAs(User::factory()->create())->test('izin.spd-list'), $target)
         ->call('saveSpd')
         ->assertHasNoErrors()
-        ->assertSet('task', 'Survei instalasi');
+        ->assertSet('task', '<ul><li>Survei instalasi</li></ul>');
 });

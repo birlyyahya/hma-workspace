@@ -38,8 +38,7 @@ new class extends Component {
     public string $department = '';
     public string $destination = '';
     public string $address = '';
-    public string $startDate = '';
-    public string $endDate = '';
+    public string $masaTugas = '';
     public bool $isSubmitted = false;
     public bool $isApproved = false;
     public $attachment = null;
@@ -61,8 +60,7 @@ new class extends Component {
             'department' => ['required', 'string'],
             'destination' => ['required', 'string'],
             'address' => ['required', 'string'],
-            'startDate' => ['required', 'date'],
-            'endDate' => ['required', 'date', 'after_or_equal:startDate'],
+            'masaTugas' => ['required', 'string'],
             'attachment' => ['nullable', 'file', 'max:10240'],
         ];
     }
@@ -75,9 +73,27 @@ new class extends Component {
             'number.required' => 'Nomor surat wajib diisi.',
             'number.integer' => 'Nomor surat harus berupa angka.',
             'number.min' => 'Nomor surat minimal 1.',
-            'endDate.after_or_equal' => 'Tanggal selesai tidak boleh sebelum tanggal mulai.',
+            'task.required' => 'Tugas / pekerjaan wajib diisi.',
+            'department.required' => 'Departemen / satuan kerja wajib diisi.',
+            'destination.required' => 'Tujuan / lokasi wajib diisi.',
+            'address.required' => 'Alamat lengkap wajib diisi.',
+            'masaTugas.required' => 'Masa tugas / tanggal wajib diisi.',
             'attachment.max' => 'Lampiran maksimal 10 MB.',
         ];
+    }
+
+    /**
+     * Rich-text editor menghasilkan HTML. Editor kosong tetap mengirim markup
+     * seperti `<p><br></p>`, jadi normalkan menjadi string kosong bila tidak ada
+     * teks maupun gambar — supaya rule `required` tetap berfungsi.
+     */
+    protected function normalizeHtml(string $html): string
+    {
+        if (trim(strip_tags($html)) === '' && ! Str::contains($html, '<img')) {
+            return '';
+        }
+
+        return trim($html);
     }
 
     protected function romanMonth(int $month): string
@@ -255,8 +271,7 @@ new class extends Component {
         $this->department = (string) ($row['department'] ?? '');
         $this->destination = (string) ($row['destination'] ?? '');
         $this->address = (string) ($row['address'] ?? '');
-        $this->startDate = $row['start_date'] ? Carbon::parse($row['start_date'])->format('Y-m-d') : '';
-        $this->endDate = $row['end_date'] ? Carbon::parse($row['end_date'])->format('Y-m-d') : '';
+        $this->masaTugas = (string) ($row['start_date'] ?? '');
         $this->isSubmitted = (bool) ($row['is_submitted'] ?? false);
         $this->isApproved = (bool) ($row['is_approved'] ?? false);
         $this->attachment = null;
@@ -274,6 +289,12 @@ new class extends Component {
 
     public function saveSpd(): void
     {
+        $this->task = $this->normalizeHtml($this->task);
+        $this->department = $this->normalizeHtml($this->department);
+        $this->destination = $this->normalizeHtml($this->destination);
+        $this->address = $this->normalizeHtml($this->address);
+        $this->masaTugas = $this->normalizeHtml($this->masaTugas);
+
         $this->validate();
 
         $payload = [
@@ -283,8 +304,8 @@ new class extends Component {
             'department' => $this->department,
             'destination' => $this->destination,
             'address' => $this->address,
-            'start_date' => $this->startDate,
-            'end_date' => $this->endDate,
+            'start_date' => $this->masaTugas,
+            'end_date' => '',
             'is_submitted' => $this->isSubmitted ? 1 : 0,
             'is_approved' => $this->isSubmitted && $this->isApproved ? 1 : 0,
         ];
@@ -426,7 +447,7 @@ new class extends Component {
     {
         $this->reset([
             'editingId', 'userId', 'userSearch', 'number', 'task', 'department', 'destination', 'address',
-            'startDate', 'endDate', 'attachment', 'existingAttachmentUrl',
+            'masaTugas', 'attachment', 'existingAttachmentUrl',
             'isSubmitted', 'isApproved',
         ]);
         $this->resetErrorBag();
@@ -590,21 +611,19 @@ new class extends Component {
                             @endif
                         </td>
                         <td class="px-5 py-3.5 max-w-[300px]">
-                            <p class="font-semibold text-zinc-900 line-clamp-1">{{ $spd['task'] }}</p>
-                            <p class="mt-0.5 text-xs text-zinc-500">{{ $spd['department'] }}</p>
+                            <p class="font-semibold text-zinc-900 line-clamp-1">{{ strip_tags($spd['task'] ?? '') }}</p>
+                            <p class="mt-0.5 text-xs text-zinc-500 line-clamp-1">{{ strip_tags($spd['department'] ?? '') }}</p>
                         </td>
                         <td class="px-5 py-3.5">
-                            <p class="text-zinc-800">{{ $spd['destination'] }}</p>
-                            <p class="mt-0.5 max-w-35 truncate text-xs text-zinc-500" title="{{ $spd['address'] }}">
-                                {{ $spd['address'] }}
+                            <p class="text-zinc-800 line-clamp-1">{{ strip_tags($spd['destination'] ?? '') }}</p>
+                            <p class="mt-0.5 max-w-35 truncate text-xs text-zinc-500" title="{{ strip_tags($spd['address'] ?? '') }}">
+                                {{ strip_tags($spd['address'] ?? '') }}
                             </p>
                         </td>
                         <td class="px-5 py-3.5 text-zinc-700">
-                            <div class="flex items-center gap-1.5 text-xs">
-                                <flux:icon name="calendar" class="h-3.5 w-3.5 text-zinc-400" />
-                                <span>{{ Carbon::parse($spd['start_date'])->format('d M Y') }}</span>
-                                <span class="text-zinc-300">→</span>
-                                <span>{{ Carbon::parse($spd['end_date'])->format('d M Y') }}</span>
+                            <div class="flex items-start gap-1.5 text-xs">
+                                <flux:icon name="calendar" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                                <span class="line-clamp-2 max-w-40">{{ strip_tags($spd['start_date'] ?? '') ?: '—' }}</span>
                             </div>
                         </td>
                         <td class="px-5 py-3.5">
@@ -700,8 +719,8 @@ new class extends Component {
             <article wire:key="spd-mob-{{ $spd['id'] }}" class="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
-                        <p class="font-semibold text-zinc-900">{{ $spd['task'] }}</p>
-                        <p class="mt-0.5 text-xs text-zinc-500">{{ $spd['department'] }}</p>
+                        <p class="font-semibold text-zinc-900 line-clamp-2">{{ strip_tags($spd['task'] ?? '') }}</p>
+                        <p class="mt-0.5 text-xs text-zinc-500 line-clamp-1">{{ strip_tags($spd['department'] ?? '') }}</p>
                     </div>
                     <span class="inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 {{ $statusClass }}">
                         {{ $statusLabel }}
@@ -716,12 +735,11 @@ new class extends Component {
                     </div>
                 </div>
                 @endif
-                <p class="mt-2 text-sm text-zinc-700">{{ $spd['destination'] }}</p>
-                <p class="mt-1 text-xs text-zinc-500">{{ $spd['address'] }}</p>
-                <div class="mt-3 flex items-center gap-1.5 text-xs text-zinc-600">
-                    <flux:icon name="calendar" class="h-3.5 w-3.5 text-zinc-400" />
-                    {{ Carbon::parse($spd['start_date'])->format('d M Y') }} →
-                    {{ Carbon::parse($spd['end_date'])->format('d M Y') }}
+                <p class="mt-2 text-sm text-zinc-700 line-clamp-2">{{ strip_tags($spd['destination'] ?? '') }}</p>
+                <p class="mt-1 text-xs text-zinc-500 line-clamp-2">{{ strip_tags($spd['address'] ?? '') }}</p>
+                <div class="mt-3 flex items-start gap-1.5 text-xs text-zinc-600">
+                    <flux:icon name="calendar" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                    <span class="line-clamp-2">{{ strip_tags($spd['start_date'] ?? '') ?: '—' }}</span>
                 </div>
                 <div class="mt-3 flex items-center justify-between gap-2 border-t border-zinc-100 pt-3">
                     @if (! empty($spd['attachment_url']))
@@ -840,43 +858,38 @@ new class extends Component {
 
             <div class="lg:col-span-2">
                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Tugas / Pekerjaan</label>
-                <flux:input wire:model="task" placeholder="Contoh: Survei instalasi" />
+                <x-spd.rich-editor model="task" placeholder="Rincian tugas / pekerjaan (bisa berupa daftar)..." />
+                <p class="mt-1 text-[11px] text-zinc-400">Gunakan tombol daftar untuk menuliskan beberapa tugas.</p>
                 @error('task')
                 <flux:error message="{{ $message }}" /> @enderror
             </div>
 
-            <div>
+            <div class="lg:col-span-2">
                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Departemen / Satuan Kerja</label>
-                <flux:input wire:model="department" placeholder="Contoh: Wilayah Jawa Barat" />
+                <x-spd.rich-editor model="department" placeholder="Departemen / satuan kerja..." />
                 @error('department')
                 <flux:error message="{{ $message }}" /> @enderror
             </div>
 
-            <div>
+            <div class="lg:col-span-2">
                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Tujuan / Lokasi</label>
-                <flux:input wire:model="destination" placeholder="Contoh: Karoseri Ottoone" />
+                <x-spd.rich-editor model="destination" placeholder="Tujuan / lokasi (bisa berupa daftar)..." />
                 @error('destination')
                 <flux:error message="{{ $message }}" /> @enderror
             </div>
 
             <div class="lg:col-span-2">
                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Alamat Lengkap</label>
-                <flux:textarea wire:model="address" rows="2" placeholder="Jl. ..." />
+                <x-spd.rich-editor model="address" placeholder="Alamat lengkap..." />
                 @error('address')
                 <flux:error message="{{ $message }}" /> @enderror
             </div>
 
-            <div>
-                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Tanggal Mulai</label>
-                <flux:input wire:model="startDate" type="date" />
-                @error('startDate')
-                <flux:error message="{{ $message }}" /> @enderror
-            </div>
-
-            <div>
-                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Tanggal Selesai</label>
-                <flux:input wire:model="endDate" type="date" />
-                @error('endDate')
+            <div class="lg:col-span-2">
+                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Masa Tugas / Tanggal</label>
+                <x-spd.rich-editor model="masaTugas" placeholder="Contoh: 12 Januari 2026 s/d 14 Januari 2026 (bisa banyak periode)..." />
+                <p class="mt-1 text-[11px] text-zinc-400">Tuliskan satu atau beberapa periode tanggal mulai &amp; selesai sebagai daftar.</p>
+                @error('masaTugas')
                 <flux:error message="{{ $message }}" /> @enderror
             </div>
 
@@ -999,3 +1012,78 @@ new class extends Component {
     </div>
 </flux:modal>
 </div>
+
+@assets
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+<style>
+    .spd-editor .ql-toolbar.ql-snow {
+        border: none;
+        border-bottom: 1px solid #e4e4e7;
+        border-top-left-radius: 0.75rem;
+        border-top-right-radius: 0.75rem;
+        background: #fafafa;
+    }
+
+    .spd-editor .ql-container.ql-snow {
+        border: none;
+        font-family: inherit;
+        font-size: 0.875rem;
+    }
+
+    .spd-editor .ql-editor {
+        min-height: 90px;
+        max-height: 220px;
+        overflow-y: auto;
+    }
+
+    .spd-editor .ql-editor.ql-blank::before {
+        color: #a1a1aa;
+        font-style: normal;
+    }
+</style>
+@endassets
+
+@script
+<script>
+    Alpine.data('spdRichEditor', (model) => ({
+        value: model,
+        quill: null,
+        syncing: false,
+
+        init() {
+            this.quill = new Quill(this.$refs.editor, {
+                theme: 'snow',
+                placeholder: this.$refs.editor.dataset.placeholder || '',
+                modules: {
+                    toolbar: [[{ list: 'ordered' }, { list: 'bullet' }]],
+                },
+            });
+
+            if (this.value) {
+                this.quill.clipboard.dangerouslyPasteHTML(this.value);
+            }
+
+            this.quill.on('text-change', () => {
+                this.syncing = true;
+                const html = this.quill.root.innerHTML;
+                this.value = html === '<p><br></p>' ? '' : html;
+                this.syncing = false;
+            });
+
+            this.$watch('value', (incoming) => {
+                if (this.syncing) {
+                    return;
+                }
+
+                const current = this.quill.root.innerHTML;
+                const next = incoming || '';
+
+                if (next !== current && !(next === '' && current === '<p><br></p>')) {
+                    this.quill.clipboard.dangerouslyPasteHTML(next);
+                }
+            });
+        },
+    }));
+</script>
+@endscript
