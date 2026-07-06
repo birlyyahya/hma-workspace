@@ -1,6 +1,5 @@
 import '../../vendor/masmerise/livewire-toaster/resources/js';
-import Quill from 'quill';
-import 'quill/dist/quill.snow.css';
+import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
 
-// Sediakan Quill secara global agar komponen Alpine (mis. editor SPD) dapat memakainya.
-window.Quill = Quill;
+// Sediakan CKEditor secara global agar komponen Alpine (editor SPD & DAR) dapat memakainya.
+window.ClassicEditor = ClassicEditor;

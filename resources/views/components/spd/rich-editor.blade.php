@@ -1,9 +1,9 @@
 @props(['model', 'placeholder' => ''])
 
 {{--
-    Editor rich-text bullet/list-only untuk form SPD. Toolbar sengaja dibatasi
-    hanya ordered/bullet list. Nilai tersimpan sebagai HTML dan di-entangle ke
-    properti Livewire bernama {{ $model }}.
+    Editor rich-text bullet/list-only untuk form SPD (CKEditor, bundled via
+    resources/js/app.js). Toolbar sengaja dibatasi hanya ordered/bullet list.
+    Nilai tersimpan sebagai HTML dan di-entangle ke properti Livewire {{ $model }}.
 --}}
 <div
     wire:ignore

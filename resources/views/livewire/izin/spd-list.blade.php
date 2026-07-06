@@ -55,11 +55,11 @@ new class extends Component {
         return [
             'userId' => ['required', 'integer', 'exists:users,id'],
             'number' => ['required', 'integer', 'min:1'],
-            'task' => ['required', 'string', 'min:3'],
-            'department' => ['required', 'string'],
-            'destination' => ['required', 'string'],
-            'address' => ['required', 'string'],
-            'masaTugas' => ['required', 'string'],
+            'task' => ['required', 'string', 'min:3', 'max:1000'],
+            'department' => ['required', 'string', 'max:1000'],
+            'destination' => ['required', 'string', 'max:1000'],
+            'address' => ['required', 'string', 'max:1000'],
+            'masaTugas' => ['required', 'string', 'max:1000'],
             'attachment' => ['nullable', 'file', 'max:10240'],
         ];
     }
@@ -73,6 +73,7 @@ new class extends Component {
             'number.integer' => 'Nomor surat harus berupa angka.',
             'number.min' => 'Nomor surat minimal 1.',
             'task.required' => 'Tugas / pekerjaan wajib diisi.',
+            'task.max' => 'Tugas / pekerjaan maksimal 1000 karakter (termasuk format daftar). Persingkat isinya.',
             'department.required' => 'Departemen / satuan kerja wajib diisi.',
             'destination.required' => 'Tujuan / lokasi wajib diisi.',
             'address.required' => 'Alamat lengkap wajib diisi.',
@@ -303,8 +304,7 @@ new class extends Component {
             'department' => $this->department,
             'destination' => $this->destination,
             'address' => $this->address,
-            'start_date' => $this->masaTugas,
-            'end_date' => '',
+            'date' => $this->masaTugas,
             'is_submitted' => $this->isSubmitted ? 1 : 0,
             'is_approved' => $this->isSubmitted && $this->isApproved ? 1 : 0,
         ];
@@ -328,7 +328,13 @@ new class extends Component {
         $result = app(IzinWriter::class)->saveSpd($this->editingId, $payload, $file);
 
         if (! $result['ok']) {
-            Toaster::error(getErrorMessages($result['body']['errors'] ?? []) ?: ($result['body']['message'] ?? 'Gagal menyimpan SPD.'));
+            $body = $result['body'] ?? [];
+
+            $message = getErrorMessages($body['errors'] ?? [])
+                ?: getErrorMessages($body['message'] ?? [])
+                ?: 'Gagal menyimpan SPD.';
+
+            Toaster::error($message);
 
             return;
         }
@@ -991,31 +997,29 @@ new class extends Component {
 </div>
 
 @assets
-{{-- Quill di-bundle lewat resources/js/app.js (window.Quill), bukan CDN. --}}
+{{-- CKEditor di-bundle lewat resources/js/app.js (window.ClassicEditor), bukan CDN. --}}
 <style>
-    .spd-editor .ql-toolbar.ql-snow {
+    .spd-editor .ck.ck-toolbar {
         border: none;
         border-bottom: 1px solid #e4e4e7;
-        border-top-left-radius: 0.75rem;
-        border-top-right-radius: 0.75rem;
         background: #fafafa;
     }
 
-    .spd-editor .ql-container.ql-snow {
-        border: none;
-        font-family: inherit;
+    .spd-editor .ck.ck-editor__editable_inline {
+        border: none !important;
+        box-shadow: none !important;
         font-size: 0.875rem;
-    }
-
-    .spd-editor .ql-editor {
         min-height: 90px;
         max-height: 220px;
         overflow-y: auto;
     }
 
-    .spd-editor .ql-editor.ql-blank::before {
+    .spd-editor .ck.ck-editor__editable_inline > :first-child {
+        margin-top: 0.5rem;
+    }
+
+    .spd-editor .ck .ck-placeholder::before {
         color: #a1a1aa;
-        font-style: normal;
     }
 </style>
 @endassets
@@ -1024,59 +1028,56 @@ new class extends Component {
 <script>
     Alpine.data('spdRichEditor', (model) => ({
         value: model,
-        quill: null,
-        syncing: false,
+        editor: null,
 
         init() {
-            this.whenQuillReady(() => this.mountEditor());
+            this.whenEditorReady(() => this.mountEditor());
         },
 
-        whenQuillReady(callback, tries = 0) {
-            if (window.Quill) {
+        destroy() {
+            this.editor?.destroy().catch(() => {});
+            this.editor = null;
+        },
+
+        whenEditorReady(callback, tries = 0) {
+            if (window.ClassicEditor) {
                 callback();
                 return;
             }
 
             if (tries > 200) {
-                console.error('Quill editor gagal dimuat.');
+                console.error('Editor gagal dimuat.');
                 return;
             }
 
-            setTimeout(() => this.whenQuillReady(callback, tries + 1), 50);
+            setTimeout(() => this.whenEditorReady(callback, tries + 1), 50);
         },
 
         mountEditor() {
-            this.quill = new Quill(this.$refs.editor, {
-                theme: 'snow',
-                placeholder: this.$refs.editor.dataset.placeholder || '',
-                modules: {
-                    toolbar: [[{ list: 'ordered' }, { list: 'bullet' }]],
-                },
-            });
-
-            if (this.value) {
-                this.quill.clipboard.dangerouslyPasteHTML(this.value);
+            if (this.editor) {
+                return;
             }
 
-            this.quill.on('text-change', () => {
-                this.syncing = true;
-                const html = this.quill.root.innerHTML;
-                this.value = html === '<p><br></p>' ? '' : html;
-                this.syncing = false;
-            });
+            ClassicEditor
+                .create(this.$refs.editor, {
+                    toolbar: ['bulletedList', 'numberedList'],
+                    placeholder: this.$refs.editor.dataset.placeholder || '',
+                })
+                .then((editor) => {
+                    this.editor = editor;
+                    editor.setData(this.value || '');
 
-            this.$watch('value', (incoming) => {
-                if (this.syncing) {
-                    return;
-                }
+                    editor.model.document.on('change:data', () => {
+                        this.value = editor.getData();
+                    });
 
-                const current = this.quill.root.innerHTML;
-                const next = incoming || '';
-
-                if (next !== current && !(next === '' && current === '<p><br></p>')) {
-                    this.quill.clipboard.dangerouslyPasteHTML(next);
-                }
-            });
+                    this.$watch('value', (val) => {
+                        if (editor.getData() !== (val || '')) {
+                            editor.setData(val || '');
+                        }
+                    });
+                })
+                .catch((error) => console.error(error));
         },
     }));
 </script>
