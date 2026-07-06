@@ -3,8 +3,7 @@
 use App\Models\User;
 use App\Services\IzinCache;
 use App\Services\IzinWriter;
-use App\Services\RemoteImageFetcher;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\SpdPdfComposer;
 use Carbon\Carbon;
 use Flux\Flux;
 use Illuminate\Support\Facades\Log;
@@ -38,8 +37,7 @@ new class extends Component {
     public string $department = '';
     public string $destination = '';
     public string $address = '';
-    public string $startDate = '';
-    public string $endDate = '';
+    public string $masaTugas = '';
     public bool $isSubmitted = false;
     public bool $isApproved = false;
     public $attachment = null;
@@ -57,12 +55,11 @@ new class extends Component {
         return [
             'userId' => ['required', 'integer', 'exists:users,id'],
             'number' => ['required', 'integer', 'min:1'],
-            'task' => ['required', 'string', 'min:3'],
-            'department' => ['required', 'string'],
-            'destination' => ['required', 'string'],
-            'address' => ['required', 'string'],
-            'startDate' => ['required', 'date'],
-            'endDate' => ['required', 'date', 'after_or_equal:startDate'],
+            'task' => ['required', 'string', 'min:3', 'max:1000'],
+            'department' => ['required', 'string', 'max:1000'],
+            'destination' => ['required', 'string', 'max:1000'],
+            'address' => ['required', 'string', 'max:1000'],
+            'masaTugas' => ['required', 'string', 'max:1000'],
             'attachment' => ['nullable', 'file', 'max:10240'],
         ];
     }
@@ -75,9 +72,28 @@ new class extends Component {
             'number.required' => 'Nomor surat wajib diisi.',
             'number.integer' => 'Nomor surat harus berupa angka.',
             'number.min' => 'Nomor surat minimal 1.',
-            'endDate.after_or_equal' => 'Tanggal selesai tidak boleh sebelum tanggal mulai.',
+            'task.required' => 'Tugas / pekerjaan wajib diisi.',
+            'task.max' => 'Tugas / pekerjaan maksimal 1000 karakter (termasuk format daftar). Persingkat isinya.',
+            'department.required' => 'Departemen / satuan kerja wajib diisi.',
+            'destination.required' => 'Tujuan / lokasi wajib diisi.',
+            'address.required' => 'Alamat lengkap wajib diisi.',
+            'masaTugas.required' => 'Masa tugas / tanggal wajib diisi.',
             'attachment.max' => 'Lampiran maksimal 10 MB.',
         ];
+    }
+
+    /**
+     * Rich-text editor menghasilkan HTML. Editor kosong tetap mengirim markup
+     * seperti `<p><br></p>`, jadi normalkan menjadi string kosong bila tidak ada
+     * teks maupun gambar — supaya rule `required` tetap berfungsi.
+     */
+    protected function normalizeHtml(string $html): string
+    {
+        if (trim(strip_tags($html)) === '' && ! Str::contains($html, '<img')) {
+            return '';
+        }
+
+        return trim($html);
     }
 
     protected function romanMonth(int $month): string
@@ -255,8 +271,7 @@ new class extends Component {
         $this->department = (string) ($row['department'] ?? '');
         $this->destination = (string) ($row['destination'] ?? '');
         $this->address = (string) ($row['address'] ?? '');
-        $this->startDate = $row['start_date'] ? Carbon::parse($row['start_date'])->format('Y-m-d') : '';
-        $this->endDate = $row['end_date'] ? Carbon::parse($row['end_date'])->format('Y-m-d') : '';
+        $this->masaTugas = (string) ($row['date'] ?? '');
         $this->isSubmitted = (bool) ($row['is_submitted'] ?? false);
         $this->isApproved = (bool) ($row['is_approved'] ?? false);
         $this->attachment = null;
@@ -274,6 +289,12 @@ new class extends Component {
 
     public function saveSpd(): void
     {
+        $this->task = $this->normalizeHtml($this->task);
+        $this->department = $this->normalizeHtml($this->department);
+        $this->destination = $this->normalizeHtml($this->destination);
+        $this->address = $this->normalizeHtml($this->address);
+        $this->masaTugas = $this->normalizeHtml($this->masaTugas);
+
         $this->validate();
 
         $payload = [
@@ -283,8 +304,7 @@ new class extends Component {
             'department' => $this->department,
             'destination' => $this->destination,
             'address' => $this->address,
-            'start_date' => $this->startDate,
-            'end_date' => $this->endDate,
+            'date' => $this->masaTugas,
             'is_submitted' => $this->isSubmitted ? 1 : 0,
             'is_approved' => $this->isSubmitted && $this->isApproved ? 1 : 0,
         ];
@@ -308,7 +328,13 @@ new class extends Component {
         $result = app(IzinWriter::class)->saveSpd($this->editingId, $payload, $file);
 
         if (! $result['ok']) {
-            Toaster::error(getErrorMessages($result['body']['errors'] ?? []) ?: ($result['body']['message'] ?? 'Gagal menyimpan SPD.'));
+            $body = $result['body'] ?? [];
+
+            $message = getErrorMessages($body['errors'] ?? [])
+                ?: getErrorMessages($body['message'] ?? [])
+                ?: 'Gagal menyimpan SPD.';
+
+            Toaster::error($message);
 
             return;
         }
@@ -388,45 +414,23 @@ new class extends Component {
         }
 
         $user = User::find($row['user_id'] ?? null);
-        $role = $user->role;
-        $attachmentImage = $this->fetchAttachmentImage($row['attachment_url'] ?? null);
 
-
-        $pdf = Pdf::loadView('pdf.spd-pdf', [
-            'spd' => $row,
-            'user' => $user,
-            'role' => $role,
-            'attachmentImage' => $attachmentImage,
-        ])->setPaper('A4', 'portrait');
+        $pdfBytes = app(SpdPdfComposer::class)->render($row, $user);
 
         $filename = 'SPD-' . str_pad((string) $id, 4, '0', STR_PAD_LEFT) . '.pdf';
 
         return response()->streamDownload(
-            fn () => print ($pdf->output()),
+            fn () => print ($pdfBytes),
             $filename,
+            ['Content-Type' => 'application/pdf'],
         );
-    }
-
-    /**
-     * Fetch attachment and convert to base64 data URI if it's an image,
-     * so DomPDF can render it as the second page.
-     *
-     * @return array{data:string,mime:string}|null
-     */
-    protected function fetchAttachmentImage(?string $url): ?array
-    {
-        if (! $url) {
-            return null;
-        }
-
-        return app(RemoteImageFetcher::class)->toImageData($url);
     }
 
     protected function resetForm(): void
     {
         $this->reset([
             'editingId', 'userId', 'userSearch', 'number', 'task', 'department', 'destination', 'address',
-            'startDate', 'endDate', 'attachment', 'existingAttachmentUrl',
+            'masaTugas', 'attachment', 'existingAttachmentUrl',
             'isSubmitted', 'isApproved',
         ]);
         $this->resetErrorBag();
@@ -590,21 +594,19 @@ new class extends Component {
                             @endif
                         </td>
                         <td class="px-5 py-3.5 max-w-[300px]">
-                            <p class="font-semibold text-zinc-900 line-clamp-1">{{ $spd['task'] }}</p>
-                            <p class="mt-0.5 text-xs text-zinc-500">{{ $spd['department'] }}</p>
+                            <p class="font-semibold text-zinc-900 line-clamp-1">{{ strip_tags($spd['task'] ?? '') }}</p>
+                            <p class="mt-0.5 text-xs text-zinc-500 line-clamp-1">{{ strip_tags($spd['department'] ?? '') }}</p>
                         </td>
                         <td class="px-5 py-3.5">
-                            <p class="text-zinc-800">{{ $spd['destination'] }}</p>
-                            <p class="mt-0.5 max-w-35 truncate text-xs text-zinc-500" title="{{ $spd['address'] }}">
-                                {{ $spd['address'] }}
+                            <p class="text-zinc-800 line-clamp-1">{{ strip_tags($spd['destination'] ?? '') }}</p>
+                            <p class="mt-0.5 max-w-35 truncate text-xs text-zinc-500" title="{{ strip_tags($spd['address'] ?? '') }}">
+                                {{ strip_tags($spd['address'] ?? '') }}
                             </p>
                         </td>
                         <td class="px-5 py-3.5 text-zinc-700">
-                            <div class="flex items-center gap-1.5 text-xs">
-                                <flux:icon name="calendar" class="h-3.5 w-3.5 text-zinc-400" />
-                                <span>{{ Carbon::parse($spd['start_date'])->format('d M Y') }}</span>
-                                <span class="text-zinc-300">→</span>
-                                <span>{{ Carbon::parse($spd['end_date'])->format('d M Y') }}</span>
+                            <div class="flex items-start gap-1.5 text-xs">
+                                <flux:icon name="calendar" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                                <span class="line-clamp-2 max-w-40">{{ strip_tags($spd['date'] ?? '') ?: '—' }}</span>
                             </div>
                         </td>
                         <td class="px-5 py-3.5">
@@ -700,8 +702,8 @@ new class extends Component {
             <article wire:key="spd-mob-{{ $spd['id'] }}" class="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
-                        <p class="font-semibold text-zinc-900">{{ $spd['task'] }}</p>
-                        <p class="mt-0.5 text-xs text-zinc-500">{{ $spd['department'] }}</p>
+                        <p class="font-semibold text-zinc-900 line-clamp-2">{{ strip_tags($spd['task'] ?? '') }}</p>
+                        <p class="mt-0.5 text-xs text-zinc-500 line-clamp-1">{{ strip_tags($spd['department'] ?? '') }}</p>
                     </div>
                     <span class="inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 {{ $statusClass }}">
                         {{ $statusLabel }}
@@ -716,12 +718,11 @@ new class extends Component {
                     </div>
                 </div>
                 @endif
-                <p class="mt-2 text-sm text-zinc-700">{{ $spd['destination'] }}</p>
-                <p class="mt-1 text-xs text-zinc-500">{{ $spd['address'] }}</p>
-                <div class="mt-3 flex items-center gap-1.5 text-xs text-zinc-600">
-                    <flux:icon name="calendar" class="h-3.5 w-3.5 text-zinc-400" />
-                    {{ Carbon::parse($spd['start_date'])->format('d M Y') }} →
-                    {{ Carbon::parse($spd['end_date'])->format('d M Y') }}
+                <p class="mt-2 text-sm text-zinc-700 line-clamp-2">{{ strip_tags($spd['destination'] ?? '') }}</p>
+                <p class="mt-1 text-xs text-zinc-500 line-clamp-2">{{ strip_tags($spd['address'] ?? '') }}</p>
+                <div class="mt-3 flex items-start gap-1.5 text-xs text-zinc-600">
+                    <flux:icon name="calendar" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" />
+                    <span class="line-clamp-2">{{ strip_tags($spd['start_date'] ?? '') ?: '—' }}</span>
                 </div>
                 <div class="mt-3 flex items-center justify-between gap-2 border-t border-zinc-100 pt-3">
                     @if (! empty($spd['attachment_url']))
@@ -840,43 +841,38 @@ new class extends Component {
 
             <div class="lg:col-span-2">
                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Tugas / Pekerjaan</label>
-                <flux:input wire:model="task" placeholder="Contoh: Survei instalasi" />
+                <x-spd.rich-editor model="task" placeholder="Rincian tugas / pekerjaan (bisa berupa daftar)..." />
+                <p class="mt-1 text-[11px] text-zinc-400">Gunakan tombol daftar untuk menuliskan beberapa tugas.</p>
                 @error('task')
                 <flux:error message="{{ $message }}" /> @enderror
             </div>
 
-            <div>
+            <div class="lg:col-span-2">
                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Departemen / Satuan Kerja</label>
-                <flux:input wire:model="department" placeholder="Contoh: Wilayah Jawa Barat" />
+                <x-spd.rich-editor model="department" placeholder="Departemen / satuan kerja..." />
                 @error('department')
                 <flux:error message="{{ $message }}" /> @enderror
             </div>
 
-            <div>
+            <div class="lg:col-span-2">
                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Tujuan / Lokasi</label>
-                <flux:input wire:model="destination" placeholder="Contoh: Karoseri Ottoone" />
+                <x-spd.rich-editor model="destination" placeholder="Tujuan / lokasi (bisa berupa daftar)..." />
                 @error('destination')
                 <flux:error message="{{ $message }}" /> @enderror
             </div>
 
             <div class="lg:col-span-2">
                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Alamat Lengkap</label>
-                <flux:textarea wire:model="address" rows="2" placeholder="Jl. ..." />
+                <x-spd.rich-editor model="address" placeholder="Alamat lengkap..." />
                 @error('address')
                 <flux:error message="{{ $message }}" /> @enderror
             </div>
 
-            <div>
-                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Tanggal Mulai</label>
-                <flux:input wire:model="startDate" type="date" />
-                @error('startDate')
-                <flux:error message="{{ $message }}" /> @enderror
-            </div>
-
-            <div>
-                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Tanggal Selesai</label>
-                <flux:input wire:model="endDate" type="date" />
-                @error('endDate')
+            <div class="lg:col-span-2">
+                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Masa Tugas / Tanggal</label>
+                <x-spd.rich-editor model="masaTugas" placeholder="Contoh: 12 Januari 2026 s/d 14 Januari 2026 (bisa banyak periode)..." />
+                <p class="mt-1 text-[11px] text-zinc-400">Tuliskan satu atau beberapa periode tanggal mulai &amp; selesai sebagai daftar.</p>
+                @error('masaTugas')
                 <flux:error message="{{ $message }}" /> @enderror
             </div>
 
@@ -999,3 +995,90 @@ new class extends Component {
     </div>
 </flux:modal>
 </div>
+
+@assets
+{{-- CKEditor di-bundle lewat resources/js/app.js (window.ClassicEditor), bukan CDN. --}}
+<style>
+    .spd-editor .ck.ck-toolbar {
+        border: none;
+        border-bottom: 1px solid #e4e4e7;
+        background: #fafafa;
+    }
+
+    .spd-editor .ck.ck-editor__editable_inline {
+        border: none !important;
+        box-shadow: none !important;
+        font-size: 0.875rem;
+        min-height: 90px;
+        max-height: 220px;
+        overflow-y: auto;
+    }
+
+    .spd-editor .ck.ck-editor__editable_inline > :first-child {
+        margin-top: 0.5rem;
+    }
+
+    .spd-editor .ck .ck-placeholder::before {
+        color: #a1a1aa;
+    }
+</style>
+@endassets
+
+@script
+<script>
+    Alpine.data('spdRichEditor', (model) => ({
+        value: model,
+        editor: null,
+
+        init() {
+            this.whenEditorReady(() => this.mountEditor());
+        },
+
+        destroy() {
+            this.editor?.destroy().catch(() => {});
+            this.editor = null;
+        },
+
+        whenEditorReady(callback, tries = 0) {
+            if (window.ClassicEditor) {
+                callback();
+                return;
+            }
+
+            if (tries > 200) {
+                console.error('Editor gagal dimuat.');
+                return;
+            }
+
+            setTimeout(() => this.whenEditorReady(callback, tries + 1), 50);
+        },
+
+        mountEditor() {
+            if (this.editor) {
+                return;
+            }
+
+            ClassicEditor
+                .create(this.$refs.editor, {
+                    toolbar: ['bulletedList', 'numberedList'],
+                    placeholder: this.$refs.editor.dataset.placeholder || '',
+                })
+                .then((editor) => {
+                    this.editor = editor;
+                    editor.setData(this.value || '');
+
+                    editor.model.document.on('change:data', () => {
+                        this.value = editor.getData();
+                    });
+
+                    this.$watch('value', (val) => {
+                        if (editor.getData() !== (val || '')) {
+                            editor.setData(val || '');
+                        }
+                    });
+                })
+                .catch((error) => console.error(error));
+        },
+    }));
+</script>
+@endscript

@@ -21,6 +21,8 @@
         "masmerise/livewire-toaster": "^2.9",
         "muhammadsadeeq/laravel-activitylog-ui": "^2.0",
         "predis/predis": "*",
+        "setasign/fpdf": "^1.9",
+        "setasign/fpdi": "^2.6",
         "spatie/laravel-activitylog": "^5.0"
     },
     "require-dev": {

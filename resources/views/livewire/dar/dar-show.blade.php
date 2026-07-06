@@ -574,7 +574,7 @@ class extends Component
     </style>
 
     <div
-        x-data="darShow()"
+        x-data="darShow"
         x-on:comment-added.window="scrollToLatestComment()"
         class="min-h-screen bg-linear-to-b from-zinc-50 to-white px-4 py-6 sm:px-6 lg:px-8"
     >
@@ -800,7 +800,7 @@ class extends Component
                                     $userMap = collect($availableUsers)->keyBy('id');
                                 @endphp
                                 <div
-                                    x-data="teamPicker()"
+                                    x-data="teamPicker"
                                     @click.away="open = false"
                                     @keydown.escape.window="open = false"
                                     class="relative"
@@ -879,10 +879,8 @@ class extends Component
                                 {{-- Description --}}
                                 <div>
                                     <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Description</label>
-                                    <div x-data="editorComponent(@entangle('editDescription'))" wire:ignore class="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-                                        <textarea x-ref="editor" rows="6"
-                                            class="w-full resize-none border-0 bg-transparent px-4 py-3 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-0"
-                                            placeholder="Tulis deskripsi tugas..."></textarea>
+                                    <div x-data="editorComponent(@entangle('editDescription'))" wire:ignore class="dar-editor overflow-hidden rounded-xl border border-zinc-200 bg-white">
+                                        <div x-ref="editor"></div>
                                     </div>
                                 </div>
 
@@ -1334,63 +1332,115 @@ class extends Component
     </div>
 
     @assets
-    <script src="https://cdn.ckeditor.com/ckeditor5/35.1.0/classic/ckeditor.js"></script>
-    <script>
-        function teamPicker() {
-            return {
-                open: false,
-                query: '',
-                matches(name) {
-                    if (!this.query) return true;
-                    return name.includes(this.query.toLowerCase());
-                },
-            };
+    {{-- CKEditor di-bundle lewat resources/js/app.js (window.ClassicEditor), bukan CDN. --}}
+    <style>
+        .dar-editor .ck.ck-toolbar {
+            border: none;
+            border-bottom: 1px solid #e4e4e7;
+            background: #fafafa;
         }
 
-        function darShow() {
-            return {
-                scrollToLatestComment() {
-                    this.$nextTick(() => {
-                        const list = this.$refs.commentList;
-                        if (!list) return;
-                        const items = list.querySelectorAll('article');
-                        const last = items[items.length - 1];
-                        if (last) {
-                            last.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            last.classList.add('ring-2', 'ring-zinc-300');
-                            setTimeout(() => last.classList.remove('ring-2', 'ring-zinc-300'), 1500);
-                        }
-                    });
-                },
-            };
+        .dar-editor .ck.ck-editor__editable_inline {
+            border: none !important;
+            box-shadow: none !important;
+            font-size: 0.875rem;
+            min-height: 150px;
+            max-height: 360px;
+            overflow-y: auto;
         }
 
-        function editorComponent(model) {
-            return {
-                editor: null,
-                value: model,
-                init() {
-                    if (this.editor) return;
-
-                    ClassicEditor
-                        .create(this.$refs.editor)
-                        .then(editor => {
-                            this.editor = editor;
-                            editor.setData(this.value || '');
-                            editor.model.document.on('change:data', () => {
-                                this.value = editor.getData();
-                            });
-                            this.$watch('value', (val) => {
-                                if (editor.getData() !== val) {
-                                    editor.setData(val || '');
-                                }
-                            });
-                        })
-                        .catch(error => console.error(error));
-                },
-            };
+        .dar-editor .ck .ck-placeholder::before {
+            color: #a1a1aa;
         }
-    </script>
+    </style>
     @endassets
+
+    @script
+    <script>
+        Alpine.data('teamPicker', () => ({
+            open: false,
+            query: '',
+            matches(name) {
+                if (!this.query) return true;
+                return name.includes(this.query.toLowerCase());
+            },
+        }));
+
+        Alpine.data('darShow', () => ({
+            scrollToLatestComment() {
+                this.$nextTick(() => {
+                    const list = this.$refs.commentList;
+                    if (!list) return;
+                    const items = list.querySelectorAll('article');
+                    const last = items[items.length - 1];
+                    if (last) {
+                        last.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        last.classList.add('ring-2', 'ring-zinc-300');
+                        setTimeout(() => last.classList.remove('ring-2', 'ring-zinc-300'), 1500);
+                    }
+                });
+            },
+        }));
+
+        Alpine.data('editorComponent', (model) => ({
+            editor: null,
+            value: model,
+
+            init() {
+                this.whenEditorReady(() => this.mountEditor());
+            },
+
+            destroy() {
+                this.editor?.destroy().catch(() => {});
+                this.editor = null;
+            },
+
+            whenEditorReady(callback, tries = 0) {
+                if (window.ClassicEditor) {
+                    callback();
+                    return;
+                }
+
+                if (tries > 200) {
+                    console.error('Editor gagal dimuat.');
+                    return;
+                }
+
+                setTimeout(() => this.whenEditorReady(callback, tries + 1), 50);
+            },
+
+            mountEditor() {
+                if (this.editor) return;
+
+                ClassicEditor
+                    .create(this.$refs.editor, {
+                        toolbar: [
+                            'heading', '|',
+                            'bold', 'italic', '|',
+                            'bulletedList', 'numberedList', '|',
+                            'link', 'blockQuote', '|',
+                            'undo', 'redo',
+                        ],
+                        placeholder: 'Tulis deskripsi tugas...',
+                    })
+                    .then((editor) => {
+                        this.editor = editor;
+                        editor.setData(this.value || '');
+
+                        editor.model.document.on('change:data', () => {
+                            this.value = editor.getData();
+                        });
+
+                        this.$watch('value', (val) => {
+                            if (editor.getData() !== (val || '')) {
+                                editor.setData(val || '');
+                            }
+                        });
+                    })
+                    .catch((error) => console.error(error));
+            },
+        }));
+    </script>
+    @endscript
     @endif
 </div>
