@@ -325,9 +325,10 @@ new class extends Component
                     <flux:field>
                         <flux:label>Status <flux:badge size="sm" color="red" class="ml-1">Wajib</flux:badge></flux:label>
                         <flux:select wire:model="status">
-                            <flux:select.option value="WAITING">WAITING</flux:select.option>
-                            <flux:select.option value="ON PROGRESS">ON PROGRESS</flux:select.option>
-                            <flux:select.option value="CLOSED">CLOSED</flux:select.option>
+                            <flux:select.option value="WAITING">Menunggu</flux:select.option>
+                            <flux:select.option value="ON PROGRESS">Berjalan</flux:select.option>
+                            <flux:select.option value="CLOSED">Selesai</flux:select.option>
+                            <flux:select.option value="MAINTENANCE" disabled>Maintenance</flux:select.option>
                         </flux:select>
                         <flux:error name="status"/>
                     </flux:field>

@@ -77,10 +77,10 @@ new class extends Component
             'client'            => ['required', 'string'],
             'ppk'               => ['required', 'string'],
             'value'             => ['required', 'numeric', 'min:0'],
-            'status'            => ['required', 'string', 'in:WAITING,ON PROGRESS,DONE,CANCELLED,MAINTENANCE'],
+            'status'            => ['required', 'string', 'in:WAITING,ON PROGRESS,CLOSED'],
             'start_date'        => ['required', 'date'],
             'end_date'          => ['required', 'date', 'after_or_equal:start_date'],
-            'maintenance_date'  => ['required', 'date', 'after_or_equal:end_date'],
+            'maintenance_date'  => ['nullable', 'date', 'after_or_equal:end_date'],
             'project_leader_id' => ['required', 'integer'],
             'company_id'        => ['required', 'integer'],
             'support_teams'     => ['array', 'nullable'],
@@ -159,9 +159,9 @@ new class extends Component
      * Merge field-level validation errors returned by the external API
      * into Livewire's error bag so they display on the matching fields.
      *
-     * @param  array<string, array<int, string>|string>|null  $errors
+     * @param  array<string, array<int, string>|string>|string|null  $errors
      */
-    protected function mergeApiErrors(?array $errors): void
+    protected function mergeApiErrors(mixed $errors): void
     {
         if (! is_array($errors)) {
             return;
@@ -275,9 +275,8 @@ new class extends Component
                     <flux:select wire:model="status">
                         <flux:select.option value="WAITING">Menunggu</flux:select.option>
                         <flux:select.option value="ON PROGRESS">Berjalan</flux:select.option>
-                        <flux:select.option value="DONE">Selesai</flux:select.option>
-                        <flux:select.option value="CANCELLED">Dibatalkan</flux:select.option>
-                        <flux:select.option value="MAINTENANCE">Maintenance</flux:select.option>
+                        <flux:select.option value="CLOSED">Selesai</flux:select.option>
+                        <flux:select.option value="MAINTENANCE" disabled>Maintenance</flux:select.option>
                     </flux:select>
                     <flux:error name="status"/>
                 </flux:field>

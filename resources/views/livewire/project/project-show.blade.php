@@ -109,14 +109,16 @@ new #[Lazy] class extends Component {
 @php
     $statusBadge = match($this->project['status'] ?? null) {
         'ON PROGRESS' => 'blue',
-        'WAITING'     => 'yellow',
-        'CLOSED'      => 'red',
+        'WAITING'     => 'red',
+        'CLOSED'      => 'green',
+        'MAINTENANCE' => 'purple',
         default       => 'zinc',
     };
     $statusDot = match($this->project['status'] ?? null) {
         'ON PROGRESS' => 'bg-blue-500',
-        'WAITING'     => 'bg-amber-500',
-        'CLOSED'      => 'bg-red-500',
+        'WAITING'     => 'bg-red-500',
+        'CLOSED'      => 'bg-green-500',
+        'MAINTENANCE' => 'bg-purple-500',
         default       => 'bg-zinc-400',
     };
 
@@ -181,7 +183,7 @@ new #[Lazy] class extends Component {
                                         {{ $this->project['code'] }}
                                     </span>
                                 @endif
-                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-zinc-100 text-zinc-700 ring-1 ring-zinc-200">
+                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-{{ $statusBadge }}-100 text-zinc-700 ring-1 ring-{{ $statusBadge }}-200">
                                     <span class="w-1.5 h-1.5 rounded-full {{ $statusDot }}"></span>
                                     {{ $this->project['status'] ?? 'UNKNOWN' }}
                                 </span>

@@ -29,8 +29,9 @@ new class extends Component {
     {
         return match ($this->project['status'] ?? null) {
             'ON PROGRESS' => ['badge' => 'blue', 'dot' => 'bg-blue-500', 'ring' => 'ring-blue-500/20', 'text' => 'text-blue-700', 'bg' => 'bg-blue-50'],
-            'WAITING' => ['badge' => 'yellow', 'dot' => 'bg-amber-500', 'ring' => 'ring-amber-500/20', 'text' => 'text-amber-700', 'bg' => 'bg-amber-50'],
-            'CLOSED' => ['badge' => 'red', 'dot' => 'bg-red-500', 'ring' => 'ring-red-500/20', 'text' => 'text-red-700', 'bg' => 'bg-red-50'],
+            'WAITING' => ['badge' => 'red', 'dot' => 'bg-red-500', 'ring' => 'ring-red-500/20', 'text' => 'text-red-700', 'bg' => 'bg-red-50'],
+            'CLOSED' => ['badge' => 'green', 'dot' => 'bg-green-500', 'ring' => 'ring-green-500/20', 'text' => 'text-green-700', 'bg' => 'bg-green-50'],
+            'MAINTENANCE' => ['badge' => 'purple', 'dot' => 'bg-purple-500', 'ring' => 'ring-purple-500/20', 'text' => 'text-purple-700', 'bg' => 'bg-purple-50'],
             default => ['badge' => 'gray', 'dot' => 'bg-zinc-400', 'ring' => 'ring-zinc-500/20', 'text' => 'text-zinc-700', 'bg' => 'bg-zinc-50'],
         };
     }

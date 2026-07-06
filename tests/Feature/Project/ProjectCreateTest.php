@@ -130,6 +130,34 @@ test('field-level errors from the api are shown on the fields and in the toaster
     Toaster::assertDispatched('Nama proyek sudah ada.');
 });
 
+test('string errors from the api do not throw and fall back to the message toaster', function () {
+    $admin = User::factory()->create(['role_id' => Role::factory()->superAdmin()]);
+    $leader = User::factory()->create();
+    Toaster::fake();
+
+    Http::fake([
+        '*projects' => Http::response([
+            'status' => 400,
+            'message' => 'Gagal membuat proyek',
+            'data' => [],
+            'pagination' => [],
+            'errors' => 'Terjadi kesalahan pada server.',
+        ], 200),
+        '*' => Http::response(['status' => 200, 'data' => []], 200),
+    ]);
+
+    $component = fillRequiredProjectFields(
+        Volt::actingAs($admin)->test('project.project-create'),
+        $leader->id
+    );
+
+    $component->call('store')
+        ->assertHasNoErrors()
+        ->assertNoRedirect();
+
+    Toaster::assertDispatched('Terjadi kesalahan pada server.');
+});
+
 test('company options are shaped as value/label pairs for the search-select', function () {
     \Illuminate\Support\Facades\Cache::flush();
     $admin = User::factory()->create(['role_id' => Role::factory()->superAdmin()]);

@@ -184,8 +184,7 @@ new class extends Component
     $statusConfig = [
         'WAITING'     => ['label' => 'Menunggu',    'bg' => 'bg-red-100 dark:bg-red-900/30',   'text' => 'text-red-700 dark:text-red-400',   'bar' => 'bg-red-500',  'accent' => 'from-red-400 to-red-500'],
         'ON PROGRESS' => ['label' => 'Berjalan',    'bg' => 'bg-blue-100 dark:bg-blue-900/30',     'text' => 'text-blue-700 dark:text-blue-400',     'bar' => 'bg-blue-500',   'accent' => 'from-blue-400 to-blue-600'],
-        'DONE'        => ['label' => 'Selesai',     'bg' => 'bg-green-100 dark:bg-green-900/30',   'text' => 'text-green-700 dark:text-green-400',   'bar' => 'bg-green-500',  'accent' => 'from-green-400 to-emerald-500'],
-        'CANCELLED'   => ['label' => 'Dibatalkan',  'bg' => 'bg-gray-100 dark:bg-gray-900/30',       'text' => 'text-gray-700 dark:text-gray-400',       'bar' => 'bg-gray-500',    'accent' => 'from-gray-400 to-gray-500'],
+        'CLOSED'      => ['label' => 'Selesai',     'bg' => 'bg-green-100 dark:bg-green-900/30',   'text' => 'text-green-700 dark:text-green-400',   'bar' => 'bg-green-500',  'accent' => 'from-green-400 to-emerald-500'],
         'MAINTENANCE' => ['label' => 'Maintenance', 'bg' => 'bg-purple-100 dark:bg-purple-900/30', 'text' => 'text-purple-700 dark:text-purple-400', 'bar' => 'bg-purple-500', 'accent' => 'from-purple-400 to-violet-500'],
     ];
     $defaultStatus = ['label' => 'Lainnya', 'bg' => 'bg-zinc-100 dark:bg-zinc-800', 'text' => 'text-zinc-500 dark:text-zinc-400', 'bar' => 'bg-zinc-400', 'accent' => 'from-zinc-300 to-zinc-400'];
