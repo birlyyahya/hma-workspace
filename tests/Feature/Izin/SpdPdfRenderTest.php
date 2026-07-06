@@ -10,8 +10,7 @@ function renderSpdPdfHtml(array $overrides = []): string
         'department' => '<p>IT RnD</p>',
         'destination' => '<ul><li>Bandung</li></ul>',
         'address' => '<p>Jl. Merdeka No. 1</p>',
-        'start_date' => '<ul><li>10 Juli 2026 s/d 12 Juli 2026</li></ul>',
-        'end_date' => '',
+        'date' => '<ul><li>10 Juli 2026 s/d 12 Juli 2026</li></ul>',
         'created_at' => '2026-07-06',
         'is_submitted' => false,
         'is_approved' => false,
@@ -25,11 +24,13 @@ function renderSpdPdfHtml(array $overrides = []): string
     ])->render();
 }
 
-test('renders two main SPD pages with the administrasi stamp', function () {
+test('renders two main SPD pages with a floating Lampiran stamp on the admin copy', function () {
     $html = renderSpdPdfHtml();
 
     expect(substr_count($html, 'SURAT PERJALANAN DINAS'))->toBe(2)
-        ->and(substr_count($html, 'class="stamp"'))->toBe(1);
+        ->and(substr_count($html, 'class="stamp"'))->toBe(1)
+        ->and($html)->toContain('<div class="stamp">Lampiran</div>')
+        ->and($html)->not->toContain('stamp-cell');
 });
 
 test('renders the rich-text fields as HTML lists', function () {
@@ -64,8 +65,7 @@ test('produces a valid PDF binary through DomPDF', function () {
             'department' => 'IT',
             'destination' => 'Jakarta',
             'address' => 'Alamat',
-            'start_date' => '<p>Hari ini</p>',
-            'end_date' => '',
+            'date' => '<p>Hari ini</p>',
             'created_at' => '2026-07-06',
             'is_submitted' => true,
             'is_approved' => false,

@@ -7,6 +7,10 @@
     disanitasi di spd-pdf dan diterima sebagai HTML siap render.
 --}}
 <div class="page">
+    @if ($adminCopy)
+    {{-- Stempel absolute agar tidak menggeser layout header. --}}
+    <div class="stamp">Lampiran</div>
+    @endif
     <table class="header">
         <tr>
             <td class="logo">
@@ -20,11 +24,6 @@
                     Web : www.hanatekindo.co.id &nbsp;&nbsp;|&nbsp;&nbsp; E-mail : info@hanatekindo.co.id
                 </div>
             </td>
-            @if ($adminCopy)
-            <td class="stamp-cell">
-                <div class="stamp">Lampiran<br>Administrasi</div>
-            </td>
-            @endif
         </tr>
     </table>
     <hr class="divider">

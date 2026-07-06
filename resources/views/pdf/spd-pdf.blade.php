@@ -80,6 +80,7 @@ $bodyData = compact(
         }
 
         .page {
+            position: relative;
             background-color: #fff;
             width: 175mm;
             min-height: 277mm;
@@ -120,14 +121,10 @@ $bodyData = compact(
             padding-left: 14px;
         }
 
-        .header .stamp-cell {
-            width: 120px;
-            text-align: right;
-            vertical-align: top;
-        }
-
-        .header .stamp {
-            display: inline-block;
+        .stamp {
+            position: absolute;
+            top: 8mm;
+            right: 12mm;
             border: 2px solid #b91c1c;
             border-radius: 4px;
             color: #b91c1c;
