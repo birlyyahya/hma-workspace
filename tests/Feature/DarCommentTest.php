@@ -1,6 +1,8 @@
 <?php
 
+use App\Models\Role;
 use App\Models\User;
+use App\Notifications\DarCommentReceived;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Volt\Volt;
@@ -51,6 +53,24 @@ test('a newly added comment carries a valid id from the reloaded task', function
     foreach ($comments as $comment) {
         expect($comment['id'] ?? null)->not->toBeNull();
     }
+});
+
+test('an all-scope super-admin receives the comment notification even when not on the team', function () {
+    Notification::fake();
+
+    $superAdmin = User::factory()->create(['role_id' => Role::factory()->superAdmin()]);
+
+    $user = User::factory()->create();
+    fakeDarApi($user);
+
+    Volt::actingAs($user)
+        ->test('dar.dar-show', ['id' => 1])
+        ->set('comment', 'Hello')
+        ->call('addComment')
+        ->assertHasNoErrors();
+
+    Notification::assertSentTo($superAdmin, DarCommentReceived::class);
+    Notification::assertNotSentTo($user, DarCommentReceived::class);
 });
 
 test('a just-added comment can be deleted without a binding resolution error', function () {

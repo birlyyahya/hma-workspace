@@ -105,15 +105,9 @@ new class extends Component {
             return collect();
         }
 
-        if ($user->viewScopeFor('dar') === 'all') {
-            $query = \Illuminate\Notifications\DatabaseNotification::query()
-                ->where('type', DarCommentReceived::class);
-        } else {
-            $query = $user->notifications()
-                ->where('type', DarCommentReceived::class);
-        }
-
-        return $query->latest()
+        return $user->notifications()
+            ->where('type', DarCommentReceived::class)
+            ->latest()
             ->limit(50)
             ->get()
             ->groupBy(fn ($n) => $n->data['activity_id'] ?? null)
@@ -139,6 +133,21 @@ new class extends Component {
 
     public function refreshMessages(): void
     {
+        $this->messages = $this->loadMessages();
+    }
+
+    public function markAllAsRead(): void
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return;
+        }
+
+        $user->notifications()
+            ->where('type', DarCommentReceived::class)
+            ->delete();
+
         $this->messages = $this->loadMessages();
     }
 
@@ -188,6 +197,7 @@ new class extends Component {
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 
                 {{-- MESSAGE BOARD --}}
+                @php $unreadTotal = collect($messages)->sum('unread'); @endphp
                 <section class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
                     <header class="flex items-center justify-between border-b border-slate-200/70 px-5 py-4">
                         <div class="flex items-center gap-3">
@@ -203,13 +213,22 @@ new class extends Component {
                                 <p class="text-xs text-slate-500">Message board terbaru</p>
                             </div>
                         </div>
-                        <button type="button" class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900" aria-label="Message actions">
-                            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="currentColor" aria-hidden="true">
-                                <circle cx="5" cy="12" r="1.6" />
-                                <circle cx="12" cy="12" r="1.6" />
-                                <circle cx="19" cy="12" r="1.6" />
-                            </svg>
-                        </button>
+                        @if($unreadTotal > 0)
+                            <button
+                                type="button"
+                                wire:click="markAllAsRead"
+                                wire:loading.attr="disabled"
+                                wire:target="markAllAsRead"
+                                class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
+                            >
+                                <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M2 12.5l4 4 7-8" />
+                                    <path d="M11 15l3 3 8-9" />
+                                </svg>
+                                <span wire:loading.remove wire:target="markAllAsRead">Read all</span>
+                                <span wire:loading wire:target="markAllAsRead">Reading...</span>
+                            </button>
+                        @endif
                     </header>
 
                     <div class="p-5" wire:poll.visible.5s="refreshMessages">

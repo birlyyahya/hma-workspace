@@ -404,8 +404,17 @@ class extends Component
                     ->filter()
                     ->map(fn ($id) => (int) $id);
 
+                $allScopeUserIds = User::query()
+                    ->where(function ($query) {
+                        $query->whereHas('role', fn ($role) => $role->where('slug', 'super-admin'))
+                            ->orWhereHas('role.permissions', fn ($permission) => $permission->where('name', 'dar.view.all'));
+                    })
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id);
+
                 $recipientIds = $teamUserIds
                     ->push($taskOwnerId)
+                    ->merge($allScopeUserIds)
                     ->filter()
                     ->reject(fn ($id) => $id === (int) $userId)
                     ->unique()
