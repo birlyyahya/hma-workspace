@@ -28,23 +28,24 @@ class RegisterUserToApiIzinJob implements ShouldQueue
 
     public function handle(): void
     {
-        Log::info('Sync user ke API Izin (placeholder, endpoint belum aktif)', [
-            'user_id' => $this->user->id,
-            'username' => $this->user->username,
-        ]);
+        // Log::info('Sync user ke API Izin (placeholder, endpoint belum aktif)', [
+        //     'user_id' => $this->user->id,
+        //     'username' => $this->user->username,
+        // ]);
 
         // TODO: aktifkan blok di bawah ketika endpoint register API Izin sudah tersedia.
-        return;
+        // return;
 
         $base = rtrim((string) config('services.api_izin'), '/');
-        $endpoint = ltrim((string) config('services.api_izin_register_endpoint'), '/');
+        $endpoint = ltrim('global/user/create', '/');
         $url = $base.'/'.$endpoint;
 
         $payload = [
+            'user_id' => $this->user->id,
             'name' => $this->user->name,
             'email' => $this->user->email,
             'username' => $this->user->username,
-            'password' => $this->plainPassword,
+            'role' => $this->user->role?->slug,
         ];
 
         try {

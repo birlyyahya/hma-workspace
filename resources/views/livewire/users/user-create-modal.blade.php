@@ -26,6 +26,11 @@ new class extends Component {
 
     public function createUser(): void
     {
+        if (!Auth::user()->can('create.user')) {
+            Toaster::error('Anda tidak memiliki izin untuk membuat user baru.');
+            return;
+        }
+
         $this->validate([
             'name' => ['required', 'string', 'min:3', 'max:100'],
             'username' => ['required', 'string', 'min:3', 'max:50', 'unique:users,username'],

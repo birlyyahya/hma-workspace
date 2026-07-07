@@ -13,6 +13,8 @@ use Livewire\Attributes\Url;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Masmerise\Toaster\Toaster;
+use App\Jobs\DeleteUserToApiIzinJob;
+use App\Jobs\DeleteUserToApiPM;
 
 new class extends Component {
     use WithPagination;
@@ -164,7 +166,11 @@ new class extends Component {
         }
 
         try {
+            DeleteUserToApiPM::dispatch($user->id);
+            DeleteUserToApiIzinJob::dispatch($user->username);
+
             $user->delete();
+
             Toaster::success('User berhasil dihapus.');
             $this->reset(['confirmDelete', 'deleteUserId']);
             Flux::modal('delete-user-modal')->close();

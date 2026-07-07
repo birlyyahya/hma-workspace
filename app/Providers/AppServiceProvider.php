@@ -60,7 +60,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Gate::define('viewActivityLog', function (User $user) {
-            return $user->hasRole('super-admin') || $user->hasPermission('activitylog.view');
+            return $user->hasRole('super-admin') || $user->hasPermission('view.activity-log');
         });
 
         if (app()->environment('production')) {

@@ -1060,7 +1060,7 @@ new class extends Component {
 
             ClassicEditor
                 .create(this.$refs.editor, {
-                    toolbar: ['bulletedList', 'numberedList'],
+                    toolbar: ['bulletedList', 'numberedList', 'italic', 'bold', 'undo', 'redo'],
                     placeholder: this.$refs.editor.dataset.placeholder || '',
                 })
                 .then((editor) => {

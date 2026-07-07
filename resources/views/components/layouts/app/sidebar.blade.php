@@ -11,7 +11,7 @@
             <flux:sidebar.collapse class="in-data-flux-sidebar-on-desktop:not-in-data-flux-sidebar-collapsed-desktop:-mr-2" />
         </flux:sidebar.header>
 
-        <flux:sidebar.nav>
+        <flux:sidebar.nav >
             <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
                 Dashboard
 
@@ -39,11 +39,11 @@
         <flux:spacer />
         <flux:sidebar.nav>
             <flux:sidebar.group class="grid">
-                @if(Auth::user()->role->level > 50)
+                @can('user.view.all')
                 <flux:sidebar.item icon="users" :href="route('users')" :current="request()->routeIs('users')" wire:navigate>
                     User Management
                 </flux:sidebar.item>
-                @endif
+                @endcan
                 <flux:sidebar.item icon="book-open" :href="route('knowledge.articles')" :current="request()->routeIs('knowledge.articles')" wire:navigate>
                     Knowledge Hub
                 </flux:sidebar.item>

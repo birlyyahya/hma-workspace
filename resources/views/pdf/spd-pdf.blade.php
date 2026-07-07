@@ -73,7 +73,7 @@ $bodyData = compact(
             font-family: Arial, Helvetica, sans-serif;
             color: #111;
             background-color: #111;
-            font-size: 10.5pt;
+            font-size: 10pt;
             line-height: 1.45;
             word-wrap: break-word;
             overflow-wrap: break-word;
@@ -140,14 +140,14 @@ $bodyData = compact(
         }
 
         .header .company .name {
-            font-size: 20pt;
+            font-size: 18pt;
             font-weight: 700;
             color: #b91c1c;
             letter-spacing: 0.5px;
         }
 
         .header .company .info {
-            font-size: 9pt;
+            font-size: 10pt;
             line-height: 1.5;
             color: #1f1f1f;
             margin-top: 2px;
@@ -167,13 +167,13 @@ $bodyData = compact(
 
         .title-block .title {
             font-weight: 700;
-            font-size: 12pt;
+            font-size: 11.5pt;
             text-decoration: underline;
         }
 
         .title-block .ref {
             font-weight: 700;
-            font-size: 11pt;
+            font-size: 10.5pt;
         }
 
         /* Body */
@@ -216,6 +216,7 @@ $bodyData = compact(
         }
 
         .description {
+            margin-top: 5px;
             text-align: justify;
         }
 
@@ -261,7 +262,7 @@ $bodyData = compact(
         }
 
         .sig-table .role {
-            font-size: 11pt;
+            font-size: 10pt;
             padding-bottom: 4px;
         }
 
@@ -283,7 +284,7 @@ $bodyData = compact(
         }
 
         .sig-table .position {
-            font-size: 10.5pt;
+            font-size: 10pt;
             color: #1f1f1f;
         }
 
@@ -315,7 +316,7 @@ $bodyData = compact(
         .attachment-title {
             text-align: center;
             font-weight: 700;
-            font-size: 13pt;
+            font-size: 14pt;
             text-decoration: underline;
             margin-bottom: 16px;
         }
@@ -344,7 +345,6 @@ $bodyData = compact(
     @if (! empty($attachmentImage['data']))
     <div class="page-break"></div>
     <div class="page">
-        <div class="attachment-title">LAMPIRAN</div>
         <div class="attachment-wrap">
             <img src="{{ $attachmentImage['data'] }}" alt="Lampiran SPD">
         </div>
