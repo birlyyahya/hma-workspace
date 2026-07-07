@@ -41,8 +41,8 @@ Route::middleware('auth')->group(function () {
     Route::get('izin/spd/{id}/pdf', \App\Http\Controllers\SpdPdfController::class)->name('izin.spd-pdf');
 
     // Inventaris
-    // Route::view('inventaris', 'inventaris')->name('inventaris');
-    Volt::route('inventaris', 'maintenance/comingsoon')->name('inventaris');
+    Route::view('inventaris', 'inventaris')->name('inventaris');
+    Volt::route('inventaris/{id}/detail', 'inventaris.inventaris-show')->name('inventaris.show');
 
     // Cash Advance
     Route::view('cashadvance', 'cashadvance')->name('cashadvance');

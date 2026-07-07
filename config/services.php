@@ -40,6 +40,7 @@ return [
     'api_project' => env('API_PROJECT'),
     'url_project' => env('URL_PROJECT'),
     'api_ca' => env('API_CA'),
+    'api_inventaris' => env('API_INVENTARIS'),
     'aws_url' => env('AWS_URL'),
     'aws_url_project' => env('AWS_URL').'workspace',
 

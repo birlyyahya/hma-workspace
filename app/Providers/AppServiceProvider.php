@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Models\User;
 use App\Services\DarCache;
 use App\Services\DarWriter;
+use App\Services\InventarisCache;
+use App\Services\InventarisWriter;
 use App\Services\IzinCache;
 use App\Services\IzinWriter;
 use App\Services\ProjectCache;
@@ -44,6 +46,15 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(IzinWriter::class, fn ($app) => new IzinWriter(
             rtrim((string) config('services.api_izin'), '/'),
             $app->make(IzinCache::class),
+        ));
+
+        $this->app->singleton(InventarisCache::class, fn () => new InventarisCache(
+            rtrim((string) config('services.api_inventaris'), '/')
+        ));
+
+        $this->app->singleton(InventarisWriter::class, fn ($app) => new InventarisWriter(
+            rtrim((string) config('services.api_inventaris'), '/'),
+            $app->make(InventarisCache::class),
         ));
 
         $this->app->singleton(ProjectWriter::class, fn ($app) => new ProjectWriter(
