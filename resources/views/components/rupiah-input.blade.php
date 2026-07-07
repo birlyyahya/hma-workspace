@@ -35,7 +35,7 @@
     }"
     class="relative"
 >
-    <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-zinc-500 dark:text-zinc-400">{{ $prefix }}</span>
+    <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-normal text-zinc-400 dark:text-zinc-400">{{ $prefix }}</span>
     <input
         type="text"
         inputmode="numeric"

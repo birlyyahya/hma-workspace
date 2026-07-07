@@ -35,7 +35,6 @@ class CaCache
                             || (method_exists($e, 'response') && optional($e->response)->serverError());
                     }, throw: false)
                     ->get($url);
-
                 if ($response->failed()) {
                     throw new \RuntimeException('status '.$response->status());
                 }
@@ -76,6 +75,34 @@ class CaCache
             }
         });
 
+    }
+
+    public function riwayatDompetCaPl(int $id)
+    {
+        $key = 'ca:riwayat-dompet-ca-pl:'.$id;
+
+        $url = $this->apiBase.'/riwayat-wallet-kegiatan?user_id='.$id.'&is_active=0';
+
+        return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], function () use ($url) {
+            try {
+                $response = Http::timeout(15)
+                    ->retry(2, 200, function ($e) {
+                        return $e instanceof \Illuminate\Http\Client\ConnectionException
+                            || (method_exists($e, 'response') && optional($e->response)->serverError());
+                    }, throw: false)
+                    ->get($url);
+
+                if ($response->failed()) {
+                    throw new \RuntimeException('status '.$response->status());
+                }
+
+                return $response->json() ?? ['data' => []];
+            } catch (\Throwable $e) {
+                Log::warning('CaCache riwayat Dompket Ca Pl gagal', ['error' => $e->getMessage()]);
+
+                throw $e;
+            }
+        });
     }
 
     public function flush(): void

@@ -18,7 +18,18 @@ beforeEach(function () {
             'chart' => ['series' => []],
             'categories' => ['Transport', 'Konsumsi'],
         ], 200),
-        '*/transaksi-wallet-pl/*' => Http::response(['data' => []], 200),
+        '*/transaksi-wallet-pl/*' => Http::response(['data' => [[
+            'id_transaksi' => 9,
+            'dompet_id' => 1,
+            'deskripsi' => 'Taksi bandara',
+            'kategori' => 'Transport',
+            'created_at' => '2026-07-01 10:00:00',
+            'jenis' => 'pengeluaran',
+            'jumlah' => 75_000,
+            'saldo_setelah' => 925_000,
+            'bukti' => null,
+        ]]], 200),
+        '*/riwayat-wallet-kegiatan*' => Http::response(['data' => []], 200),
         '*/ca/CA-PL-01/transaksi/*' => Http::response(['success' => true], 200),
         '*/ca/CA-PL-01/transaksi' => Http::response(['success' => true], 200),
     ]);
@@ -43,7 +54,7 @@ test('saveExpense delegates a valid new expense to the writer and resets the for
         ->once()
         ->with('CA-PL-01', Mockery::on(fn ($payload) => $payload['jumlah'] === 50_000
             && $payload['kategori'] === 'Transport'
-            && $payload['direction'] === 'keluar'
+            && $payload['jenis'] === 'pengeluaran'
             && isset($payload['bukti'])))
         ->andReturn(['ok' => true, 'body' => [], 'status' => 201, 'error' => null]);
 
@@ -58,6 +69,27 @@ test('saveExpense delegates a valid new expense to the writer and resets the for
         ->call('saveExpense')
         ->assertHasNoErrors()
         ->assertSet('jumlah', null)
+        ->assertSet('editingId', null);
+});
+
+test('startEdit fills the form from the selected transaction', function () {
+    $this->actingAs(User::factory()->create());
+
+    Volt::test('cashadvance.ca-index')
+        ->call('startEdit', 9)
+        ->assertSet('editingId', 9)
+        ->assertSet('jumlah', 75_000)
+        ->assertSet('kategori', 'Transport')
+        ->assertSet('deskripsi', 'Taksi bandara')
+        ->assertSet('tanggal', '2026-07-01')
+        ->assertSet('bukti', null);
+});
+
+test('startEdit ignores an unknown transaction id', function () {
+    $this->actingAs(User::factory()->create());
+
+    Volt::test('cashadvance.ca-index')
+        ->call('startEdit', 999)
         ->assertSet('editingId', null);
 });
 

@@ -27,9 +27,44 @@ new class extends Component {
 
     public $deleteTransactionId = null;
 
+    // Form Top Up Pertama (aktivasi CA)
+    public $topupJumlah;
+    public $topupBukti;
+    public $topupCatatan;
+
+    // dompet Kegiatan
+    public int $rab;
+
+
     public function mount(): void
     {
         $this->refreshDashboard();
+    }
+
+    /**
+     * Pengguna dianggap sudah memiliki CA bila dashboard API mengembalikan
+     * kode dompet CA PL. Bila belum, UI onboarding top up ditampilkan.
+     */
+    public function hasCa(): bool
+    {
+        return filled($this->caPlBalance['kode_ca'] ?? null);
+    }
+
+    /**
+     * Ajukan top up pertama untuk membuka dompet CA PL.
+     * Endpoint writer belum tersedia — validasi & alur UI sudah siap,
+     * tinggal delegasikan payload ke CaWriter saat API-nya ada.
+     */
+    public function submitInitialTopup(): void
+    {
+        $this->validate([
+            'topupJumlah' => ['required', 'integer', 'min:1'],
+            'topupBukti' => ['required', 'file', 'mimes:jpg,png,pdf', 'max:2048'],
+            'topupCatatan' => ['nullable', 'string'],
+        ]);
+
+        Flux::modal('topup-pertama')->close();
+        Toaster::info('Pengajuan top up terkirim — menunggu integrasi API CA.');
     }
 
     public function transaksiCaPl(): array
@@ -63,7 +98,7 @@ new class extends Component {
             'kategori' => $this->kategori,
             'deskripsi' => $this->deskripsi,
             'tanggal' => $this->tanggal,
-            'direction' => 'keluar',
+            'jenis' => 'pengeluaran',
             'user_id' => Auth::id(),
         ];
 
@@ -99,6 +134,27 @@ new class extends Component {
         $this->resetValidation();
     }
 
+    /**
+     * Isi form dari transaksi terpilih untuk diedit. Dilakukan di server
+     * (bukan @js di atribut komponen) karena kutip ter-escape pada atribut
+     * component tag membuat precompiler Livewire salah membaca tanda kurung.
+     */
+    public function startEdit(int $id): void
+    {
+        $trx = collect($this->transaksiCaPl()['data'] ?? [])->firstWhere('id_transaksi', $id);
+
+        if (! $trx) {
+            return;
+        }
+
+        $this->editingId = $id;
+        $this->jumlah = (int) $trx['jumlah'];
+        $this->kategori = $trx['kategori'] ?? '';
+        $this->deskripsi = $trx['deskripsi'] ?? '';
+        $this->tanggal = \Carbon\Carbon::parse($trx['created_at'])->toDateString();
+        $this->bukti = null;
+    }
+
     private function refreshDashboard(): void
     {
         $response = app(CaCache::class)->dashboard(Auth::id());
@@ -127,10 +183,82 @@ new class extends Component {
         Flux::modal('hapus-pengeluaran')->close();
         Toaster::success('Pengeluaran berhasil dihapus.');
     }
+
+    public function riwayatDompetCaPl(){
+        return app(CaCache::class)->riwayatDompetCaPl(Auth::id()) ?? [];
+    }
 }; ?>
 
 <div class="space-y-4">
 
+    @if (! $this->hasCa())
+    {{-- ================= ONBOARDING: BELUM MEMILIKI CA ================= --}}
+    <div class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+        <div class="mx-auto flex max-w-lg flex-col items-center gap-5 px-6 py-20 text-center">
+            <div class="flex size-16 items-center justify-center rounded-full bg-blue-500/10 dark:bg-blue-500/20">
+                <flux:icon.wallet class="size-8 text-blue-500" />
+            </div>
+
+            <div class="space-y-2">
+                <flux:heading size="lg">Anda belum memiliki Cash Advance</flux:heading>
+                <flux:text>
+                    Lakukan top up pertama untuk membuka dompet CA PL Anda.
+                    Setelah dana masuk, saldo, dompet kegiatan, dan riwayat transaksi akan tampil di halaman ini.
+                </flux:text>
+            </div>
+
+            <div class="grid w-full grid-cols-1 gap-3 sm:grid-cols-3 text-left">
+                <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">
+                    <flux:icon.banknotes class="size-5 text-zinc-400 mb-1.5" />
+                    <p class="text-xs font-medium text-zinc-900 dark:text-white">1. Ajukan top up</p>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400">Isi nominal &amp; bukti transfer</p>
+                </div>
+                <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">
+                    <flux:icon.clock class="size-5 text-zinc-400 mb-1.5" />
+                    <p class="text-xs font-medium text-zinc-900 dark:text-white">2. Menunggu verifikasi</p>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400">Finance memverifikasi pengajuan</p>
+                </div>
+                <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">
+                    <flux:icon.check-circle class="size-5 text-zinc-400 mb-1.5" />
+                    <p class="text-xs font-medium text-zinc-900 dark:text-white">3. CA aktif</p>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400">Dompet siap mencatat pengeluaran</p>
+                </div>
+            </div>
+
+            <flux:modal.trigger name="topup-pertama">
+                <flux:button variant="primary" icon="arrow-up-tray">Top up Pertama</flux:button>
+            </flux:modal.trigger>
+        </div>
+    </div>
+
+    {{-- ================= MODAL: TOP UP PERTAMA ================= --}}
+    <flux:modal name="topup-pertama" class="w-lg">
+        <form wire:submit.prevent="submitInitialTopup" class="space-y-6">
+            <div>
+                <flux:heading size="lg">Top up Pertama</flux:heading>
+                <flux:text class="mt-1">Dana ini menjadi saldo awal (float) dompet CA PL Anda.</flux:text>
+            </div>
+
+            <flux:input wire:model="topupJumlah" type="number" label="Nominal" prefix="Rp" placeholder="0" />
+            <flux:textarea wire:model="topupCatatan" label="Catatan (opsional)" placeholder="Keterangan pengajuan" rows="2" />
+
+            <div>
+                <flux:input wire:model="topupBukti" type="file" accept=".jpg,.jpeg,.png,.pdf"
+                    label="Bukti transfer (jpg, png, pdf &mdash; maks 2MB)" />
+                <span wire:loading wire:target="topupBukti" class="mt-1 block text-xs text-zinc-500 animate-pulse">
+                    Mengunggah bukti&hellip;
+                </span>
+            </div>
+
+            <flux:button type="submit" variant="primary" class="w-full"
+                wire:loading.attr="disabled" wire:target="topupBukti,submitInitialTopup">
+                <span wire:loading.remove wire:target="topupBukti,submitInitialTopup">Ajukan Top up</span>
+                <span wire:loading wire:target="topupBukti" class="animate-pulse">Menunggu unggahan&hellip;</span>
+                <span wire:loading wire:target="submitInitialTopup" class="animate-pulse">Mengirim&hellip;</span>
+            </flux:button>
+        </form>
+    </flux:modal>
+    @else
     {{-- ================= TOP GRID ================= --}}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
@@ -360,14 +488,7 @@ new class extends Component {
                             <div class="flex items-center justify-center gap-1">
                                 <flux:modal.trigger name="catat-pengeluaran">
                                     <flux:button size="sm" variant="ghost" icon="pencil-square" type="button"
-                                        x-on:click="
-                                            $wire.editingId = {{ $trx['id_transaksi'] }};
-                                            $wire.jumlah = {{ (int) $trx['jumlah'] }};
-                                            $wire.kategori = @js($trx['kategori'] ?? '');
-                                            $wire.deskripsi = @js($trx['deskripsi'] ?? '');
-                                            $wire.tanggal = @js(\Carbon\Carbon::parse($trx['created_at'])->toDateString());
-                                            $wire.bukti = null;
-                                        " />
+                                        wire:click="startEdit({{ $trx['id_transaksi'] }})" />
                                 </flux:modal.trigger>
                                 <flux:modal.trigger name="hapus-pengeluaran">
                                     <flux:button size="sm" variant="ghost" icon="trash" class="text-red-600" x-on:click="$wire.set('deleteTransactionId', {{ $trx['id_transaksi'] }})" />
@@ -396,7 +517,11 @@ new class extends Component {
                 <flux:text class="mt-1">Arah transaksi terkunci sebagai pengeluaran (keluar).</flux:text>
             </div>
 
-            <flux:input wire:model="jumlah" type="number" label="Nominal" prefix="Rp" placeholder="0" />
+            <flux:field>
+                <flux:label>Jumlah</flux:label>
+                <x-rupiah-input model="jumlah" placeholder="8.000.000.000" />
+                <flux:error name="jumlah" />
+            </flux:field>
 
             <flux:select wire:model="kategori" label="Kategori" placeholder="Pilih kategori">
                 @foreach ($categories as $cat)
@@ -405,7 +530,16 @@ new class extends Component {
             </flux:select>
 
             <flux:textarea wire:model="deskripsi" label="Deskripsi" placeholder="Keterangan pengeluaran" rows="2" />
-            <flux:input wire:model="tanggal" type="date" label="Tanggal" />
+            <div x-data="{ tanggal: new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+            .toISOString()
+            .slice(0,16) }">
+                <flux:input
+                    x-model="tanggal"
+                    x-init="$wire.set('tanggal', tanggal)"
+                    type="datetime-local"
+                    label="Tanggal"
+                />
+            </div>
 
             <div>
                 <flux:input wire:model="bukti" type="file" accept=".jpg,.jpeg,.png,.pdf"
@@ -438,17 +572,17 @@ new class extends Component {
             <div class="grid grid-cols-2 gap-3">
                 <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
                     <p class="text-xs text-zinc-500">Total Pengeluaran</p>
-                    <p class="text-lg font-semibold tabular-nums text-red-600">Rp 0</p>
+                    <p class="text-lg font-semibold tabular-nums text-red-600">Rp {{ $this->caPlBalance['sisa_saldo'] ?? 0 }}</p>
                 </div>
                 <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
                     <p class="text-xs text-zinc-500">Closing Balance</p>
-                    <p class="text-lg font-semibold tabular-nums text-zinc-900 dark:text-white">Rp 0</p>
+                    <p class="text-lg font-semibold tabular-nums text-zinc-900 dark:text-white">Rp {{ $this->caPlBalance['expense'] ?? 0 }}</p>
                 </div>
             </div>
 
             <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 flex items-center justify-between">
                 <span class="text-sm text-zinc-500">Top up untuk restore ke float</span>
-                <span class="text-lg font-semibold tabular-nums text-green-600">Rp 0</span>
+                <span class="text-lg font-semibold tabular-nums text-green-600">Rp 2.000.000</span>
             </div>
 
             <div class="flex justify-between gap-2">
@@ -474,7 +608,33 @@ new class extends Component {
             </div>
 
             <div class="space-y-2">
+                @forelse ($this->riwayatDompetCaPl()['data'] ?? [] as $dompet)
+                    <div wire:key="seal-{{ $dompet['id'] }}"
+                        class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <p class="font-medium text-zinc-900 dark:text-white">Periode #{{ $dompet['kode_ca'] }}</p>
+                                <flux:badge size="sm" color="zinc">Closed</flux:badge>
+                            </div>
+                            <p class="text-xs text-zinc-500 mt-0.5">
+                                {{ \Carbon\Carbon::parse($dompet['tanggal_mulai'])->translatedFormat('d M Y') }}
+                                – {{ \Carbon\Carbon::parse($dompet['created_at'])->translatedFormat('d M Y') }}
+                            </p>
+                            <p class="text-xs text-zinc-500 mt-0.5">
+                                • Keluar Rp {{ number_format($dompet['total_pengeluaran'], 0, ',', '.') }}
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-sm font-medium tabular-nums {{ $dompet['saldo_akhir'] < 0 ? 'text-red-600' : 'text-zinc-900 dark:text-white' }}">
+                                Rp {{ number_format($dompet['saldo_akhir'], 0, ',', '.') }}
+                            </span>
+                            <flux:button :href="route('cashadvance.laporan.capl', $dompet['id'])" target="_blank"
+                                size="sm" variant="outline" icon="document-arrow-down">Laporan</flux:button>
+                        </div>
+                    </div>
+                @empty
                 <p class="text-sm text-zinc-400 text-center py-4">Belum ada periode tersegel.</p>
+                @endforelse
             </div>
         </div>
     </flux:modal>
@@ -488,8 +648,17 @@ new class extends Component {
             </div>
 
             <flux:input label="Nama Kegiatan" placeholder="mis. Survei Lokasi Bandung" />
-            <flux:input type="number" label="RAB (opsional)" prefix="Rp" placeholder="0" />
-            <flux:input type="number" label="Dana Cair" prefix="Rp" placeholder="0" />
+            <flux:field>
+                <flux:label>RAB (Opsional)</flux:label>
+                <x-rupiah-input model="rab" placeholder="8.000.000.000" />
+                <flux:error name="rab" />
+            </flux:field>
+
+            <flux:field>
+                <flux:label>Dana Cair</flux:label>
+                <x-rupiah-input model="dana_cair" placeholder="8.000.000.000" />
+                <flux:error name="dana_cair" />
+            </flux:field>
             <flux:input type="file" label="Bukti pencairan (wajib &mdash; jpg, png, pdf)" />
 
             <flux:button type="submit" variant="primary" class="w-full">Buat Dompet</flux:button>
@@ -511,4 +680,5 @@ new class extends Component {
             </div>
         </div>
     </flux:modal>
+    @endif
 </div>
