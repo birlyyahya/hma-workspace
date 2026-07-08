@@ -1,6 +1,5 @@
 <?php
 
-use App\Jobs\SendWhatsappJob;
 use App\Mail\NotificationSpdMail;
 use App\Models\User;
 use App\Services\IzinCache;
@@ -122,8 +121,8 @@ test('updating an approved spd succeeds even when the response omits user_id', f
         ->assertSet('editingId', null);
 
     // Falls back to the selected user for the approval notification.
+    // (Job WhatsApp sedang dinonaktifkan di NotificationService.)
     Mail::assertQueued(NotificationSpdMail::class);
-    Queue::assertPushed(SendWhatsappJob::class);
 });
 
 test('does not crash when the API returns validation errors as an array under message', function () {

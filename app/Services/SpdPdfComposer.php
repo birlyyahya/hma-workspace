@@ -23,8 +23,10 @@ class SpdPdfComposer
 
     /**
      * @param  array<string, mixed>  $spd
+     * @param  bool  $withAdminCopy  Sertakan halaman salinan administrasi (full TTD) —
+     *                               hanya untuk viewer ber-permission spd.create.
      */
-    public function render(array $spd, ?User $user): string
+    public function render(array $spd, ?User $user, bool $withAdminCopy = false): string
     {
         $attachmentUrl = $spd['attachment_url'] ?? null;
         $attachmentIsPdf = $this->attachmentIsPdf($attachmentUrl);
@@ -33,6 +35,7 @@ class SpdPdfComposer
             'spd' => $spd,
             'user' => $user,
             'role' => $user?->role,
+            'withAdminCopy' => $withAdminCopy,
             'attachmentImage' => $attachmentIsPdf ? null : $this->images->toImageData($attachmentUrl),
         ])->setPaper('A4', 'portrait')->output();
 

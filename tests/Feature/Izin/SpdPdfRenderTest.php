@@ -1,30 +1,8 @@
 <?php
 
-use App\Models\Permission;
-use App\Models\Role;
-use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 
-use function Pest\Laravel\actingAs;
-
-uses(RefreshDatabase::class);
-
-function spdPdfCreatorUser(): User
-{
-    $role = Role::factory()->create();
-
-    $permission = Permission::query()->firstOrCreate(
-        ['name' => 'spd.create'],
-        ['module' => 'spd', 'action' => 'create', 'label' => 'Create SPD'],
-    );
-
-    $role->permissions()->attach($permission);
-
-    return User::factory()->create(['role_id' => $role->id]);
-}
-
-function renderSpdPdfHtml(array $overrides = []): string
+function renderSpdPdfHtml(array $overrides = [], bool $withAdminCopy = false): string
 {
     $spd = array_merge([
         'number' => 7,
@@ -42,23 +20,20 @@ function renderSpdPdfHtml(array $overrides = []): string
         'spd' => $spd,
         'user' => ['name' => 'Budi Santoso'],
         'role' => ['name' => 'Staff IT'],
+        'withAdminCopy' => $withAdminCopy,
         'attachmentImage' => null,
     ])->render();
 }
 
-test('spd.create user gets two main pages with a floating Lampiran stamp', function () {
-    actingAs(spdPdfCreatorUser());
-
-    $html = renderSpdPdfHtml();
+test('admin variant renders two main pages with a floating Lampiran stamp', function () {
+    $html = renderSpdPdfHtml(withAdminCopy: true);
 
     expect(substr_count($html, 'SURAT PERJALANAN DINAS'))->toBe(2)
         ->and(substr_count($html, 'class="stamp"'))->toBe(1)
         ->and($html)->toContain('<div class="stamp">Lampiran</div>');
 });
 
-test('user without spd.create gets only the checklist page, no admin copy or stamp', function () {
-    actingAs(User::factory()->create());
-
+test('plain variant renders only the checklist page, no admin copy or stamp', function () {
     $html = renderSpdPdfHtml();
 
     expect(substr_count($html, 'SURAT PERJALANAN DINAS'))->toBe(1)
@@ -66,8 +41,6 @@ test('user without spd.create gets only the checklist page, no admin copy or sta
 });
 
 test('renders the rich-text fields as HTML lists', function () {
-    actingAs(User::factory()->create());
-
     $html = renderSpdPdfHtml();
 
     expect($html)->toContain('<li>Survei instalasi</li>')
@@ -75,19 +48,15 @@ test('renders the rich-text fields as HTML lists', function () {
         ->and($html)->toContain('10 Juli 2026 s/d 12 Juli 2026');
 });
 
-test('admin copy always shows both signatures for spd.create even when not submitted', function () {
-    actingAs(spdPdfCreatorUser());
-
-    $html = renderSpdPdfHtml(['is_submitted' => false, 'is_approved' => false]);
+test('admin copy always shows both signatures even when not submitted', function () {
+    $html = renderSpdPdfHtml(['is_submitted' => false, 'is_approved' => false], withAdminCopy: true);
 
     // Page 1 (not submitted) has no signature image; the administrasi copy adds both.
     expect(substr_count($html, 'alt="TTD Andre"'))->toBe(1)
         ->and(substr_count($html, 'alt="TTD Irwan"'))->toBe(1);
 });
 
-test('user without spd.create sees no signatures when the SPD is not submitted', function () {
-    actingAs(User::factory()->create());
-
+test('plain variant shows no signatures when the SPD is not submitted', function () {
     $html = renderSpdPdfHtml(['is_submitted' => false, 'is_approved' => false]);
 
     expect($html)->not->toContain('alt="TTD Andre"')
@@ -95,18 +64,14 @@ test('user without spd.create sees no signatures when the SPD is not submitted',
 });
 
 test('checklist page shows signatures when submitted and approved', function () {
-    actingAs(User::factory()->create());
-
     $html = renderSpdPdfHtml(['is_submitted' => true, 'is_approved' => true]);
 
-    // Only the checklist page (admin copy hidden for non-creators).
+    // Only the checklist page (plain variant has no admin copy).
     expect(substr_count($html, 'alt="TTD Andre"'))->toBe(1)
         ->and(substr_count($html, 'alt="TTD Irwan"'))->toBe(1);
 });
 
 test('produces a valid PDF binary through DomPDF', function () {
-    actingAs(User::factory()->create());
-
     $output = Pdf::loadView('pdf.spd-pdf', [
         'spd' => [
             'number' => 1,
@@ -121,6 +86,7 @@ test('produces a valid PDF binary through DomPDF', function () {
         ],
         'user' => ['name' => 'Budi'],
         'role' => ['name' => 'Staff'],
+        'withAdminCopy' => true,
         'attachmentImage' => null,
     ])->setPaper('A4', 'portrait')->output();
 

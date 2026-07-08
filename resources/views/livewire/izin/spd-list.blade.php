@@ -415,7 +415,7 @@ new class extends Component {
 
         $user = User::find($row['user_id'] ?? null);
 
-        $pdfBytes = app(SpdPdfComposer::class)->render($row, $user);
+        $pdfBytes = app(SpdPdfComposer::class)->render($row, $user, (bool) Auth::user()?->can('spd.create'));
 
         $filename = 'SPD-' . str_pad((string) $id, 4, '0', STR_PAD_LEFT) . '.pdf';
 
@@ -424,6 +424,43 @@ new class extends Component {
             $filename,
             ['Content-Type' => 'application/pdf'],
         );
+    }
+
+    /**
+     * Kirim email SPD ke pegawai secara langsung (sinkron) agar hasil kirim
+     * bisa ditampilkan apa adanya. Activity sent/failed dicatat di mailable.
+     */
+    public function sendEmail(int $id): void
+    {
+        if (! Auth::user()?->can('spd.create')) {
+            Toaster::error('Anda tidak memiliki izin mengirim email SPD.');
+
+            return;
+        }
+
+        $row = collect($this->list['data'] ?? [])->firstWhere('id', $id);
+
+        if (! $row) {
+            Toaster::error('Data SPD tidak ditemukan.');
+
+            return;
+        }
+
+        $user = User::find($row['user_id'] ?? null);
+
+        if (! $user) {
+            Toaster::error('Pegawai SPD tidak ditemukan.');
+
+            return;
+        }
+
+        try {
+            NotificationService::sendSpdEmailNow($user, $row);
+            Toaster::success('Email SPD berhasil dikirim ke '.$user->email);
+        } catch (\Throwable $e) {
+            Log::error('Kirim email SPD gagal', ['spd_id' => $id, 'message' => $e->getMessage()]);
+            Toaster::error('Gagal mengirim email SPD: '.$e->getMessage());
+        }
     }
 
     protected function resetForm(): void
@@ -658,6 +695,11 @@ new class extends Component {
                                     <button wire:click="downloadPdf({{ $spd['id'] }})" @click="open = false" type="button" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50">
                                         <flux:icon name="document-arrow-down" class="h-4 w-4" /> Download PDF
                                     </button>
+                                    @can('spd.create')
+                                    <button wire:click="sendEmail({{ $spd['id'] }})" @click="open = false" type="button" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50" wire:loading.attr="disabled" wire:target="sendEmail">
+                                        <flux:icon name="envelope" class="h-4 w-4" /> Kirim Email
+                                    </button>
+                                    @endcan
                                     @can('spd.update')
                                     <div class="h-px bg-zinc-200/70"></div>
                                     <button wire:click="openEdit({{ $spd['id'] }})" @click="open = false" type="button" class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-50">
@@ -737,6 +779,9 @@ new class extends Component {
                             <flux:button size="xs" variant="ghost" icon="eye">Preview</flux:button>
                         </a>
                         <flux:button size="xs" variant="ghost" icon="document-arrow-down" wire:click="downloadPdf({{ $spd['id'] }})">PDF</flux:button>
+                        @can('spd.create')
+                        <flux:button size="xs" variant="ghost" icon="envelope" wire:click="sendEmail({{ $spd['id'] }})" wire:loading.attr="disabled" wire:target="sendEmail">Email</flux:button>
+                        @endcan
                         @if (! $isApproved)
                         <flux:button size="xs" variant="ghost" icon="pencil-square" wire:click="openEdit({{ $spd['id'] }})">Edit</flux:button>
                         <flux:button size="xs" variant="ghost" icon="trash" wire:click="confirmDelete({{ $spd['id'] }})">Hapus</flux:button>

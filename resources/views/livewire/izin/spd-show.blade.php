@@ -1,9 +1,14 @@
 <?php
 
+use App\Models\User;
 use App\Services\IzinCache;
+use App\Services\NotificationService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
+use Masmerise\Toaster\Toaster;
 
 new
 #[Layout('components.layouts.app', ['title' => 'Preview SPD'])]
@@ -18,6 +23,41 @@ class extends Component {
 
         $rows = $response['data'] ?? [];
         $this->spd = collect($rows)->firstWhere('id', (int) $this->id);
+    }
+
+    /**
+     * Kirim email SPD ke pegawai secara langsung (sinkron) agar hasil kirim
+     * bisa ditampilkan apa adanya. Activity sent/failed dicatat di mailable.
+     */
+    public function sendEmail(): void
+    {
+        if (! Auth::user()?->can('spd.create')) {
+            Toaster::error('Anda tidak memiliki izin mengirim email SPD.');
+
+            return;
+        }
+
+        if (! $this->spd) {
+            Toaster::error('Data SPD tidak tersedia.');
+
+            return;
+        }
+
+        $user = User::find($this->spd['user_id'] ?? null);
+
+        if (! $user) {
+            Toaster::error('Pegawai SPD tidak ditemukan.');
+
+            return;
+        }
+
+        try {
+            NotificationService::sendSpdEmailNow($user, $this->spd);
+            Toaster::success('Email SPD berhasil dikirim ke '.$user->email);
+        } catch (\Throwable $e) {
+            Log::error('Kirim email SPD gagal', ['spd_id' => $this->id, 'message' => $e->getMessage()]);
+            Toaster::error('Gagal mengirim email SPD: '.$e->getMessage());
+        }
     }
 }; ?>
 
@@ -68,9 +108,17 @@ class extends Component {
             </div>
         </div>
 
-        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 {{ $statusClass }}">
-            {{ $statusLabel }}
-        </span>
+        <div class="flex items-center gap-2">
+            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 {{ $statusClass }}">
+                {{ $statusLabel }}
+            </span>
+            @can('spd.create')
+            <flux:button size="sm" icon="envelope" variant="primary" wire:click="sendEmail" wire:loading.attr="disabled" wire:target="sendEmail">
+                <span wire:loading.remove wire:target="sendEmail">Kirim Email</span>
+                <span wire:loading wire:target="sendEmail">Mengirim...</span>
+            </flux:button>
+            @endcan
+        </div>
     </div>
 
     {{-- PDF preview via URL stream (bukan data URI — lampiran gambar bisa berukuran MB,

@@ -29,8 +29,8 @@ class SpdPdfController extends Controller
 
         $cacheKey = 'spd-pdf-'.$id.'-'.($withAdminCopy ? 'admin' : 'plain').'-'.md5((string) json_encode($spd));
 
-        $bytes = Cache::remember($cacheKey, now()->addMinutes(30), function () use ($spd, $composer) {
-            return $composer->render($spd, User::find($spd['user_id'] ?? null));
+        $bytes = Cache::remember($cacheKey, now()->addMinutes(30), function () use ($spd, $composer, $withAdminCopy) {
+            return $composer->render($spd, User::find($spd['user_id'] ?? null), $withAdminCopy);
         });
 
         $filename = 'SPD-'.str_pad((string) $id, 4, '0', STR_PAD_LEFT).'.pdf';

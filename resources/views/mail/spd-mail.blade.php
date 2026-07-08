@@ -18,11 +18,11 @@
     <table cellpadding="4" cellspacing="0">
         <tr>
             <td width="150">Tujuan</td>
-            <td>: {{ $spd['destination'] }}</td>
+            <td>: {{ strip_tags($spd['destination'] ?? '-') }}</td>
         </tr>
         <tr>
             <td>Tanggal</td>
-            <td>: {{ $spd['start_date'] }} s/d {{ $spd['end_date'] }}</td>
+            <td>: {{ strip_tags($spd['date'] ?? '-') }}</td>
         </tr>
     </table>
 

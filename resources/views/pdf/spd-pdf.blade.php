@@ -337,11 +337,13 @@ $bodyData = compact(
     {{-- ── Halaman 1: SPD (TTD mengikuti checklist) ── --}}
     @include('pdf.partials.spd-body', array_merge($bodyData, ['adminCopy' => false]))
 
-    {{-- ── Halaman 2: SPD Administrasi (TTD lengkap statis + stempel lampiran) ── --}}
-    @can('spd.create')
+    {{-- ── Halaman 2: SPD Administrasi (TTD lengkap statis + stempel lampiran).
+         Flag eksplisit dari caller (bukan @can) karena template juga dirender
+         dari queue (email) tanpa konteks auth. ── --}}
+    @if (! empty($withAdminCopy))
     <div class="page-break"></div>
         @include('pdf.partials.spd-body', array_merge($bodyData, ['adminCopy' => true]))
-    @endcan
+    @endif
 
     {{-- ── Halaman 3+: Lampiran gambar (PDF digabung terpisah oleh service merge) ── --}}
     @if (! empty($attachmentImage['data']))
