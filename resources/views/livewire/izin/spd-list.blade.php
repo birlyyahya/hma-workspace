@@ -543,8 +543,8 @@ new class extends Component {
         </div>
         @else
         {{-- Desktop table --}}
-        <div class="hidden md:block overflow-visible">
-            <table class="w-full text-left text-sm overflow-visible">
+        <div class="hidden md:block overflow-visible overflow-x-auto">
+            <table class="w-full text-left text-sm ">
                 <thead class="border-b border-zinc-100 bg-zinc-50/50 text-xs uppercase tracking-wide text-zinc-500">
                     <tr>
                         <th class="pl-5 py-3 font-semibold">NO SPD</th>
