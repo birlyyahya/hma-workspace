@@ -425,9 +425,6 @@ new class extends Component {
                                             <p class="text-sm font-medium text-zinc-900 truncate">{{ $support['user_name'] }}</p>
                                             <p class="text-xs text-zinc-500 truncate">@ {{ $support['user_username'] }}</p>
                                         </div>
-                                        @if(!empty($support['user_is_process']))
-                                            <flux:badge color="green" size="sm">Active</flux:badge>
-                                        @endif
                                     </div>
                                 @endforeach
                             </div>
