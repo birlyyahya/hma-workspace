@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Forms;
 
+use App\Services\DarWriter;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
 use Livewire\Form;
 
 class ActivityForm extends Form
@@ -66,7 +66,10 @@ class ActivityForm extends Form
         $this->team_user = [];
     }
 
-    public function store($id)
+    /**
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function store($id): array
     {
         if ($this->isproject) {
             $this->project_id = $id;
@@ -80,7 +83,7 @@ class ActivityForm extends Form
         $teamUser = ! empty($this->team_user) ? $this->team_user : ($this->team ?? []);
         $date = $this->date ?: $this->start_date;
 
-        $response = Http::post(config('services.api_izin').'/global/dar/create', [
+        return app(DarWriter::class)->createActivity([
             'user_id' => Auth::user()->id,
             'activity' => $this->activity,
             'description' => $this->description,
@@ -94,7 +97,5 @@ class ActivityForm extends Form
             'project_id' => $this->project_id,
             'project_category_id' => $this->timelines_id,
         ]);
-
-        return $response;
     }
 }

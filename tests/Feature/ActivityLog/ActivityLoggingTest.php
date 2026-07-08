@@ -3,6 +3,8 @@
 use App\Models\Role;
 use App\Models\SupportArticle;
 use App\Models\User;
+use App\Services\DarCache;
+use App\Services\DarWriter;
 use App\Services\IzinCache;
 use App\Services\IzinWriter;
 use App\Services\ProjectCache;
@@ -101,7 +103,74 @@ test('izin creation is logged when the API reports success', function () {
 
     $activity = Activity::query()->where('log_name', 'izin')->latest('id')->first();
 
-    expect($activity?->description)->toBe('Mengajukan izin baru');
+    expect($activity?->description)->toBe('Mengajukan izin baru')
+        ->and($activity->properties->get('payload'))->toBe(['jenis_izin' => 'cuti']);
+});
+
+test('creating a dar activity is logged with the request payload in properties', function () {
+    Http::fake(['*/global/dar/create' => Http::response(['success' => true], 200)]);
+
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $payload = ['user_id' => $user->id, 'activity' => 'Survey lokasi', 'status' => 1];
+
+    $result = (new DarWriter('http://api.test', new DarCache('http://api.test')))
+        ->createActivity($payload);
+
+    $activity = Activity::query()->where('log_name', 'dar')->latest('id')->first();
+
+    expect($result['ok'])->toBeTrue()
+        ->and($activity)->not->toBeNull()
+        ->and($activity->event)->toBe('created')
+        ->and($activity->description)->toBe('Membuat aktivitas DAR baru')
+        ->and($activity->causer_id)->toBe($user->id)
+        ->and($activity->properties->get('payload'))->toBe($payload);
+});
+
+test('updating a dar activity records the payload in properties', function () {
+    Http::fake(['*/global/dar/update/3' => Http::response(['success' => true], 200)]);
+
+    (new DarWriter('http://api.test', new DarCache('http://api.test')))
+        ->updateActivity(3, ['activity' => 'Revisi laporan']);
+
+    $activity = Activity::query()->where('log_name', 'dar')->latest('id')->first();
+
+    expect($activity?->properties->get('id'))->toBe(3)
+        ->and($activity->properties->get('payload'))->toBe(['activity' => 'Revisi laporan']);
+});
+
+test('a project write records the payload in properties', function () {
+    Http::fake(['*/projects' => Http::response(['status' => 201], 200)]);
+
+    (new ProjectWriter('http://api.test', new ProjectCache('http://api.test')))
+        ->createProject(['name' => 'Proyek B', 'company_id' => 4]);
+
+    $activity = Activity::query()->where('log_name', 'project')->latest('id')->first();
+
+    expect($activity?->properties->get('payload'))->toBe(['name' => 'Proyek B', 'company_id' => 4]);
+});
+
+test('spectech creation and update are logged with the payload', function () {
+    Http::fake([
+        '*/activity-categories/9' => Http::response(['status' => 200], 200),
+        '*/activity-categories' => Http::response(['status' => 201], 201),
+    ]);
+
+    $writer = new ProjectWriter('http://api.test', new ProjectCache('http://api.test'));
+
+    $writer->createSpectechCategory(7, ['name' => 'Router', 'qty_total' => 2, 'project_id' => 7]);
+    $writer->updateSpectechCategory(9, 7, ['name' => 'Router Baru', 'qty_total' => 3]);
+
+    $logs = Activity::query()->where('log_name', 'project')->orderBy('id')->get();
+
+    expect($logs)->toHaveCount(2)
+        ->and($logs[0]->event)->toBe('created')
+        ->and($logs[0]->description)->toBe('Menambah spektek project #7')
+        ->and($logs[0]->properties->get('payload'))->toBe(['name' => 'Router', 'qty_total' => 2, 'project_id' => 7])
+        ->and($logs[1]->event)->toBe('updated')
+        ->and($logs[1]->description)->toBe('Memperbarui spektek #9 (project #7)')
+        ->and($logs[1]->properties->get('payload'))->toBe(['name' => 'Router Baru', 'qty_total' => 3]);
 });
 
 test('login and logout events are recorded under the auth log', function () {

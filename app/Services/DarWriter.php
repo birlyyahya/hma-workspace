@@ -27,6 +27,31 @@ class DarWriter
     ) {}
 
     /**
+     * Buat aktivitas DAR baru. NON-idempotent — double submit = aktivitas duplikat.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function createActivity(array $payload): array
+    {
+        try {
+            $response = $this->externalWrite()
+                ->post($this->apiBase.'/global/dar/create', $payload);
+
+            $body = (array) $response->json();
+
+            return $this->result((bool) ($body['success'] ?? false), $body, $response->status(), [
+                'name' => 'dar',
+                'event' => 'created',
+                'description' => 'Membuat aktivitas DAR baru',
+                'properties' => ['payload' => $payload],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->fail('createActivity', $e);
+        }
+    }
+
+    /**
      * Update aktivitas DAR (#4). Idempotent — POST dengan _method=PUT (pola existing).
      *
      * @param  array<string, mixed>  $payload
@@ -47,7 +72,7 @@ class DarWriter
                 'name' => 'dar',
                 'event' => 'updated',
                 'description' => "Memperbarui aktivitas DAR #{$id}",
-                'properties' => ['id' => $id],
+                'properties' => ['id' => $id, 'payload' => $payload],
             ]);
         } catch (\Throwable $e) {
             return $this->fail('updateActivity', $e, ['id' => $id]);
@@ -73,7 +98,7 @@ class DarWriter
                 'name' => 'dar',
                 'event' => 'updated',
                 'description' => "Mengubah status aktivitas DAR #{$id}",
-                'properties' => ['id' => $id, 'status' => $status],
+                'properties' => ['id' => $id, 'payload' => ['status' => $status]],
             ]);
         } catch (\Throwable $e) {
             return $this->fail('updateStatus', $e, ['id' => $id, 'status' => $status]);
@@ -107,7 +132,14 @@ class DarWriter
                 'name' => 'dar',
                 'event' => 'created',
                 'description' => "Menambah komentar pada aktivitas DAR #{$activityId}",
-                'properties' => ['activity_id' => $activityId],
+                'properties' => [
+                    'activity_id' => $activityId,
+                    'payload' => [
+                        'user_id' => $userId,
+                        'body' => $body,
+                        'files' => array_column($files, 'name'),
+                    ],
+                ],
             ]);
         } catch (\Throwable $e) {
             return $this->fail('addComment', $e, ['activity_id' => $activityId]);
@@ -133,7 +165,7 @@ class DarWriter
                 'name' => 'dar',
                 'event' => 'updated',
                 'description' => "Memperbarui komentar DAR #{$commentId}",
-                'properties' => ['comment_id' => $commentId],
+                'properties' => ['comment_id' => $commentId, 'payload' => ['body' => $body]],
             ]);
         } catch (\Throwable $e) {
             return $this->fail('updateComment', $e, ['comment_id' => $commentId]);

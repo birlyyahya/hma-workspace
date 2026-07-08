@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Forms;
 
-use Illuminate\Support\Facades\Http;
+use App\Services\ProjectWriter;
 use Livewire\Attributes\Validate;
 use Livewire\Form;
 
@@ -28,11 +28,6 @@ class SpectechForm extends Form
 
     public ?int $idUpdate = null;
 
-    protected function endpoint(?string $suffix = null): string
-    {
-        return rtrim((string) config('services.api_project'), '/').'/activity-categories'.($suffix ? '/'.$suffix : '');
-    }
-
     protected function payload(?int $projectId = null): array
     {
         $payload = [
@@ -54,11 +49,14 @@ class SpectechForm extends Form
         return $payload;
     }
 
-    public function store(int $projectId): \Illuminate\Http\Client\Response
+    /**
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function store(int $projectId): array
     {
         $this->validate();
 
-        return Http::post($this->endpoint(), $this->payload($projectId));
+        return app(ProjectWriter::class)->createSpectechCategory($projectId, $this->payload($projectId));
     }
 
     public function setUpdate(array $spectech): void
@@ -74,10 +72,13 @@ class SpectechForm extends Form
         $this->idUpdate = (int) $spectech['id'];
     }
 
-    public function update(): \Illuminate\Http\Client\Response
+    /**
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function update(int $projectId): array
     {
         $this->validate();
 
-        return Http::post($this->endpoint((string) $this->idUpdate), $this->payload());
+        return app(ProjectWriter::class)->updateSpectechCategory((int) $this->idUpdate, $projectId, $this->payload());
     }
 }

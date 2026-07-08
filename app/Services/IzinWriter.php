@@ -48,7 +48,10 @@ class IzinWriter
                 'name' => 'izin',
                 'event' => 'created',
                 'description' => 'Mengajukan izin baru',
-                'properties' => ['jenis' => $payload['jenis_izin'] ?? $payload['jenis'] ?? null],
+                'properties' => [
+                    'jenis' => $payload['jenis_izin'] ?? $payload['jenis'] ?? null,
+                    'payload' => $payload,
+                ],
             ]);
         } catch (\Throwable $e) {
             return $this->fail('createIzin', $e);
@@ -88,7 +91,11 @@ class IzinWriter
                 'name' => 'izin',
                 'event' => $id !== null ? 'updated' : 'created',
                 'description' => $id !== null ? "Memperbarui SPD #{$id}" : 'Membuat SPD baru',
-                'properties' => ['id' => $id],
+                'properties' => [
+                    'id' => $id,
+                    'payload' => $payload,
+                    'attachment' => $file['name'] ?? null,
+                ],
             ]);
         } catch (\Throwable $e) {
             return $this->fail('saveSpd', $e, ['id' => $id]);
@@ -123,6 +130,7 @@ class IzinWriter
     /**
      * Perbarui tanda tangan user (data di BE izin). Idempotent — real value replace.
      * Sukses = body.success. Invalidasi cache tanda tangan user saat berhasil.
+     * Payload base64 sengaja TIDAK dicatat di properties activity (terlalu besar).
      *
      * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
      */

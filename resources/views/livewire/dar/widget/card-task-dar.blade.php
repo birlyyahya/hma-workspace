@@ -313,33 +313,27 @@ new class extends Component {
 
     public function createActivity(): void
     {
-        try {
-            $response = $this->form->store($this->projectSelected);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            throw $e;
-        } catch (\Throwable $e) {
-            Toaster::error('Server Error saat membuat task');
-            Log::error('DAR create exception', ['message' => $e->getMessage()]);
+        $result = $this->form->store($this->projectSelected);
 
-            return;
-        }
+        if (! $result['ok']) {
+            if ($result['error'] !== null) {
+                Toaster::error('Server Error saat membuat task');
+                Log::error('DAR create exception', ['message' => $result['error']]);
 
-        $success = is_array($response) ? ($response['success'] ?? false) : ($response['success'] ?? false);
+                return;
+            }
 
-        if (! $success) {
-            $message = is_array($response) ? ($response['message'] ?? 'Create Task failed') : 'Create Task failed';
+            $message = $result['body']['message'] ?? 'Create Task failed';
             Toaster::error($message);
             Log::error('DAR create API failed', [
                 'message' => $message,
-                'errors' => $response['errors'] ?? null,
+                'errors' => $result['body']['errors'] ?? null,
             ]);
 
             return;
         }
 
         Toaster::success('Create Activity successfully');
-
-        app(DarCache::class)->flush();
 
         $this->resetForm();
         $this->projectSelected = null;

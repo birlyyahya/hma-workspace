@@ -130,11 +130,11 @@ new class extends Component {
 
     public function create(): void
     {
-        $response = $this->form->store((int) $this->id);
+        $result = $this->form->store((int) $this->id);
 
-        if (($response['status'] ?? null) !== 201) {
-            Toaster::error(getErrorMessages($response['errors'] ?? []));
-            $this->logApiFailure('create', $response->json() ?? []);
+        if (! $result['ok']) {
+            Toaster::error(getErrorMessages($result['body']['errors'] ?? []));
+            $this->logApiFailure('create', $result['body']);
             return;
         }
 
@@ -161,11 +161,11 @@ new class extends Component {
 
     public function update(): void
     {
-        $response = $this->form->update();
+        $result = $this->form->update((int) $this->id);
 
-        if (($response['status'] ?? null) !== 200) {
-            Toaster::error(getErrorMessages($response['errors'] ?? []));
-            $this->logApiFailure('update', $response->json() ?? []);
+        if (! $result['ok']) {
+            Toaster::error(getErrorMessages($result['body']['errors'] ?? []));
+            $this->logApiFailure('update', $result['body']);
             return;
         }
 

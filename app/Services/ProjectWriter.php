@@ -49,7 +49,7 @@ class ProjectWriter
                 'name' => 'project',
                 'event' => 'created',
                 'description' => 'Membuat project baru',
-                'properties' => ['name' => $payload['name'] ?? null],
+                'properties' => ['name' => $payload['name'] ?? null, 'payload' => $payload],
             ]);
         } catch (\Throwable $e) {
             return $this->fail('createProject', $e);
@@ -72,7 +72,7 @@ class ProjectWriter
                 'name' => 'project',
                 'event' => 'updated',
                 'description' => "Memperbarui project #{$id}",
-                'properties' => ['id' => $id],
+                'properties' => ['id' => $id, 'payload' => $payload],
             ]);
         } catch (\Throwable $e) {
             return $this->fail('updateProject', $e, ['id' => $id]);
@@ -119,7 +119,7 @@ class ProjectWriter
                 'name' => 'project',
                 'event' => 'created',
                 'description' => 'Menambah timeline project',
-                'properties' => ['project_id' => $payload['project_id'] ?? null],
+                'properties' => ['project_id' => $payload['project_id'] ?? null, 'payload' => $payload],
             ]);
         } catch (\Throwable $e) {
             return $this->fail('createTimeline', $e);
@@ -142,7 +142,7 @@ class ProjectWriter
                 'name' => 'project',
                 'event' => 'updated',
                 'description' => "Memperbarui timeline #{$id}",
-                'properties' => ['id' => $id],
+                'properties' => ['id' => $id, 'payload' => $payload],
             ]);
         } catch (\Throwable $e) {
             return $this->fail('updateTimeline', $e, ['id' => $id]);
@@ -299,6 +299,53 @@ class ProjectWriter
     }
 
     /**
+     * Tambah spektek (activity category). NON-idempotent. Sukses = body.status === 201.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function createSpectechCategory(int $projectId, array $payload): array
+    {
+        try {
+            $response = $this->externalWrite(timeout: 10)->post($this->apiBase.'/activity-categories', $payload);
+            $body = (array) $response->json();
+
+            return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), fn () => $this->cache->flushSpectech($projectId), [
+                'name' => 'project',
+                'event' => 'created',
+                'description' => "Menambah spektek project #{$projectId}",
+                'properties' => ['project_id' => $projectId, 'payload' => $payload],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->fail('createSpectechCategory', $e, ['project_id' => $projectId]);
+        }
+    }
+
+    /**
+     * Perbarui spektek (POST ke /activity-categories/{id}, meniru pemanggil asli).
+     * Idempotent. Sukses = body.status === 200.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function updateSpectechCategory(int $id, int $projectId, array $payload): array
+    {
+        try {
+            $response = $this->externalWrite(timeout: 10)->post($this->apiBase.'/activity-categories/'.$id, $payload);
+            $body = (array) $response->json();
+
+            return $this->result((int) ($body['status'] ?? 0) === 200, $body, $response->status(), fn () => $this->cache->flushSpectech($projectId), [
+                'name' => 'project',
+                'event' => 'updated',
+                'description' => "Memperbarui spektek #{$id} (project #{$projectId})",
+                'properties' => ['id' => $id, 'project_id' => $projectId, 'payload' => $payload],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->fail('updateSpectechCategory', $e, ['id' => $id, 'project_id' => $projectId]);
+        }
+    }
+
+    /**
      * Simpan spektek massal. Sukses = HTTP 2xx.
      *
      * @param  array<string, mixed>  $payload
@@ -314,7 +361,7 @@ class ProjectWriter
                 'name' => 'project',
                 'event' => 'updated',
                 'description' => "Menyimpan spektek project #{$projectId}",
-                'properties' => ['project_id' => $projectId],
+                'properties' => ['project_id' => $projectId, 'payload' => $payload],
             ]);
         } catch (\Throwable $e) {
             return $this->fail('bulkSpectech', $e, ['project_id' => $projectId]);
@@ -339,7 +386,7 @@ class ProjectWriter
                 'name' => 'project',
                 'event' => 'updated',
                 'description' => "Mengimpor spektek project #{$projectId}",
-                'properties' => ['project_id' => $projectId],
+                'properties' => ['project_id' => $projectId, 'file' => $file['name'] ?? null],
             ]);
         } catch (\Throwable $e) {
             return $this->fail('importSpectech', $e, ['project_id' => $projectId]);
@@ -365,7 +412,7 @@ class ProjectWriter
                 'name' => 'project',
                 'event' => 'created',
                 'description' => 'Mengunggah dokumen admin project',
-                'properties' => ['project_id' => $payload['project_id'] ?? null],
+                'properties' => ['project_id' => $payload['project_id'] ?? null, 'payload' => $payload],
             ]);
         } catch (\Throwable $e) {
             return $this->fail('uploadDoc', $e);
@@ -421,7 +468,12 @@ class ProjectWriter
                 'name' => 'perusahaan',
                 'event' => $id !== null ? 'updated' : 'created',
                 'description' => $id !== null ? "Memperbarui perusahaan #{$id}" : 'Membuat perusahaan baru',
-                'properties' => ['id' => $id, 'name' => $payload['name'] ?? null],
+                'properties' => [
+                    'id' => $id,
+                    'name' => $payload['name'] ?? null,
+                    'payload' => $payload,
+                    'letter_head' => $file['name'] ?? null,
+                ],
             ]);
         } catch (\Throwable $e) {
             return $this->fail('saveCompany', $e, ['id' => $id]);
