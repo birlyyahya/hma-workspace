@@ -22,7 +22,12 @@ class SpdPdfController extends Controller
 
         abort_if(! $spd, 404);
 
-        $cacheKey = 'spd-pdf-'.$id.'-'.md5((string) json_encode($spd));
+        // Template menyembunyikan halaman salinan administrasi untuk user tanpa
+        // spd.create — varian PDF-nya berbeda, jadi flag ikut menjadi bagian key
+        // agar cache milik pembuat tidak bocor ke user biasa (dan sebaliknya).
+        $withAdminCopy = (bool) request()->user()?->can('spd.create');
+
+        $cacheKey = 'spd-pdf-'.$id.'-'.($withAdminCopy ? 'admin' : 'plain').'-'.md5((string) json_encode($spd));
 
         $bytes = Cache::remember($cacheKey, now()->addMinutes(30), function () use ($spd, $composer) {
             return $composer->render($spd, User::find($spd['user_id'] ?? null));

@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\SpdPdfComposer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -7,7 +9,23 @@ use Illuminate\Support\Facades\Http;
 use setasign\Fpdi\Fpdi;
 use setasign\Fpdi\PdfParser\StreamReader;
 
+use function Pest\Laravel\actingAs;
+
 uses(RefreshDatabase::class);
+
+function spdComposerCreatorUser(): User
+{
+    $role = Role::factory()->create();
+
+    $permission = Permission::query()->firstOrCreate(
+        ['name' => 'spd.create'],
+        ['module' => 'spd', 'action' => 'create', 'label' => 'Create SPD'],
+    );
+
+    $role->permissions()->attach($permission);
+
+    return User::factory()->create(['role_id' => $role->id]);
+}
 
 function makePdfBytes(int $pages): string
 {
@@ -44,8 +62,9 @@ function spdFixture(array $overrides = []): array
     ], $overrides);
 }
 
-test('renders exactly two main pages when there is no attachment', function () {
+test('spd.create viewer gets two main pages when there is no attachment', function () {
     $user = User::factory()->create();
+    actingAs(spdComposerCreatorUser());
 
     $pdf = app(SpdPdfComposer::class)->render(spdFixture(), $user);
 
@@ -53,12 +72,23 @@ test('renders exactly two main pages when there is no attachment', function () {
         ->and(countPdfPages($pdf))->toBe(2);
 });
 
-test('merges a PDF attachment behind the two main pages', function () {
+test('viewer without spd.create gets a single main page (no admin copy)', function () {
+    $user = User::factory()->create();
+    actingAs(User::factory()->create());
+
+    $pdf = app(SpdPdfComposer::class)->render(spdFixture(), $user);
+
+    expect(substr($pdf, 0, 4))->toBe('%PDF')
+        ->and(countPdfPages($pdf))->toBe(1);
+});
+
+test('merges a PDF attachment behind the two main pages for spd.create viewer', function () {
     Http::fake([
         'darbe.test/*' => Http::response(makePdfBytes(2), 200, ['Content-Type' => 'application/pdf']),
     ]);
 
     $user = User::factory()->create();
+    actingAs(spdComposerCreatorUser());
 
     $pdf = app(SpdPdfComposer::class)->render(
         spdFixture(['attachment_url' => 'https://darbe.test/files/lampiran.pdf']),
@@ -69,7 +99,7 @@ test('merges a PDF attachment behind the two main pages', function () {
         ->and(countPdfPages($pdf))->toBe(4);
 });
 
-test('embeds an image attachment as an additional page', function () {
+test('embeds an image attachment as an additional page for spd.create viewer', function () {
     $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
 
     Http::fake([
@@ -77,6 +107,7 @@ test('embeds an image attachment as an additional page', function () {
     ]);
 
     $user = User::factory()->create();
+    actingAs(spdComposerCreatorUser());
 
     $pdf = app(SpdPdfComposer::class)->render(
         spdFixture(['attachment_url' => 'https://darbe.test/files/lampiran.png']),
@@ -86,12 +117,31 @@ test('embeds an image attachment as an additional page', function () {
     expect(countPdfPages($pdf))->toBe(3);
 });
 
+test('viewer without spd.create gets checklist page plus attachment only', function () {
+    $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
+
+    Http::fake([
+        'darbe.test/*' => Http::response($png, 200, ['Content-Type' => 'image/png']),
+    ]);
+
+    $user = User::factory()->create();
+    actingAs(User::factory()->create());
+
+    $pdf = app(SpdPdfComposer::class)->render(
+        spdFixture(['attachment_url' => 'https://darbe.test/files/lampiran.png']),
+        $user,
+    );
+
+    expect(countPdfPages($pdf))->toBe(2);
+});
+
 test('falls back to the main PDF when the PDF attachment cannot be parsed', function () {
     Http::fake([
         'darbe.test/*' => Http::response('this-is-not-a-pdf', 200, ['Content-Type' => 'application/pdf']),
     ]);
 
     $user = User::factory()->create();
+    actingAs(spdComposerCreatorUser());
 
     $pdf = app(SpdPdfComposer::class)->render(
         spdFixture(['attachment_url' => 'https://darbe.test/files/broken.pdf']),

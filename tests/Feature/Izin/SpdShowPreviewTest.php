@@ -1,10 +1,14 @@
 <?php
 
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\IzinCache;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Livewire\Volt\Volt;
+use setasign\Fpdi\Fpdi;
+use setasign\Fpdi\PdfParser\StreamReader;
 
 use function Pest\Laravel\actingAs;
 use function Pest\Laravel\mock;
@@ -14,6 +18,25 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     Livewire::withoutLazyLoading();
 });
+
+function spdPreviewCreatorUser(): User
+{
+    $role = Role::factory()->create();
+
+    $permission = Permission::query()->firstOrCreate(
+        ['name' => 'spd.create'],
+        ['module' => 'spd', 'action' => 'create', 'label' => 'Create SPD'],
+    );
+
+    $role->permissions()->attach($permission);
+
+    return User::factory()->create(['role_id' => $role->id]);
+}
+
+function spdPreviewCountPages(string $bytes): int
+{
+    return (new Fpdi)->setSourceFile(StreamReader::createByString($bytes));
+}
 
 function fakeSpdRow(User $user): array
 {
@@ -92,4 +115,27 @@ test('the PDF route returns 404 for a missing SPD', function () {
     });
 
     actingAs($user)->get(route('izin.spd-pdf', 999))->assertNotFound();
+});
+
+test('admin copy is cached per permission and never leaks to users without spd.create', function () {
+    $target = User::factory()->create();
+
+    mock(IzinCache::class, function ($mock) use ($target) {
+        $mock->shouldReceive('spdList')->andReturn(['data' => [fakeSpdRow($target)]]);
+    });
+
+    // Pembuat membuka lebih dulu (memanaskan cache dengan varian 2 halaman)...
+    $creatorPdf = actingAs(spdPreviewCreatorUser())
+        ->get(route('izin.spd-pdf', 1))
+        ->assertSuccessful()
+        ->getContent();
+
+    // ...user biasa setelahnya tetap menerima varian 1 halaman, bukan cache pembuat.
+    $plainPdf = actingAs(User::factory()->create())
+        ->get(route('izin.spd-pdf', 1))
+        ->assertSuccessful()
+        ->getContent();
+
+    expect(spdPreviewCountPages($creatorPdf))->toBe(2)
+        ->and(spdPreviewCountPages($plainPdf))->toBe(1);
 });

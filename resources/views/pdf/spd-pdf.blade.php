@@ -338,8 +338,10 @@ $bodyData = compact(
     @include('pdf.partials.spd-body', array_merge($bodyData, ['adminCopy' => false]))
 
     {{-- ── Halaman 2: SPD Administrasi (TTD lengkap statis + stempel lampiran) ── --}}
+    @can('spd.create')
     <div class="page-break"></div>
-    @include('pdf.partials.spd-body', array_merge($bodyData, ['adminCopy' => true]))
+        @include('pdf.partials.spd-body', array_merge($bodyData, ['adminCopy' => true]))
+    @endcan
 
     {{-- ── Halaman 3+: Lampiran gambar (PDF digabung terpisah oleh service merge) ── --}}
     @if (! empty($attachmentImage['data']))
