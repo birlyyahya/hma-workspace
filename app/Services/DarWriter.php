@@ -43,7 +43,7 @@ class DarWriter
             return $this->result((bool) ($body['success'] ?? false), $body, $response->status(), [
                 'name' => 'dar',
                 'event' => 'created',
-                'description' => 'Membuat aktivitas DAR baru',
+                'description' => 'Membuat aktivitas DAR baru #'.$body['data']['id'] ?? 'unknown',
                 'properties' => ['payload' => $payload],
             ]);
         } catch (\Throwable $e) {

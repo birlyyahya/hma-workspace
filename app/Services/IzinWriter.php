@@ -47,7 +47,7 @@ class IzinWriter
             return $this->result((bool) ($body['success'] ?? false), $body, $response->status(), [
                 'name' => 'izin',
                 'event' => 'created',
-                'description' => 'Mengajukan izin baru',
+                'description' => 'Mengajukan izin baru #'.($body['data']['id'] ?? null),
                 'properties' => [
                     'jenis' => $payload['jenis_izin'] ?? $payload['jenis'] ?? null,
                     'payload' => $payload,

@@ -632,9 +632,6 @@ new class extends Component {
                 };
 
                 $assignees = $this->teamUser(collect($task['team_user'])->pluck('user_id')) ?? [];
-                if (empty($assignees)) {
-                    $assignees = [Auth::user()->name];
-                }
 
                 $lastComment = collect($task['comments'] ?? [])
                     ->sortByDesc(fn ($c) => $c['created_at'] ?? '')

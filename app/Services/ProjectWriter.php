@@ -48,7 +48,7 @@ class ProjectWriter
             return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), fn () => $this->cache->flushProjects(), [
                 'name' => 'project',
                 'event' => 'created',
-                'description' => 'Membuat project baru',
+                'description' => 'Membuat project baru project #' . ($body['id'] ?? 'Unknown'),
                 'properties' => ['name' => $payload['name'] ?? null, 'payload' => $payload],
             ]);
         } catch (\Throwable $e) {
@@ -118,7 +118,7 @@ class ProjectWriter
             return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), fn () => $this->cache->flushProjects(), [
                 'name' => 'project',
                 'event' => 'created',
-                'description' => 'Menambah timeline project',
+                'description' => 'Menambah timeline project di ' . ($payload['project_id'] ?? 'Unknown'),
                 'properties' => ['project_id' => $payload['project_id'] ?? null, 'payload' => $payload],
             ]);
         } catch (\Throwable $e) {
@@ -141,7 +141,7 @@ class ProjectWriter
             return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushProjects(), [
                 'name' => 'project',
                 'event' => 'updated',
-                'description' => "Memperbarui timeline #{$id}",
+                'description' => "Memperbarui timeline #{$id} di project #" . ($body['project_id'] ?? 'Unknown'),
                 'properties' => ['id' => $id, 'payload' => $payload],
             ]);
         } catch (\Throwable $e) {
@@ -163,7 +163,7 @@ class ProjectWriter
             return $this->result((int) ($body['status'] ?? 0) === 200, $body, $response->status(), fn () => $this->cache->flushProjects(), [
                 'name' => 'project',
                 'event' => 'deleted',
-                'description' => "Menghapus timeline #{$id}",
+                'description' => "Menghapus timeline #{$id} di project #" . ($body['project_id'] ?? 'Unknown'),
                 'properties' => ['id' => $id],
             ]);
         } catch (\Throwable $e) {
@@ -218,7 +218,7 @@ class ProjectWriter
             }, [
                 'name' => 'project',
                 'event' => 'deleted',
-                'description' => 'Menghapus anggota tim project',
+                'description' => 'Menghapus anggota tim project pada project #' . ($body['project_id'] ?? 'Unknown'),
                 'properties' => ['team_id' => $teamId, 'user_id' => $userId],
             ]);
         } catch (\Throwable $e) {
@@ -313,7 +313,7 @@ class ProjectWriter
             return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), fn () => $this->cache->flushSpectech($projectId), [
                 'name' => 'project',
                 'event' => 'created',
-                'description' => "Menambah spektek project #{$projectId}",
+                'description' => "Menambah spektek project di project #{$projectId}",
                 'properties' => ['project_id' => $projectId, 'payload' => $payload],
             ]);
         } catch (\Throwable $e) {
@@ -411,7 +411,7 @@ class ProjectWriter
             return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), null, [
                 'name' => 'project',
                 'event' => 'created',
-                'description' => 'Mengunggah dokumen admin project',
+                'description' => 'Mengunggah dokumen admin project di project #' . ($payload['project_id'] ?? 'Unknown'),
                 'properties' => ['project_id' => $payload['project_id'] ?? null, 'payload' => $payload],
             ]);
         } catch (\Throwable $e) {
@@ -434,7 +434,7 @@ class ProjectWriter
             return $this->result($ok, $body, $response->status(), null, [
                 'name' => 'project',
                 'event' => 'deleted',
-                'description' => "Menghapus dokumen admin project #{$id}",
+                'description' => "Menghapus dokumen admin project #{$id} di project #" . ($body['project_id'] ?? 'Unknown'),
                 'properties' => ['id' => $id],
             ]);
         } catch (\Throwable $e) {
