@@ -113,7 +113,7 @@ class extends Component {
                 {{ $statusLabel }}
             </span>
             @can('spd.create')
-            <flux:button size="sm" icon="envelope" variant="primary" wire:click="sendEmail" wire:loading.attr="disabled" wire:target="sendEmail">
+            <flux:button size="sm" icon="envelope" variant="outline" wire:click="sendEmail" wire:loading.attr="disabled" wire:target="sendEmail">
                 <span wire:loading.remove wire:target="sendEmail">Kirim Email</span>
                 <span wire:loading wire:target="sendEmail">Mengirim...</span>
             </flux:button>
