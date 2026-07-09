@@ -43,6 +43,9 @@
 
         <livewire:widget.dashboard.event-calendar lazy />
 
+        {{-- Project Matrix --}}
+        <livewire:widget.dashboard.project-matrix lazy />
+
         {{-- Latest Articles --}}
         <livewire:widget.dashboard.latest-articles lazy />
 
