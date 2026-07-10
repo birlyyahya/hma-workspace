@@ -8,13 +8,13 @@ new class extends Component {
 @php
 
     // Data dummy laporan matriks (Ide 3)
-    $matrixStages = ['PO', 'Barang Tiba', 'Pemeriksaan', 'Pelatihan', 'Uji Fungsi/Petik', 'Distribusi', 'BAST'];
+    $matrixStages = ['PO', 'Barang Tiba', 'Pemeriksaan', 'Uji Fungsi', 'Distribusi', 'Pelatihan', 'Uji Petik', 'BAST'];
     $matrixRows = [
-        ['company' => 'PT Bintang Asheeqa Teknologi', 'code' => 'P12', 'progress' => 60, 'checks' => [true, false, false, false, true, false, false], 'note' => 'Pelatihan tgl 7–9 Juli 2027 (Hotel Trembesi)'],
-        ['company' => 'PT Cahaya Radja', 'code' => 'P14', 'progress' => 30, 'checks' => [true, false, false, false, false, false, false], 'note' => 'Masih ada penyesuaian yang belum sesuai spektek. Packing diminta pakai hardcase.'],
-        ['company' => 'PT Bitra Solusi Tekindo', 'code' => 'P09', 'progress' => 45, 'checks' => [true, true, false, false, false, false, false], 'note' => 'Laptop per 3 Juli 2026 sudah datang'],
-        ['company' => 'PT Binacitra Teknologi Indonesia', 'code' => 'P15', 'progress' => 45, 'checks' => [true, true, false, false, false, false, false], 'note' => 'Menunggu feedback dari vendor terkait SN'],
-        ['company' => 'PT Adhibuana Artha Kencana', 'code' => 'P08', 'progress' => 100, 'checks' => [true, true, true, true, true, true, true], 'note' => 'Selesai — BAST ditandatangani 20 Jun 2026'],
+        ['company' => 'PT Bintang Asheeqa Teknologi', 'code' => 'P12', 'progress' => 60, 'checks' => [true, false, false, false, true, false, false, true], 'note' => 'Pelatihan tgl 7–9 Juli 2027 (Hotel Trembesi)'],
+        ['company' => 'PT Cahaya Radja', 'code' => 'P14', 'progress' => 30, 'checks' => [true, false, false, false, false, false, false, true], 'note' => 'Masih ada penyesuaian yang belum sesuai spektek. Packing diminta pakai hardcase.'],
+        ['company' => 'PT Bitra Solusi Tekindo', 'code' => 'P09', 'progress' => 45, 'checks' => [true, true, false, false, false, false, false ,true], 'note' => 'Laptop per 3 Juli 2026 sudah datang'],
+        ['company' => 'PT Binacitra Teknologi Indonesia', 'code' => 'P15', 'progress' => 45, 'checks' => [true, true, false, false, false, false, false, true], 'note' => 'Menunggu feedback dari vendor terkait SN'],
+        ['company' => 'PT Adhibuana Artha Kencana', 'code' => 'P08', 'progress' => 100, 'checks' => [true, true, true, true, true, true, true, true], 'note' => 'Selesai — BAST ditandatangani 20 Jun 2026'],
     ];
 
     $stageChip = fn (string $status) => match ($status) {
