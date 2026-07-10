@@ -124,9 +124,9 @@ new #[Lazy] class extends Component {
 
     $tabs = [
         ['key' => 'overview', 'label' => 'Overview',     'icon' => 'layout-grid'],
-        ['key' => 'progress', 'label' => 'Progress',     'icon' => 'chart-bar'],
         ['key' => 'spectech', 'label' => 'Spektek',     'icon' => 'cube'],
         ['key' => 'timeline', 'label' => 'Timeline',     'icon' => 'calendar-days'],
+        ['key' => 'progress', 'label' => 'Progress',     'icon' => 'chart-bar'],
         ['key' => 'team',     'label' => 'Tim',          'icon' => 'users'],
         ['key' => 'file',     'label' => 'File',         'icon' => 'folder'],
     ];
@@ -309,6 +309,10 @@ new #[Lazy] class extends Component {
                     </div>
                 </div>
 
+                <div x-show="active === 'progress'" wire:key="progress-{{ $this->id }}" x-transition.opacity.duration.150ms>
+                    <livewire:project.components.project-progress-tabs lazy :id="$this->id" />
+                </div>
+
                 <div x-show="active === 'team'" wire:key="team-{{ $this->id }}" x-transition.opacity.duration.150ms>
                     <livewire:project.components.project-team-tabs lazy
                         :id="$this->id"
@@ -319,10 +323,6 @@ new #[Lazy] class extends Component {
 
                 <div x-show="active === 'file'" wire:key="files-{{ $this->id }}" x-transition.opacity.duration.150ms>
                     <livewire:project.components.project-files-tabs lazy :id="$this->id" />
-                </div>
-
-                <div x-show="active === 'progress'" wire:key="progress-{{ $this->id }}" x-transition.opacity.duration.150ms>
-                    <livewire:project.components.project-progress-tabs lazy :id="$this->id" />
                 </div>
             </div>
         </div>
