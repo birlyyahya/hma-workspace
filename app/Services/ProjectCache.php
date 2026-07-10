@@ -488,7 +488,14 @@ class ProjectCache
     private function buildStageDocuments(Collection $documents,Array $stageActivities, String $title, Carbon $start, Carbon $end): array
     {
         $keywords = collect([$title])
-        ->merge(collect($stageActivities)->pluck('title'))
+        ->merge(
+            collect($stageActivities)
+                ->flatMap(fn ($activity) => [
+                    $activity['title'] ?? null,
+                    $activity['description'] ?? null,
+                ])
+        )
+        ->filter()
         ->flatMap(fn ($text) => preg_split('/\s+/', Str::lower($text)))
         ->filter(fn ($word) => strlen($word) >= 4)
         ->unique()
@@ -510,7 +517,7 @@ class ProjectCache
                 $keywords
             );
 
-            return $matchKeyword;
+            return $inDate && $matchKeyword;
              })
             ->map(fn (array $doc): array => [
                 'name' => $doc['title'] ?? 'Dokumen',

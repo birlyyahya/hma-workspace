@@ -4,6 +4,7 @@ use App\Models\User;
 use App\Services\DarCache;
 use App\Services\ProjectCache;
 use Carbon\Carbon;
+use Livewire\Attributes\Computed;
 use Livewire\Volt\Component;
 
 new class extends Component {
@@ -14,11 +15,13 @@ new class extends Component {
         $this->getStagesProperty();
     }
 
+    #[Computed]
     public function getStagesProperty(): array
     {
         return app(ProjectCache::class)->progressStages($this->id);
     }
 
+    #[Computed]
     public function getSummaryProperty(): array
     {
         return app(ProjectCache::class)->progressSummary($this->id);
@@ -34,7 +37,7 @@ new class extends Component {
         'done' => ['label' => 'Selesai', 'class' => 'bg-green-50 text-green-700 ring-green-200'],
         'current' => ['label' => 'Berjalan', 'class' => 'bg-blue-50 text-blue-700 ring-blue-200'],
         'upcoming' => ['label' => 'Belum', 'class' => 'bg-zinc-50 text-zinc-700 ring-zinc-200'],
-        default => ['label' => 'Pending', 'class' => 'bg-orange-50 text-orange-500 ring-orange-200'],
+        default => ['label' => 'Pending', 'class' => 'bg-red-50 text-red-500 ring-red-200'],
     };
 @endphp
 
@@ -75,7 +78,7 @@ new class extends Component {
                 <span class="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-blue-200">
                     {{ $summary['current'] }} Berjalan
                 </span>
-                <span class="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-medium text-orange-500 ring-1 ring-orange-200">
+                <span class="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-500 ring-1 ring-red-200">
                     {{ $summary['pending'] }} Pending
                 </span>
                 <span class="inline-flex items-center gap-1 rounded-full bg-zinc-50 px-2 py-0.5 text-[10px] font-medium text-zinc-700 ring-1 ring-zinc-200">
@@ -106,7 +109,7 @@ new class extends Component {
                         <flux:icon name="{{ $stage['icon'] }}" class="w-4.5 h-4.5" />
                     </span>
                     @elseif ($stage['status'] === 'pending')
-                    <span class="absolute left-0 top-0.5 flex items-center justify-center w-9 h-9 rounded-full bg-orange-500 text-white ring-4 ring-orange-100">
+                    <span class="absolute left-0 top-0.5 flex items-center justify-center w-9 h-9 rounded-full bg-red-500 text-white ring-4 ring-red-100">
                         <flux:icon name="{{ $stage['icon'] }}" class="w-4.5 h-4.5" />
                     </span>
                     @else
