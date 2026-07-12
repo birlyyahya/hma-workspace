@@ -28,7 +28,7 @@
             <flux:sidebar.item icon="bookmark-square" :href="route('dar')" :current="request()->routeIs('dar') || request()->routeIs('dar.dar-show')" wire:navigate>
                 DAR
             </flux:sidebar.item>
-            <flux:sidebar.item icon="archive-box" :href="route('inventaris')" :current="request()->routeIs('inventaris') || request()->routeIs('inventaris.show')" wire:navigate>
+            <flux:sidebar.item icon="archive-box" :href="route('inventaris')" :current="request()->routeIs('inventaris', 'inventaris.*')" wire:navigate>
                 Inventaris
             </flux:sidebar.item>
             <flux:sidebar.item icon="envelope" :href="route('izin')" :current="request()->routeIs('izin') || request()->routeIs('izin.show') || request()->routeIs('izin.laporan-pengajuan')" wire:navigate >

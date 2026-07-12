@@ -5,7 +5,6 @@ use App\Services\InventarisCache;
 use App\Services\InventarisWriter;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
-use Livewire\Volt\Volt;
 
 function makeInventarisWriter(): InventarisWriter
 {
@@ -69,42 +68,63 @@ test('deleteItem succeeds on HTTP 2xx and never throws on transport failure', fu
         ->and($result['error'])->not->toBeNull();
 });
 
-test('halaman inventaris tampil untuk user terautentikasi', function () {
+test('halaman pilih project tampil untuk user terautentikasi', function () {
     $this->actingAs(User::factory()->create());
 
     $this->get(route('inventaris'))
         ->assertOk()
         ->assertSee('Inventaris')
-        ->assertSeeLivewire('inventaris.inventaris-table');
+        ->assertSee('Pembangunan Jaringan FO Cikarang');
 });
 
-test('inventaris-table menampilkan data dari API dan empty state', function () {
-    config()->set('services.api_inventaris', 'http://api.test');
-    Http::fake(['*/inventaris/list*' => Http::response(['data' => [
-        ['id' => 1, 'kode' => 'INV-001', 'nama' => 'Laptop Dell', 'kategori' => 'Elektronik', 'lokasi' => 'Kantor Pusat', 'kondisi' => 'baik'],
-    ], 'pagination' => ['last_page' => 1]], 200)]);
-
-    Volt::test('inventaris.inventaris-table')
-        ->assertSee('INV-001')
-        ->assertSee('Laptop Dell');
-});
-
-test('inventaris-table menampilkan empty state saat data kosong', function () {
-    config()->set('services.api_inventaris', 'http://api.test');
-    Http::fake(['*/inventaris/list*' => Http::response(['data' => [], 'pagination' => []], 200)]);
-
-    Volt::test('inventaris.inventaris-table')
-        ->assertSee('Belum ada data inventaris');
-});
-
-test('halaman detail inventaris tampil dengan data dari API', function () {
-    config()->set('services.api_inventaris', 'http://api.test');
-    Http::fake(['*/inventaris/detail/12' => Http::response(['data' => ['id' => 12, 'kode' => 'INV-012', 'nama' => 'Kamera', 'kondisi' => 'baik']], 200)]);
-
+test('halaman daftar spektek tampil dengan progress', function () {
     $this->actingAs(User::factory()->create());
 
-    $this->get(route('inventaris.show', 12))
+    $this->get(route('inventaris.project', 101))
         ->assertOk()
-        ->assertSee('INV-012')
-        ->assertSee('Kamera');
+        ->assertSee('Perangkat OLT + Aksesoris')
+        ->assertSee('SN terpasang');
+});
+
+test('halaman detail spektek tampil dengan modal generate dan riwayat batch', function () {
+    $this->actingAs(User::factory()->create());
+
+    $this->get(route('inventaris.spektek', [101, 12]))
+        ->assertOk()
+        ->assertSee('Generate Unit')
+        ->assertSee('GR-2026-0007');
+});
+
+test('halaman list unit tampil dengan tabel dan import preview', function () {
+    $this->actingAs(User::factory()->create());
+
+    $this->get(route('inventaris.units', 501))
+        ->assertOk()
+        ->assertSee('INV-0007-001')
+        ->assertSee('Import SN');
+});
+
+test('halaman detail unit tampil dengan SN dan timeline', function () {
+    $this->actingAs(User::factory()->create());
+
+    $this->get(route('inventaris.unit-detail', 9002))
+        ->assertOk()
+        ->assertSee('ZTE10G-88342')
+        ->assertSee('Riwayat Pergerakan');
+});
+
+test('halaman scan tampil dengan tab kamera dan input manual', function () {
+    $this->actingAs(User::factory()->create());
+
+    $this->get(route('inventaris.scan'))
+        ->assertOk()
+        ->assertSee('Scan Unit')
+        ->assertSee('Ketik SN');
+});
+
+test('route inventaris statis tidak tertelan wildcard projectId', function () {
+    $this->actingAs(User::factory()->create());
+
+    $this->get('/inventaris/scan')->assertOk()->assertSee('Scan Unit');
+    $this->get('/inventaris/abc')->assertNotFound();
 });

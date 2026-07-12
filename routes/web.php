@@ -40,9 +40,17 @@ Route::middleware('auth')->group(function () {
     Volt::route('izin/spd/{id}/preview', 'izin.spd-show')->name('izin.spd-preview');
     Route::get('izin/spd/{id}/pdf', \App\Http\Controllers\SpdPdfController::class)->name('izin.spd-pdf');
 
-    // Inventaris
-    Route::view('inventaris', 'inventaris')->name('inventaris');
-    Volt::route('inventaris/{id}/detail', 'inventaris.inventaris-show')->name('inventaris.show');
+    // Inventaris (route statis didefinisikan sebelum wildcard {projectId})
+    Volt::route('inventaris', 'inventaris.index')->name('inventaris');
+    Volt::route('inventaris/scan', 'inventaris.scan')->name('inventaris.scan');
+    Volt::route('inventaris/receipts/{goodsReceiptId}', 'inventaris.units')
+        ->whereNumber('goodsReceiptId')->name('inventaris.units');
+    Volt::route('inventaris/units/{unitId}', 'inventaris.unit-detail')
+        ->whereNumber('unitId')->name('inventaris.unit-detail');
+    Volt::route('inventaris/{projectId}', 'inventaris.spektek-list')
+        ->whereNumber('projectId')->name('inventaris.project');
+    Volt::route('inventaris/{projectId}/{spektekId}', 'inventaris.spektek-detail')
+        ->whereNumber(['projectId', 'spektekId'])->name('inventaris.spektek');
 
     // Cash Advance
     Route::view('cashadvance', 'cashadvance')->name('cashadvance');
