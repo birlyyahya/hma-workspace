@@ -63,6 +63,8 @@ class DarCache
 
     private const STATUS_OPEN = 1;
 
+    private const BOARD_RECENT_DAYS = 30;
+
     /**
      * DAR yang start_date-nya jatuh dalam rentang [from, to]. CATATAN PENTING:
      * API DARBE memfilter start-in-range (bukan overlap), jadi task multi-hari
@@ -131,6 +133,28 @@ class DarCache
 
         $rows = collect($this->listForRange($scope, $userId, $today, $today)['data'] ?? [])
             ->concat($this->listByStatus($scope, $userId, self::STATUS_OPEN)['data'] ?? [])
+            ->unique('id')
+            ->values()
+            ->all();
+
+        return ['data' => $rows];
+    }
+
+    /**
+     * DAR untuk board-overview, dirakit dari dua query (API filter start-in-range
+     * saja, single-status):
+     *   1) status Open           → todos (aktif, mulai kapan pun),
+     *   2) start_date >= today-N  → schedules (date>=today-2) & Closed done-today.
+     * Digabung & dedupe by id; komponen tetap menyaring todos/schedule di PHP.
+     *
+     * @return array{data: array<int, array<string, mixed>>}
+     */
+    public function board(string $scope, ?int $userId = null): array
+    {
+        $from = now()->subDays(self::BOARD_RECENT_DAYS)->format('Y-m-d');
+
+        $rows = collect($this->listByStatus($scope, $userId, self::STATUS_OPEN)['data'] ?? [])
+            ->concat($this->listForRange($scope, $userId, $from, null)['data'] ?? [])
             ->unique('id')
             ->values()
             ->all();

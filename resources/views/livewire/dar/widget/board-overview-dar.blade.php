@@ -3,7 +3,6 @@
 use App\Notifications\DarCommentReceived;
 use App\Services\DarCache;
 use App\Services\DarWriter;
-use App\Services\ProjectCache;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
@@ -13,30 +12,29 @@ new class extends Component {
     public $messages;
     public $todos;
     public $schedules;
-    public array $projectMap = [];
+
+    public function mount(): void
+    {
+        $this->loadBoard();
+    }
 
     #[On('updatedTimeline')]
     #[On('darCommentAdded')]
-    public function mount(): void
+    public function refresh(): void
+    {
+        $this->loadBoard();
+    }
+
+    private function loadBoard(): void
     {
         $scope = Auth::user()->viewScopeFor('dar') === 'all' ? 'all' : 'user';
-        $response = app(DarCache::class)->list($scope, Auth::id());
-
-        try {
-            $this->projectMap = collect(app(ProjectCache::class)->allProjects())
-                ->keyBy('id')
-                ->map(fn ($p) => $p['name'] ?? null)
-                ->filter()
-                ->toArray();
-        } catch (\Throwable $e) {
-            $this->projectMap = [];
-        }
+        $response = app(DarCache::class)->board($scope, Auth::id());
 
         $today = now()->startOfDay();
         $todayEnd = now()->endOfDay();
 
         $collection = collect($response['data'])
-            ->whereIn('status', [1, 2, 3, 4])
+            ->whereIn('status', [1, 4])
             ->map(function ($item) use ($today, $todayEnd) {
                 $endDate = ! empty($item['end_date']) ? \Carbon\Carbon::parse($item['end_date']) : null;
                 $endPassed = $endDate ? $endDate->lt($today) : false;
@@ -80,7 +78,7 @@ new class extends Component {
 
         $this->schedules = collect($response['data'])
             ->map(function ($item) {
-                $reference = $item['date'] ?? $item['start_date'] ?? null;
+                $reference = $item['start_date'] ?? $item['date'] ?? null;
 
                 return (object) [
                     'title' => $item['activity'],
@@ -184,7 +182,7 @@ new class extends Component {
 
         Toaster::success('Todo status updated');
 
-        $this->mount();
+        $this->loadBoard();
 
         $this->dispatch('updatedTimeline');
         $this->dispatch('updatedCardTaskDar');
@@ -346,7 +344,6 @@ new class extends Component {
                                 @foreach($todos['project'] as $todo)
                                 @php
                                     $isDone = (int) $todo['status'] === 4;
-                                    $projName = $projectMap[$todo['project_id']] ?? null;
                                 @endphp
                                 <label wire:key="todo-{{ $todo['id'] }}" class="group flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200/70 bg-white px-3 py-2 hover:bg-slate-50 {{ $isDone ? 'opacity-60' : '' }}">
                                     <input
@@ -401,7 +398,7 @@ new class extends Component {
                     <div class="p-5">
                         @php
                         $scheduleGroups = collect($schedules ?? [])->groupBy(function ($item) {
-                        return \Carbon\Carbon::parse($item->date)->toDateString();
+                        return \Carbon\Carbon::parse($item->start_date)->toDateString();
                         });
                         @endphp
 

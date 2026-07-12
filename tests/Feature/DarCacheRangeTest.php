@@ -95,6 +95,33 @@ test('timelineToday queries todays range and the open status', function () {
     Http::assertSent(fn ($request) => (int) ($request->data()['status'] ?? 0) === 1);
 });
 
+test('board merges open tasks with the recent-start window, deduped by id', function () {
+    Http::fake(function ($request) {
+        if (array_key_exists('status', $request->data())) {
+            return Http::response(['data' => [['id' => 1], ['id' => 2]]], 200);
+        }
+
+        return Http::response(['data' => [['id' => 2], ['id' => 3]]], 200);
+    });
+
+    $cache = new DarCache('http://api.test');
+
+    $ids = collect($cache->board('all')['data'])->pluck('id')->sort()->values()->all();
+
+    expect($ids)->toBe([1, 2, 3]);
+});
+
+test('board queries the open status and a 30-day start window', function () {
+    Http::fake(['*global/dar/list*' => Http::response(['data' => []], 200)]);
+
+    $cache = new DarCache('http://api.test');
+    $cache->board('all');
+
+    Http::assertSent(fn ($request) => (int) ($request->data()['status'] ?? 0) === 1);
+    Http::assertSent(fn ($request) => ($request->data()['start_date'] ?? null) === now()->subDays(30)->format('Y-m-d')
+        && ! array_key_exists('end_date', $request->data()));
+});
+
 test('listForRange returns an empty data set when the API connection fails', function () {
     Http::fake(fn () => throw new ConnectionException('Connection timed out'));
 
