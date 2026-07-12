@@ -62,6 +62,54 @@ class DarCache
     }
 
     /**
+     * DAR list yang dibatasi rentang tanggal dan/atau status — irisan ringan
+     * untuk widget (timeline hari ini, board aktif, kalender bulan). Filter
+     * dikerjakan di sisi API (start_date/end_date/status) agar payload kecil,
+     * alih-alih menarik seluruh riwayat lewat list().
+     *
+     * Scope: 'all' = seluruh DAR (permission dar.view.all), 'user' = filter team_user.
+     * Konsumen tetap WAJIB memfilter final di PHP sebagai jaring pengaman —
+     * endpoint yang mengabaikan param tak boleh membocorkan data ke UI.
+     *
+     * @param  array<int, int>  $status
+     * @return array{data?: array<int, array<string, mixed>>}
+     */
+    public function listForRange(string $scope, ?int $userId = null, ?string $from = null, ?string $to = null, array $status = []): array
+    {
+        $params = ['perPage' => 1000000];
+
+        if ($from !== null) {
+            $params['start_date'] = $from;
+        }
+
+        if ($to !== null) {
+            $params['end_date'] = $to;
+        }
+
+        if ($scope !== 'all' && $userId) {
+            $params['team_user'] = $userId;
+        }
+
+        if ($status !== []) {
+            $params['status'] = implode(',', $status);
+        }
+
+        $scopeKey = $scope === 'all' ? 'all' : "user:{$userId}";
+        $key = "dar:range:{$scopeKey}:".md5((string) json_encode($params));
+
+        return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], function () use ($params) {
+            $response = $this->externalRead(timeout: 15)
+                ->get($this->apiBase.'/global/dar/list', $params);
+
+            if ($response->failed()) {
+                throw new \RuntimeException('status '.$response->status());
+            }
+
+            return $response->json() ?? ['data' => []];
+        }, ['data' => []]);
+    }
+
+    /**
      * Detail satu aktivitas DAR + komentar (#2 dar-show loadTask).
      * Cache TTL pendek; write apa pun lewat DarWriter akan flush tag 'dar'.
      *
