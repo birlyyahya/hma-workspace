@@ -10,11 +10,10 @@ use Livewire\Volt\Component;
 
 new class extends Component {
     public array $events = [];
+    public array $overdue = [];
     public string $date = '';
     public array $hours = [];
     public bool $loading = true;
-    public array $projectMap = [];
-
     public int $rangeStartHour = 8;
     public int $rangeEndHour = 18;
 
@@ -25,29 +24,29 @@ new class extends Component {
     private const ROW_HEIGHT = 56;
     private const HEADER_HEIGHT = 44;
 
-    #[On('updatedTimeline')]
     public function mount(): void
+    {
+        $this->loadTimeline();
+    }
+
+    #[On('updatedTimeline')]
+    public function refresh(): void
+    {
+        $this->loadTimeline();
+    }
+
+    private function loadTimeline(): void
     {
         $this->loading = true;
         $this->date = now()->format('d/m/Y');
 
         try {
             $scope = Auth::user()->viewScopeFor('dar') === 'all' ? 'all' : 'user';
-            $response = app(DarCache::class)->list($scope, Auth::id());
-
-            try {
-                $this->projectMap = collect(app(ProjectCache::class)->allProjects())
-                    ->keyBy('id')
-                    ->map(fn ($p) => $p['name'] ?? null)
-                    ->filter()
-                    ->toArray();
-            } catch (\Throwable $e) {
-                $this->projectMap = [];
-            }
-
+            $response = app(DarCache::class)->timelineToday($scope, Auth::id());
             $this->buildTimeline($response['data'] ?? []);
         } catch (\Throwable $e) {
             $this->events = [];
+            $this->overdue = [];
             $this->hours = $this->buildHours(self::DEFAULT_START, self::DEFAULT_END);
             $this->rangeStartHour = self::DEFAULT_START;
             $this->rangeEndHour = self::DEFAULT_END;
@@ -62,18 +61,42 @@ new class extends Component {
         $dayStart = $timelineDate->copy()->startOfDay();
         $dayEnd = $timelineDate->copy()->endOfDay();
 
-        $relevant = collect($data)
-            ->filter(function ($item) use ($dayStart, $dayEnd) {
-                $start = Carbon::parse($item['start_date']);
-                $end = Carbon::parse($item['end_date']);
+        $parsed = collect($data)
+            ->map(fn ($item) => [
+                'item' => $item,
+                'rawStart' => Carbon::parse($item['start_date']),
+                'rawEnd' => Carbon::parse($item['end_date']),
+            ]);
 
-                return $start <= $dayEnd && $end >= $dayStart;
-            })
+        $relevant = $parsed
+            ->filter(fn ($e) => $e['rawStart'] <= $dayEnd && $e['rawEnd'] >= $dayStart)
             ->values();
 
-        $processed = $relevant->map(function ($item) use ($dayStart, $dayEnd) {
-            $rawStart = Carbon::parse($item['start_date']);
-            $rawEnd = Carbon::parse($item['end_date']);
+        $overdue = $parsed
+            ->filter(fn ($e) => $e['rawEnd'] < $dayStart)
+            ->sortBy(fn ($e) => $e['rawEnd']->timestamp)
+            ->values();
+
+        $projectMap = $this->resolveProjectNames(
+            $relevant->pluck('item.project_id')->concat($overdue->pluck('item.project_id'))
+        );
+
+        $this->overdue = $overdue->map(function ($e) use ($dayStart, $projectMap) {
+            $projectId = $e['item']['project_id'] ?? null;
+
+            return [
+                'title' => $e['item']['activity'] ?? 'Untitled',
+                'status' => $e['item']['status'] ?? null,
+                'user' => $e['item']['user'] ?? null,
+                'end_label' => $e['rawEnd']->format('d/m/Y'),
+                'days_late' => (int) $e['rawEnd']->copy()->startOfDay()->diffInDays($dayStart),
+                'project_name' => $projectId ? ($projectMap[$projectId] ?? null) : null,
+            ];
+        })->toArray();
+
+        $processed = $relevant->map(function ($e) use ($dayStart, $dayEnd) {
+            $rawStart = $e['rawStart'];
+            $rawEnd = $e['rawEnd'];
 
             if ($rawEnd->lt($dayStart)) {
                 $timing = 'past';
@@ -96,7 +119,7 @@ new class extends Component {
             }
 
             return [
-                'item' => $item,
+                'item' => $e['item'],
                 'start' => $displayStart,
                 'end' => $displayEnd,
                 'timing' => $timing,
@@ -108,7 +131,7 @@ new class extends Component {
         $this->rangeEndHour = $rangeEnd;
         $this->hours = $this->buildHours($rangeStart, $rangeEnd);
 
-        $this->events = $processed->values()->map(function ($entry, $index) use ($rangeStart) {
+        $this->events = $processed->values()->map(function ($entry, $index) use ($rangeStart, $projectMap) {
             $start = $entry['start'];
             $end = $entry['end'];
             $timing = $entry['timing'];
@@ -140,9 +163,35 @@ new class extends Component {
                 'color' => $color,
                 'timing' => $timing,
                 'user' => $entry['item']['user'] ?? null,
-                'project_name' => $projectId ? ($this->projectMap[$projectId] ?? null) : null,
+                'project_name' => $projectId ? ($projectMap[$projectId] ?? null) : null,
             ];
         })->toArray();
+    }
+
+    /**
+     * Resolusi nama project hanya untuk id yang muncul di event hari ini —
+     * hindari membangun map atas seluruh katalog project tiap render.
+     *
+     * @param  \Illuminate\Support\Collection<int, mixed>  $projectIds
+     * @return array<int, string>
+     */
+    private function resolveProjectNames($projectIds): array
+    {
+        $ids = $projectIds->filter()->unique();
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        try {
+            return collect(app(ProjectCache::class)->allProjects())
+                ->whereIn('id', $ids->all())
+                ->pluck('name', 'id')
+                ->filter()
+                ->toArray();
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     /**
@@ -225,6 +274,12 @@ new class extends Component {
             </div>
 
             <div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                @if(! empty($overdue))
+                    <span class="flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-red-700 ring-1 ring-red-200">
+                        <flux:icon name="exclamation-triangle" class="size-3.5" />
+                        {{ count($overdue) }} terlambat
+                    </span>
+                @endif
                 <span class="rounded-full bg-slate-100 px-2.5 py-1 ring-1 ring-slate-200">
                     {{ count($events) }} task
                 </span>
@@ -236,7 +291,7 @@ new class extends Component {
 
         @if($loading)
             <div class="px-5 py-8 text-sm text-slate-500">Memuat timeline...</div>
-        @elseif(empty($events))
+        @elseif(empty($events) && empty($overdue))
             <div class="px-5 py-10 text-center text-sm text-slate-500">
                 Belum ada task untuk ditampilkan pada timeline.
             </div>
@@ -290,6 +345,7 @@ new class extends Component {
                                 'red' => 'bg-red-50 text-red-800 ring-red-200 before:bg-red-500',
                                 'sky' => 'bg-sky-50 text-sky-800 ring-sky-200 before:bg-sky-500',
                             ];
+
                         @endphp
 
                         @foreach($events as $event)
@@ -320,6 +376,33 @@ new class extends Component {
                     </div>
                 </div>
             </div>
+
+            {{-- Task terlambat (Open, end_date sudah lewat) — daftar yang bisa dibuka --}}
+            @if(! empty($overdue))
+                <div x-data="{ open: false }" class="border-t border-red-100 bg-red-50/50">
+                    <button type="button" @click="open = ! open" class="flex w-full items-center justify-between px-5 py-3 text-xs font-semibold text-red-700">
+                        <span class="flex items-center gap-1.5">
+                            <flux:icon name="exclamation-triangle" class="size-4" />
+                            {{ count($overdue) }} task terlambat
+                        </span>
+                        <span class="flex items-center gap-1 text-red-500" x-text="open ? 'tutup' : 'buka'"></span>
+                    </button>
+                    <div x-show="open" x-collapse class="space-y-2 px-5 pb-3">
+                        @foreach($overdue as $i => $o)
+                            <div wire:key="ov-c-{{ $i }}" class="flex items-center gap-2 rounded-lg bg-white px-3 py-2 ring-1 ring-red-200">
+                                <flux:icon name="exclamation-triangle" class="size-4 shrink-0 text-red-500" />
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-[13px] font-semibold text-slate-900">{{ $o['title'] }}</p>
+                                    <p class="truncate text-[10px] font-medium text-red-600">
+                                        terlambat {{ $o['days_late'] }} hari · jatuh tempo {{ $o['end_label'] }}
+                                        @if(! empty($o['project_name'])) · {{ $o['project_name'] }} @endif
+                                    </p>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
         @endif
 
     </div>

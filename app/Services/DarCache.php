@@ -61,20 +61,19 @@ class DarCache
         }, ['data' => []]);
     }
 
+    private const STATUS_OPEN = 1;
+
     /**
-     * DAR list yang dibatasi rentang tanggal dan/atau status — irisan ringan
-     * untuk widget (timeline hari ini, board aktif, kalender bulan). Filter
-     * dikerjakan di sisi API (start_date/end_date/status) agar payload kecil,
-     * alih-alih menarik seluruh riwayat lewat list().
+     * DAR yang start_date-nya jatuh dalam rentang [from, to]. CATATAN PENTING:
+     * API DARBE memfilter start-in-range (bukan overlap), jadi task multi-hari
+     * yang MULAI sebelum `from` TIDAK ikut — gunakan bersama listByStatus()
+     * lewat timelineToday() untuk menangkap task yang masih berjalan.
      *
      * Scope: 'all' = seluruh DAR (permission dar.view.all), 'user' = filter team_user.
-     * Konsumen tetap WAJIB memfilter final di PHP sebagai jaring pengaman —
-     * endpoint yang mengabaikan param tak boleh membocorkan data ke UI.
      *
-     * @param  array<int, int>  $status
      * @return array{data?: array<int, array<string, mixed>>}
      */
-    public function listForRange(string $scope, ?int $userId = null, ?string $from = null, ?string $to = null, array $status = []): array
+    public function listForRange(string $scope, ?int $userId = null, ?string $from = null, ?string $to = null): array
     {
         $params = ['perPage' => 1000000];
 
@@ -90,23 +89,53 @@ class DarCache
             $params['team_user'] = $userId;
         }
 
-        if ($status !== []) {
-            $params['status'] = implode(',', $status);
-        }
-
         $scopeKey = $scope === 'all' ? 'all' : "user:{$userId}";
         $key = "dar:range:{$scopeKey}:".md5((string) json_encode($params));
 
-        return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], function () use ($params) {
-            $response = $this->externalRead(timeout: 15)
-                ->get($this->apiBase.'/global/dar/list', $params);
+        return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], fn () => $this->fetchTasks($params), ['data' => []]);
+    }
 
-            if ($response->failed()) {
-                throw new \RuntimeException('status '.$response->status());
-            }
+    /**
+     * DAR untuk SATU status (API tidak menerima multi-status: koma/array/param
+     * berulang semuanya gagal). Di-cache terpisah per status agar dipakai ulang
+     * lintas widget. Set "open" terikat alami oleh WIP berjalan, bukan riwayat.
+     *
+     * @return array{data?: array<int, array<string, mixed>>}
+     */
+    public function listByStatus(string $scope, ?int $userId, int $status): array
+    {
+        $params = ['perPage' => 1000000, 'status' => $status];
 
-            return $response->json() ?? ['data' => []];
-        }, ['data' => []]);
+        if ($scope !== 'all' && $userId) {
+            $params['team_user'] = $userId;
+        }
+
+        $scopeKey = $scope === 'all' ? 'all' : "user:{$userId}";
+        $key = "dar:status:{$scopeKey}:{$status}";
+
+        return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], fn () => $this->fetchTasks($params), ['data' => []]);
+    }
+
+    /**
+     * DAR relevan untuk timeline hari ini, dirakit dari dua query karena API
+     * tidak punya filter overlap:
+     *   1) start_date = hari ini → task yang MULAI hari ini (durasi berapa pun),
+     *   2) status Open           → task yang MASIH berjalan, mulai kapan pun.
+     * Digabung & dedupe by id; konsumen tetap memfilter overlap final di PHP.
+     *
+     * @return array{data: array<int, array<string, mixed>>}
+     */
+    public function timelineToday(string $scope, ?int $userId = null): array
+    {
+        $today = now()->format('Y-m-d');
+
+        $rows = collect($this->listForRange($scope, $userId, $today, $today)['data'] ?? [])
+            ->concat($this->listByStatus($scope, $userId, self::STATUS_OPEN)['data'] ?? [])
+            ->unique('id')
+            ->values()
+            ->all();
+
+        return ['data' => $rows];
     }
 
     /**
