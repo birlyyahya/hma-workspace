@@ -1054,142 +1054,48 @@ class extends Component
                     </aside>
                 </div>
 
-                {{-- ── Comments + Activity Logs section ── --}}
+                {{-- ── Comments section ── --}}
                 <section wire:init="loadLogs" class="mt-5 rounded-2xl bg-white shadow-sm ring-1 ring-zinc-200/70">
-                    <header class="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
+                    <header class="flex items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4">
                         <div class="flex items-center gap-2">
                             <flux:icon name="chat-bubble-left-right" class="h-4 w-4 text-zinc-500" />
-                            <h2 class="text-sm font-semibold text-zinc-900">Activity</h2>
-                            @php $visibleLogCount = collect($logs)->reject(fn ($l) => ($l['action'] ?? '') === 'created')->count(); @endphp
-                            <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600">{{ count($comments) + $visibleLogCount }}</span>
+                            <h2 class="text-sm font-semibold text-zinc-900">Comments</h2>
+                            <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600">{{ count($comments) }}</span>
                         </div>
+
+                        <flux:modal.trigger name="activity-log-flyout">
+                            <button
+                                type="button"
+                                class="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200 shadow-sm hover:bg-zinc-50"
+                            >
+                                <flux:icon name="clock" class="h-3.5 w-3.5" />
+                                Riwayat Perubahan
+                                <span class="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600">{{ count($logs) }}</span>
+                            </button>
+                        </flux:modal.trigger>
                     </header>
 
                     @php
-                        $fieldLabels = [
-                            'activity' => 'Judul',
-                            'description' => 'Deskripsi',
-                            'status' => 'Status',
-                            'start_date' => 'Tanggal Mulai',
-                            'end_date' => 'Tanggal Selesai',
-                            'team_user' => 'Anggota Tim',
-                            'team' => 'Anggota Tim',
-                            'project_id' => 'Project',
-                            'project_category_id' => 'Timeline',
-                            'timelines_id' => 'Timeline',
-                        ];
-
-                        $statusMap = [1 => 'OPEN', 2 => 'PENDING', 3 => 'CANCELLED', 4 => 'CLOSED'];
-
-                        $formatLogValue = function ($field, $val) use ($statusMap) {
-                            if ($val === null || $val === '' || $val === []) {
-                                return '—';
-                            }
-                            if ($field === 'status') {
-                                return $statusMap[(int) $val] ?? (string) $val;
-                            }
-                            if (in_array($field, ['start_date', 'end_date'], true)) {
-                                try {
-                                    return Carbon::parse($val)->format('d M Y · H:i');
-                                } catch (\Throwable) {
-                                    return (string) $val;
-                                }
-                            }
-                            if (is_array($val)) {
-                                return implode(', ', array_map(fn ($v) => is_array($v) ? json_encode($v) : (string) $v, $val));
-                            }
-                            $str = strip_tags((string) $val);
-                            return mb_strlen($str) > 80 ? mb_substr($str, 0, 80) . '…' : $str;
-                        };
-
-                        // Build merged chronological timeline
-                        $timeline = collect()
-                            ->merge(collect($comments)->map(fn ($c) => [
-                                'kind' => 'comment',
-                                'data' => $c,
-                                'at' => $c['created_at'] ?? null,
-                            ]))
-                            ->merge(collect($logs)
-                                ->reject(fn ($l) => ($l['action'] ?? '') === 'created')
-                                ->map(fn ($l) => [
-                                    'kind' => 'log',
-                                    'data' => $l,
-                                    'at' => $l['created_at'] ?? null,
-                                ]))
-                            ->sortBy(fn ($i) => $i['at'] ? Carbon::parse($i['at'])->timestamp : 0)
+                        $sortedComments = collect($comments)
+                            ->sortBy(fn ($c) => ! empty($c['created_at']) ? Carbon::parse($c['created_at'])->timestamp : 0)
                             ->values();
                     @endphp
 
-                    {{-- Activity timeline (comments + logs) --}}
+                    {{-- Comment list --}}
                     <div x-ref="commentList" class="divide-y divide-zinc-100">
-                        @forelse ($timeline as $item)
-                            @if ($item['kind'] === 'comment')
-                                @php $c = $item['data']; @endphp
-                                @include('livewire.dar.partials.comment-item', [
-                                    'c' => $c,
-                                    'cu' => $commentUsers[$c['user_id']] ?? null,
-                                    'isOwn' => ($c['user_id'] ?? null) === Auth::id() || Auth::user()->level >= 90,
-                                    'isEditing' => $editingCommentId !== null && isset($c['id']) && $editingCommentId === $c['id'],
-                                ])
-                            @else
-                                @php
-                                    $log = $item['data'];
-                                    $logAt = ! empty($log['created_at']) ? Carbon::parse($log['created_at']) : null;
-                                    $changes = $log['changes'] ?? [];
-                                    $action = $log['action'] ?? 'updated';
-                                    $label = $log['label'] ?? match ($action) {
-                                        'created' => 'Task dibuat',
-                                        'deleted' => 'Task dihapus',
-                                        default => 'Data diubah',
-                                    };
-                                    $iconName = match ($action) {
-                                        'created' => 'sparkles',
-                                        'deleted' => 'trash',
-                                        default => 'pencil-square',
-                                    };
-                                @endphp
-
-                                <div wire:key="log-{{ $log['id'] ?? uniqid() }}" class="px-5 py-3">
-                                    {{-- Centered separator-style header --}}
-                                    <div class="flex items-center gap-3 text-xs text-zinc-500">
-                                        <span class="h-px flex-1 bg-zinc-200/70"></span>
-                                        <span class="inline-flex items-center gap-1.5">
-                                            <flux:icon name="{{ $iconName }}" class="h-3.5 w-3.5 text-zinc-400" />
-                                            <span class="font-medium text-zinc-600">{{ $label }}</span>
-                                            @if ($logAt)
-                                                <span class="text-zinc-400">·</span>
-                                                <span class="text-zinc-400" title="{{ $logAt->format('d M Y, H:i') }}">{{ $logAt->diffForHumans() }}</span>
-                                            @endif
-                                        </span>
-                                        <span class="h-px flex-1 bg-zinc-200/70"></span>
-                                    </div>
-
-                                    {{-- Diff details (centered, inline list) --}}
-                                    @if (! empty($changes) && is_array($changes))
-                                        <div class="mt-2 flex flex-col items-center gap-1 text-[11px] text-zinc-500">
-                                            @foreach ($changes as $field => $diff)
-                                                @php
-                                                    $fieldLabel = $fieldLabels[$field] ?? \Illuminate\Support\Str::headline($field);
-                                                    $oldVal = $formatLogValue($field, $diff['old'] ?? null);
-                                                    $newVal = $formatLogValue($field, $diff['new'] ?? null);
-                                                @endphp
-                                                <div class="inline-flex max-w-full flex-wrap items-center justify-center gap-1.5">
-                                                    <span class="font-semibold text-zinc-700">{{ $fieldLabel }}</span>
-                                                    <span class="rounded bg-red-50 px-1.5 py-0.5 text-red-600 line-through decoration-red-300">{{ $oldVal }}</span>
-                                                    <flux:icon name="arrow-right" class="h-3 w-3 text-zinc-400" />
-                                                    <span class="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700">{{ $newVal }}</span>
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    @endif
-                                </div>
-                            @endif
+                        @forelse ($sortedComments as $c)
+                            @include('livewire.dar.partials.comment-item', [
+                                'c' => $c,
+                                'cu' => $commentUsers[$c['user_id']] ?? null,
+                                'isOwn' => ($c['user_id'] ?? null) === Auth::id() || Auth::user()->level >= 90,
+                                'isEditing' => $editingCommentId !== null && isset($c['id']) && $editingCommentId === $c['id'],
+                            ])
                         @empty
                             <div class="px-5 py-10 text-center">
                                 <div class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-zinc-100 text-zinc-400">
                                     <flux:icon name="chat-bubble-left-right" class="h-6 w-6" />
                                 </div>
-                                <p class="text-sm font-medium text-zinc-700">Belum ada aktivitas</p>
+                                <p class="text-sm font-medium text-zinc-700">Belum ada komentar</p>
                                 <p class="mt-1 text-xs text-zinc-500">Mulai diskusi dengan menulis komentar pertama.</p>
                             </div>
                         @endforelse
@@ -1296,6 +1202,121 @@ class extends Component
                         </p>
                     </div>
                 </section>
+
+                {{-- ── Activity log flyout ── --}}
+                @php
+                    $fieldLabels = [
+                        'activity' => 'Judul',
+                        'description' => 'Deskripsi',
+                        'status' => 'Status',
+                        'start_date' => 'Tanggal Mulai',
+                        'end_date' => 'Tanggal Selesai',
+                        'team_user' => 'Anggota Tim',
+                        'team' => 'Anggota Tim',
+                        'project_id' => 'Project',
+                        'project_category_id' => 'Timeline',
+                        'timelines_id' => 'Timeline',
+                    ];
+
+                    $statusMap = [1 => 'OPEN', 2 => 'PENDING', 3 => 'CANCELLED', 4 => 'CLOSED'];
+
+                    $formatLogValue = function ($field, $val) use ($statusMap) {
+                        if ($val === null || $val === '' || $val === []) {
+                            return '—';
+                        }
+                        if ($field === 'status') {
+                            return $statusMap[(int) $val] ?? (string) $val;
+                        }
+                        if (in_array($field, ['start_date', 'end_date'], true)) {
+                            try {
+                                return Carbon::parse($val)->format('d M Y · H:i');
+                            } catch (\Throwable) {
+                                return (string) $val;
+                            }
+                        }
+                        if (is_array($val)) {
+                            return implode(', ', array_map(fn ($v) => is_array($v) ? json_encode($v) : (string) $v, $val));
+                        }
+                        $str = strip_tags((string) $val);
+                        return mb_strlen($str) > 80 ? mb_substr($str, 0, 80) . '…' : $str;
+                    };
+
+                    $sortedLogs = collect($logs)
+                        ->sortByDesc(fn ($l) => ! empty($l['created_at']) ? Carbon::parse($l['created_at'])->timestamp : 0)
+                        ->values();
+                @endphp
+
+                <flux:modal name="activity-log-flyout" flyout class="w-full sm:max-w-md">
+                    <div class="space-y-6">
+                        <div>
+                            <flux:heading size="lg">Riwayat Perubahan</flux:heading>
+                            <flux:text class="mt-1">Semua perubahan pada task ini, terbaru di atas.</flux:text>
+                        </div>
+
+                        @if ($sortedLogs->isEmpty())
+                            <div class="rounded-xl bg-zinc-50 px-4 py-8 text-center">
+                                <div class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-zinc-100 text-zinc-400">
+                                    <flux:icon name="clock" class="h-6 w-6" />
+                                </div>
+                                <p class="text-sm font-medium text-zinc-700">Belum ada riwayat perubahan</p>
+                                <p class="mt-1 text-xs text-zinc-500">Setiap perubahan pada task akan tercatat di sini.</p>
+                            </div>
+                        @else
+                            <ol class="relative ms-2.5 space-y-6 border-s-2 border-zinc-100 ps-6">
+                                @foreach ($sortedLogs as $log)
+                                    @php
+                                        $logAt = ! empty($log['created_at']) ? Carbon::parse($log['created_at']) : null;
+                                        $changes = $log['changes'] ?? [];
+                                        $action = $log['action'] ?? 'updated';
+                                        $label = $log['label'] ?? match ($action) {
+                                            'created' => 'Task dibuat',
+                                            'deleted' => 'Task dihapus',
+                                            default => 'Data diubah',
+                                        };
+                                        $iconName = match ($action) {
+                                            'created' => 'sparkles',
+                                            'deleted' => 'trash',
+                                            default => 'pencil-square',
+                                        };
+                                    @endphp
+
+                                    <li wire:key="flyout-log-{{ $log['id'] ?? 'i'.$loop->index }}" class="relative">
+                                        <span class="absolute -start-9.5 top-0 grid h-6 w-6 place-items-center rounded-full bg-white ring-2 ring-zinc-200">
+                                            <flux:icon name="{{ $iconName }}" class="h-3.5 w-3.5 text-zinc-500" />
+                                        </span>
+
+                                        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                            <p class="text-sm font-semibold text-zinc-900">{{ $label }}</p>
+                                            @if ($logAt)
+                                                <span class="text-xs text-zinc-400" title="{{ $logAt->format('d M Y, H:i') }}">{{ $logAt->diffForHumans() }}</span>
+                                            @endif
+                                        </div>
+
+                                        @if (! empty($changes) && is_array($changes))
+                                            <div class="mt-2 space-y-2">
+                                                @foreach ($changes as $field => $diff)
+                                                    @php
+                                                        $fieldLabel = $fieldLabels[$field] ?? \Illuminate\Support\Str::headline($field);
+                                                        $oldVal = $formatLogValue($field, $diff['old'] ?? null);
+                                                        $newVal = $formatLogValue($field, $diff['new'] ?? null);
+                                                    @endphp
+                                                    <div class="rounded-xl bg-zinc-50 p-3 ring-1 ring-zinc-100">
+                                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{{ $fieldLabel }}</p>
+                                                        <div class="mt-1.5 flex flex-col items-start gap-1 text-xs">
+                                                            <span class="rounded bg-red-50 px-2 py-1 text-red-600 line-through decoration-red-300">{{ $oldVal }}</span>
+                                                            <flux:icon name="arrow-down" class="ms-2 h-3 w-3 text-zinc-400" />
+                                                            <span class="rounded bg-emerald-50 px-2 py-1 text-emerald-700">{{ $newVal }}</span>
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ol>
+                        @endif
+                    </div>
+                </flux:modal>
             @endif
         </div>
 
