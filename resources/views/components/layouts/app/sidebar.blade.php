@@ -102,6 +102,7 @@
     </flux:header>
     <x-toaster-hub />
     <audio id="notifSound" src="{{ asset('sounds/notification.mp3') }}" preload="auto"></audio>
+    <livewire:components.browser-notification />
 
 
     {{ $slot }}
@@ -112,6 +113,29 @@
         document.addEventListener('livewire:init', () => {
             Livewire.on('play-notification-sound', () => {
                 document.getElementById('notifSound').play();
+            });
+
+            if ('Notification' in window && Notification.permission === 'default') {
+                document.addEventListener('click', () => Notification.requestPermission(), { once: true });
+            }
+
+            Livewire.on('browser-push-notifications', ({ notifications }) => {
+                if (!('Notification' in window) || Notification.permission !== 'granted') {
+                    return;
+                }
+
+                notifications.forEach((item) => {
+                    const pushNotification = new Notification(item.title, {
+                        body: item.body,
+                        tag: item.id,
+                        icon: '{{ asset('img/logo/logo-hma2.png') }}',
+                    });
+
+                    pushNotification.onclick = () => {
+                        window.focus();
+                        window.location.href = item.url;
+                    };
+                });
             });
         });
 
