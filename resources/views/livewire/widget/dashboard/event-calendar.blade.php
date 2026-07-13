@@ -4,7 +4,6 @@ use App\Models\User;
 use App\Services\DarCache;
 use App\Services\ProjectCache;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
@@ -38,17 +37,20 @@ new class extends Component
     public function prevMonth(): void
     {
         $this->currentMonth = $this->currentMonth->copy()->subMonth();
+        $this->loadEvents();
     }
 
     public function nextMonth(): void
     {
         $this->currentMonth = $this->currentMonth->copy()->addMonth();
+        $this->loadEvents();
     }
 
     public function goToday(): void
     {
         $this->currentMonth = Carbon::now()->startOfMonth();
         $this->selectedDate = Carbon::today()->toDateString();
+        $this->loadEvents();
     }
 
     #[On('updatedTimeline')]
@@ -61,15 +63,23 @@ new class extends Component
     protected function loadEvents(): void
     {
         try {
-            $scope = Auth::user()?->viewScopeFor('dar') === 'all' ? 'all' : 'user';
-            $response = app(DarCache::class)->list('all', Auth::id());
+            // Kalender men-key event berdasarkan start_date, dan API DARBE memfilter
+            // start-in-range — jadi ambil tepat event yang MULAI di bulan tampil.
+            // Selalu scope 'all': semua user melihat aktivitas semua orang.
+            $monthStart = $this->currentMonth->copy()->startOfMonth()->toDateString();
+            $monthEnd = $this->currentMonth->copy()->endOfMonth()->toDateString();
+
+            $response = app(DarCache::class)->listForRange('all', null, $monthStart, $monthEnd);
             $rows = $response['data'] ?? [];
 
-            $projectMap = collect(app(ProjectCache::class)->allProjects())
-                ->keyBy('id')
-                ->map(fn ($p) => $p['name'] ?? null)
-                ->filter()
-                ->toArray();
+            $projectIds = collect($rows)->pluck('project_id')->filter()->unique();
+            $projectMap = $projectIds->isEmpty()
+                ? []
+                : collect(app(ProjectCache::class)->allProjects())
+                    ->whereIn('id', $projectIds->all())
+                    ->pluck('name', 'id')
+                    ->filter()
+                    ->toArray();
 
             $teamUserIds = collect($rows)
                 ->pluck('team_user')
@@ -210,13 +220,14 @@ new class extends Component
                 </div>
 
                 <div class="flex items-center gap-1">
-                    <button type="button" wire:click="goToday" class="px-3 py-1.5 text-xs font-medium text-zinc-600 rounded-lg hover:bg-zinc-100 transition">
+                    <flux:icon.loading wire:loading wire:target="prevMonth,nextMonth,goToday" class="size-4 text-violet-500 mr-1" variant="mini" />
+                    <button type="button" wire:click="goToday" wire:loading.attr="disabled" wire:target="prevMonth,nextMonth,goToday" class="px-3 py-1.5 text-xs font-medium text-zinc-600 rounded-lg hover:bg-zinc-100 transition disabled:opacity-50">
                         Hari ini
                     </button>
-                    <button type="button" wire:click="prevMonth" class="cursor-pointer size-8 flex items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 transition">
+                    <button type="button" wire:click="prevMonth" wire:loading.attr="disabled" wire:target="prevMonth,nextMonth,goToday" class="cursor-pointer size-8 flex items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 transition disabled:opacity-50">
                         <flux:icon name="chevron-left" class="size-4" />
                     </button>
-                    <button type="button" wire:click="nextMonth" class="cursor-pointer size-8 flex items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 transition">
+                    <button type="button" wire:click="nextMonth" wire:loading.attr="disabled" wire:target="prevMonth,nextMonth,goToday" class="cursor-pointer size-8 flex items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 transition disabled:opacity-50">
                         <flux:icon name="chevron-right" class="size-4" />
                     </button>
                 </div>
@@ -228,7 +239,9 @@ new class extends Component
                 @endforeach
             </div>
 
-            <div class="grid grid-cols-7 gap-y-1 auto-rows-fr min-h-82 text-sm">
+            <div class="relative">
+                <div wire:loading.class="opacity-40" wire:target="prevMonth,nextMonth,goToday"
+                    class="grid grid-cols-7 gap-y-1 auto-rows-fr min-h-82 text-sm transition-opacity duration-200">
                 @for ($i = $startDay - 1; $i >= 0; $i--)
                 <div class="size-11 m-auto flex items-center justify-center text-zinc-300">
                     {{ $daysInPrevMonth - $i }}
@@ -255,11 +268,13 @@ new class extends Component
 
                     @for ($i = 1; $i <= $nextDays; $i++) <div class="size-11 m-auto flex items-center justify-center text-zinc-300">{{ $i }}</div>
             @endfor
+                </div>
+            </div>
         </div>
-    </div>
 
-    {{-- Event List --}}
-    <div class="min-w-0 p-5 lg:col-span-2 bg-zinc-50/40">
+        {{-- Event List --}}
+        <div wire:target="prevMonth,nextMonth,goToday"
+        class="min-w-0 p-5 lg:col-span-2 bg-zinc-50/40 transition-opacity duration-200">
         @php
         $selected = Carbon::parse($selectedDate);
         @endphp
