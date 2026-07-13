@@ -92,7 +92,7 @@ new class extends Component {
 @endphp
 
 <div>
-    <div class="bg-white rounded-2xl border border-zinc-200 p-5 sm:p-6 h-full md:max-h-92 flex flex-col">
+    <div class="bg-white rounded-2xl border border-zinc-200 p-4 sm:p-6 h-full md:max-h-92 flex flex-col">
         {{-- Header --}}
         <div class="flex items-start justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0">

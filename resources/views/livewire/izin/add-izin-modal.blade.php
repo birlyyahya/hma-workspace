@@ -89,8 +89,8 @@ new class extends Component {
 }; ?>
 
 <div>
-    <flux:modal name="form-izin-modal" class="w-full max-w-xl">
-        <form wire:submit="save" class="space-y-5">
+    <flux:modal name="form-izin-modal" class="w-full max-w-xl overflow-auto max-sm:max-h-[85dvh]">
+        <form wire:submit="save" class="space-y-4 sm:space-y-5">
             {{-- Header --}}
             <div class="flex items-start gap-3 pb-4 border-b border-zinc-200">
                 <div class="size-10 rounded-xl bg-red-50 ring-1 ring-red-100 flex items-center justify-center">

@@ -498,7 +498,7 @@ new class extends Component {
     {{-- ── Card container ── --}}
     <section class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         {{-- Header --}}
-        <header class="flex flex-col gap-3 border-b border-zinc-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <header class="flex flex-col gap-3 border-b border-zinc-100 px-4 py-4 sm:px-5 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex items-center gap-3">
                 <div class="grid h-10 w-10 place-items-center rounded-xl bg-zinc-100 text-zinc-700">
                     <flux:icon name="paper-airplane" class="h-5 w-5" />
@@ -542,7 +542,7 @@ new class extends Component {
                 </flux:dropdown>
 
                 @can('spd.create')
-                <flux:button wire:click="openCreate" icon="plus-circle" variant="primary">
+                <flux:button wire:click="openCreate" icon="plus-circle" variant="primary" class="w-full sm:w-auto">
                     Buat SPD
                 </flux:button>
                 @endcan
@@ -730,7 +730,7 @@ new class extends Component {
         </div>
 
         {{-- Mobile cards --}}
-        <div class="space-y-3 p-4 md:hidden">
+        <div class="space-y-3 p-3 md:hidden">
             @foreach ($rows as $spd)
             @php
             $isSubmitted = (int) ($spd['is_submitted'] ?? 0) === 1;
@@ -773,7 +773,7 @@ new class extends Component {
                     <flux:icon name="calendar" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400" />
                     <span class="line-clamp-2">{{ strip_tags($spd['start_date'] ?? '') ?: '—' }}</span>
                 </div>
-                <div class="mt-3 flex items-center justify-between gap-2 border-t border-zinc-100 pt-3">
+                <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-3">
                     @if (! empty($spd['attachment_url']))
                     <a href="{{ $spd['attachment_url'] }}" target="_blank" class="inline-flex items-center gap-1 text-xs font-medium text-blue-600">
                         <flux:icon name="paper-clip" class="h-3.5 w-3.5" /> Lampiran
@@ -781,7 +781,7 @@ new class extends Component {
                     @else
                     <span></span>
                     @endif
-                    <div class="flex items-center gap-1">
+                    <div class="flex flex-wrap items-center justify-end gap-1">
                         <a href="{{ route('izin.spd-preview', $spd['id']) }}" target="_blank">
                             <flux:button size="xs" variant="ghost" icon="eye">Preview</flux:button>
                         </a>
@@ -801,7 +801,7 @@ new class extends Component {
 
         {{-- Pagination --}}
         @if ($lastPage > 1)
-        <div class="flex items-center justify-between gap-3 border-t border-zinc-100 px-5 py-3 text-xs text-zinc-600">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 px-4 py-3 text-xs text-zinc-600 sm:px-5">
             <span>Halaman {{ $currentPage }} dari {{ $lastPage }} · {{ $total }} data</span>
             <div class="flex items-center gap-1">
                 <button wire:click="goToPage({{ max(1, $currentPage - 1) }})" @disabled($currentPage <=1) class="rounded-lg px-3 py-1.5 text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50 disabled:opacity-40">
@@ -819,10 +819,10 @@ new class extends Component {
 </section>
 
 {{-- ── Form modal (create / edit) ── --}}
-<flux:modal name="spd-form-modal" class="min-w-2xl overflow-auto md:min-w-3xl lg:min-w-4xl">
+<flux:modal name="spd-form-modal" class="min-w-xs overflow-auto max-sm:max-h-[85dvh] md:min-w-3xl lg:min-w-4xl">
     <form
         wire:submit="saveSpd"
-        class="space-y-5"
+        class="space-y-4 sm:space-y-5"
         x-data="{ uploading: false }"
         x-on:livewire-upload-start.window="uploading = true"
         x-on:livewire-upload-finish.window="uploading = false"
@@ -999,7 +999,7 @@ new class extends Component {
             </div>
         </div>
 
-        <div class="flex items-center justify-between gap-2 border-t border-zinc-100 pt-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-4">
             @if ($editingId)
             <a href="{{ route('izin.spd-preview', $editingId) }}" target="_blank" class="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50">
                 <flux:icon name="eye" class="h-4 w-4" />
@@ -1024,7 +1024,7 @@ new class extends Component {
 </flux:modal>
 
 {{-- ── Delete confirmation modal ── --}}
-<flux:modal name="spd-delete-modal" class="min-w-md" :dismissible="false">
+<flux:modal name="spd-delete-modal" class="min-w-xs sm:min-w-md" :dismissible="false">
     <div class="space-y-5">
         <div class="flex items-start gap-4">
             <div class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-red-100 text-red-600">

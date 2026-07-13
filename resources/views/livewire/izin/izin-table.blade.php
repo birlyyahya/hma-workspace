@@ -176,7 +176,7 @@ new class extends Component {
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:items-center lg:gap-2">
+            <div class="grid grid-cols-2 gap-2 lg:flex lg:items-center lg:gap-2">
                 <flux:select wire:model.live="sort" size="sm" class="w-full lg:w-36">
                     <flux:select.option value="desc">Terbaru</flux:select.option>
                     <flux:select.option value="asc">Terlama</flux:select.option>
@@ -194,8 +194,8 @@ new class extends Component {
             </div>
         </div>
 
-        {{-- Table --}}
-        <div class="overflow-x-auto">
+        {{-- Table (desktop) --}}
+        <div class="hidden md:block overflow-x-auto">
             <table class="min-w-225 md:min-w-full text-sm text-left">
                 <thead class="bg-zinc-50/80 border-b border-zinc-200 text-[11px] uppercase tracking-wide text-zinc-500">
                     <tr>
@@ -288,6 +288,79 @@ new class extends Component {
                     @endforelse
                 </tbody>
             </table>
+        </div>
+
+        {{-- Cards (mobile) --}}
+        <div class="space-y-3 p-3 md:hidden" wire:loading.class="pointer-events-none">
+            @forelse ($this->data['data'] ?? [] as $izin)
+                @php
+                    $admin = (int) ($izin['status_admin'] ?? 1);
+                    $superadmin = (int) ($izin['status_superadmin'] ?? 1);
+
+                    if ($admin === 3 || $superadmin === 3) {
+                        $progress = 100;
+                        $progressColor = 'bg-rose-500';
+                    } elseif ($admin === 2 && $superadmin === 2) {
+                        $progress = 100;
+                        $progressColor = 'bg-emerald-500';
+                    } elseif ($admin === 2 || $superadmin === 2) {
+                        $progress = 50;
+                        $progressColor = 'bg-blue-500';
+                    } else {
+                        $progress = 25;
+                        $progressColor = 'bg-amber-500';
+                    }
+
+                    $statusLabel = match ($izin['status'] ?? null) {
+                        '2' => ['text' => 'Approved', 'color' => 'green'],
+                        '3' => ['text' => 'Rejected', 'color' => 'red'],
+                        default => ['text' => 'Pending', 'color' => 'yellow'],
+                    };
+                @endphp
+                <article wire:key="izin-mob-{{ $izin['id'] }}" class="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex min-w-0 items-center gap-2">
+                            <flux:avatar size="xs" name="{{ $izin['user_name'] ?? '?' }}" />
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-medium text-zinc-900">{{ $izin['user_name'] ?? 'N/A' }}</p>
+                                <p class="text-xs text-zinc-500 tabular-nums">{{ Carbon::parse($izin['start_date'])->format('d M Y') }}</p>
+                            </div>
+                        </div>
+                        <flux:badge color="{{ $statusLabel['color'] }}" size="sm" class="shrink-0">{{ $statusLabel['text'] }}</flux:badge>
+                    </div>
+
+                    <p class="mt-2.5 text-sm text-zinc-600 line-clamp-2">{{ $izin['reason'] ?? 'N/A' }}</p>
+
+                    <div class="mt-3 flex items-center gap-2">
+                        <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100">
+                            <div class="{{ $progressColor }} h-full rounded-full transition-all duration-300" style="width: {{ $progress }}%"></div>
+                        </div>
+                        <span class="w-9 text-right text-[11px] font-medium text-zinc-500 tabular-nums">{{ $progress }}%</span>
+                    </div>
+
+                    <div class="mt-3 grid grid-cols-2 gap-2 border-t border-zinc-100 pt-3">
+                        <a href="{{ route('izin.show', $izin['id']) }}" wire:navigate>
+                            <flux:button icon="eye" variant="outline" size="sm" class="w-full cursor-pointer">
+                                Detail
+                            </flux:button>
+                        </a>
+                        <flux:button
+                            wire:click="generatePDF({{ $izin['id'] }})"
+                            icon="arrow-down-tray"
+                            variant="outline"
+                            size="sm"
+                            class="w-full cursor-pointer"
+                        >
+                            PDF
+                        </flux:button>
+                    </div>
+                </article>
+            @empty
+                <div class="flex flex-col items-center gap-2 py-10 text-zinc-400">
+                    <flux:icon name="inbox" class="size-8" />
+                    <p class="text-sm">Tidak ada data izin</p>
+                </div>
+            @endforelse
         </div>
 
         {{-- Pagination --}}

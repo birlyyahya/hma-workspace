@@ -61,7 +61,7 @@ class extends Component {
     }
 }; ?>
 
-<div class="min-h-screen px-4 py-6">
+<div class="min-h-screen px-2 py-4 sm:px-4 sm:py-6">
     @if (! $spd)
     <div class="mx-auto max-w-2xl rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-zinc-200">
         <div class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-zinc-100 text-zinc-400">
@@ -96,7 +96,7 @@ class extends Component {
     @endphp
 
     {{-- Toolbar --}}
-    <div class="mx-auto mb-5 flex max-w-[900px] flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white px-5 py-3 shadow-sm">
+    <div class="mx-auto mb-4 flex max-w-[900px] flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm sm:mb-5 sm:px-5">
         <div class="flex items-center gap-3">
             <a href="{{ route('izin') }}" class="inline-flex items-center gap-1.5 rounded-full bg-zinc-50 px-3 py-1.5 text-sm font-medium text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-100">
                 <flux:icon name="arrow-left" class="h-4 w-4" />

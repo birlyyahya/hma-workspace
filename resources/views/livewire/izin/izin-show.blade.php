@@ -84,7 +84,7 @@ class extends Component {
             <div class="grid lg:grid-cols-3 grid-cols-1 gap-4">
                 {{-- pdf reader --}}
 
-                <div class="bg-white border rounded-lg p-4 col-span-2">
+                <div class="bg-white border rounded-lg p-3 sm:p-4 lg:col-span-2">
                     @if($pdfPreview)
                     <iframe src="{{ $this->pdfPreview }}" class="w-full h-[420px] sm:h-[500px] md:h-[600px] rounded-lg">
                     </iframe>

@@ -14,7 +14,7 @@ new class extends Component {
     <div class="max-h-screen overflow-auto py-4 px-2">
         <div class="py-4 mb-5 space-y-4">
             <div class="flex justify-between items-center">
-                <div class="flex items-end gap-4">
+                <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:gap-4">
                     <flex:heading class="font-bold text-xl">Laporan Pengajuan Izin</flex:heading>
                     <flux:description class="text-sm text-gray-500">Ringkasan status pengajuan izin</flux:description>
                 </div>

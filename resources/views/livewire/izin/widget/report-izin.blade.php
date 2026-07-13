@@ -171,7 +171,7 @@ new class extends Component
 }; ?>
 
 <div>
-    <div class="bg-white rounded-2xl border border-zinc-200 p-5 sm:p-6 h-full flex flex-col">
+    <div class="bg-white rounded-2xl border border-zinc-200 p-4 sm:p-6 h-full flex flex-col">
         {{-- Header --}}
         <div class="flex items-start justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0">
@@ -249,7 +249,7 @@ new class extends Component
         </div>
 
         {{-- Legend / mini stats --}}
-        <div class="mt-5 grid grid-cols-3 gap-3">
+        <div class="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
             @foreach ($this->stats as $stat)
             <div class="rounded-xl border border-zinc-200 p-3 transition hover:border-zinc-300 hover:shadow-xs">
                 <div class="flex items-center gap-1.5">
