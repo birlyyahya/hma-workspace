@@ -3,68 +3,76 @@
 use App\Models\User;
 use App\Notifications\DarCommentReceived;
 use Livewire\Volt\Volt;
+use NotificationChannels\WebPush\WebPushChannel;
 
-function sendDarCommentNotification(User $user): void
-{
-    $user->notify(new DarCommentReceived(
+test('the subscribe action stores a push subscription for the logged-in user', function () {
+    $user = User::factory()->create();
+
+    Volt::actingAs($user)
+        ->test('components.browser-notification')
+        ->call('subscribe', [
+            'endpoint' => 'https://push.example.com/endpoint-1',
+            'keys' => ['p256dh' => 'p256dh-key', 'auth' => 'auth-token'],
+        ])
+        ->assertHasNoErrors();
+
+    expect($user->pushSubscriptions()->count())->toBe(1)
+        ->and($user->pushSubscriptions()->first()->endpoint)->toBe('https://push.example.com/endpoint-1');
+});
+
+test('subscribing twice with the same endpoint does not duplicate the subscription', function () {
+    $user = User::factory()->create();
+
+    $subscription = [
+        'endpoint' => 'https://push.example.com/endpoint-1',
+        'keys' => ['p256dh' => 'p256dh-key', 'auth' => 'auth-token'],
+    ];
+
+    $component = Volt::actingAs($user)->test('components.browser-notification');
+
+    $component->call('subscribe', $subscription);
+    $component->call('subscribe', $subscription);
+
+    expect($user->pushSubscriptions()->count())->toBe(1);
+});
+
+test('a payload without an endpoint is ignored', function () {
+    $user = User::factory()->create();
+
+    Volt::actingAs($user)
+        ->test('components.browser-notification')
+        ->call('subscribe', ['keys' => ['p256dh' => 'x', 'auth' => 'y']])
+        ->assertHasNoErrors();
+
+    expect($user->pushSubscriptions()->count())->toBe(0);
+});
+
+test('dar comment notification is delivered via database and web push channels', function () {
+    $notification = new DarCommentReceived(
         activityId: 1,
         activityTitle: 'Task X',
         commentId: 42,
         commenterId: 99,
         commenterName: 'Budi',
         body: 'Halo tim',
-    ));
-}
+    );
 
-test('it dispatches a browser push event for new unread dar comment notifications', function () {
-    $user = User::factory()->create();
-
-    $component = Volt::actingAs($user)->test('components.browser-notification');
-
-    $this->travel(1)->minute();
-    sendDarCommentNotification($user);
-
-    $component->call('checkNewNotifications')
-        ->assertDispatched('browser-push-notifications')
-        ->assertDispatched('play-notification-sound');
+    expect($notification->via(new stdClass))->toContain('database', WebPushChannel::class);
 });
 
-test('it does not dispatch when there are no new notifications', function () {
-    $user = User::factory()->create();
+test('the web push message carries the comment details and task url', function () {
+    $notification = new DarCommentReceived(
+        activityId: 7,
+        activityTitle: 'Task X',
+        commentId: 42,
+        commenterId: 99,
+        commenterName: 'Budi',
+        body: 'Halo tim',
+    );
 
-    Volt::actingAs($user)
-        ->test('components.browser-notification')
-        ->call('checkNewNotifications')
-        ->assertNotDispatched('browser-push-notifications')
-        ->assertNotDispatched('play-notification-sound');
-});
+    $message = $notification->toWebPush(new stdClass, $notification)->toArray();
 
-test('it does not re-dispatch the same notification on the next poll', function () {
-    $user = User::factory()->create();
-
-    $component = Volt::actingAs($user)->test('components.browser-notification');
-
-    $this->travel(1)->minute();
-    sendDarCommentNotification($user);
-
-    $component->call('checkNewNotifications')
-        ->assertDispatched('browser-push-notifications');
-
-    $this->travel(1)->minute();
-
-    $component->call('checkNewNotifications')
-        ->assertNotDispatched('browser-push-notifications');
-});
-
-test('notifications created before mount are not pushed to the browser', function () {
-    $user = User::factory()->create();
-
-    sendDarCommentNotification($user);
-
-    $this->travel(1)->minute();
-
-    Volt::actingAs($user)
-        ->test('components.browser-notification')
-        ->call('checkNewNotifications')
-        ->assertNotDispatched('browser-push-notifications');
+    expect($message['title'])->toBe('Komentar baru: Task X')
+        ->and($message['body'])->toBe('Budi: Halo tim')
+        ->and($message['data']['url'])->toBe(route('dar.dar-show', ['id' => 7]));
 });

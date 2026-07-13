@@ -1,44 +1,26 @@
 <?php
 
-use App\Notifications\DarCommentReceived;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
+use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 
 new class extends Component {
-    public string $lastCheckedAt = '';
-
-    public function mount(): void
+    #[On('push-subscribed')]
+    public function subscribe(array $subscription): void
     {
-        $this->lastCheckedAt = now()->toDateTimeString();
-    }
+        $endpoint = $subscription['endpoint'] ?? null;
 
-    public function checkNewNotifications(): void
-    {
-        $notifications = Auth::user()
-            ->unreadNotifications()
-            ->where('type', DarCommentReceived::class)
-            ->where('created_at', '>', $this->lastCheckedAt)
-            ->latest()
-            ->limit(10)
-            ->get();
-
-        $this->lastCheckedAt = now()->toDateTimeString();
-
-        if ($notifications->isEmpty()) {
+        if (! $endpoint) {
             return;
         }
 
-        $payload = $notifications->map(fn ($notification) => [
-            'id' => (string) $notification->id,
-            'title' => 'Komentar baru: '.($notification->data['activity_title'] ?? 'DAR'),
-            'body' => ($notification->data['commenter_name'] ?? 'Seseorang').': '.Str::limit($notification->data['body'] ?? '', 120),
-            'url' => route('dar.dar-show', ['id' => $notification->data['activity_id'] ?? 0]),
-        ])->values()->all();
-
-        $this->dispatch('browser-push-notifications', notifications: $payload);
-        $this->dispatch('play-notification-sound');
+        Auth::user()->updatePushSubscription(
+            $endpoint,
+            $subscription['keys']['p256dh'] ?? null,
+            $subscription['keys']['auth'] ?? null,
+            'aes128gcm',
+        );
     }
 }; ?>
 
-<div wire:poll.30s.keep-alive="checkNewNotifications"></div>
+<div data-vapid-public-key="{{ config('webpush.vapid.public_key') }}" id="web-push-config"></div>

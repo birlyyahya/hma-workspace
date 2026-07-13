@@ -3,9 +3,13 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Str;
+use NotificationChannels\WebPush\WebPushChannel;
+use NotificationChannels\WebPush\WebPushMessage;
 
-class DarCommentReceived extends Notification
+class DarCommentReceived extends Notification implements ShouldQueue
 {
     use Queueable;
 
@@ -23,7 +27,7 @@ class DarCommentReceived extends Notification
      */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return ['database', WebPushChannel::class];
     }
 
     /**
@@ -39,5 +43,15 @@ class DarCommentReceived extends Notification
             'commenter_name' => $this->commenterName,
             'body' => $this->body,
         ];
+    }
+
+    public function toWebPush(object $notifiable, Notification $notification): WebPushMessage
+    {
+        return (new WebPushMessage)
+            ->title('Komentar baru: '.($this->activityTitle !== '' ? $this->activityTitle : 'DAR'))
+            ->body($this->commenterName.': '.Str::limit($this->body, 120))
+            ->icon(asset('img/logo/logo-hma2.png'))
+            ->tag('dar-comment-'.$this->commentId)
+            ->data(['url' => route('dar.dar-show', ['id' => $this->activityId])]);
     }
 }

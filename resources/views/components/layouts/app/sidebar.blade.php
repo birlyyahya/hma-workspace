@@ -115,29 +115,63 @@
                 document.getElementById('notifSound').play();
             });
 
-            if ('Notification' in window && Notification.permission === 'default') {
-                document.addEventListener('click', () => Notification.requestPermission(), { once: true });
+            registerWebPush();
+        });
+
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+            const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+
+            return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+        }
+
+        async function registerWebPush() {
+            if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+                return;
             }
 
-            Livewire.on('browser-push-notifications', ({ notifications }) => {
-                if (!('Notification' in window) || Notification.permission !== 'granted') {
+            const config = document.getElementById('web-push-config');
+            const vapidPublicKey = config?.dataset.vapidPublicKey;
+
+            if (!vapidPublicKey || Notification.permission === 'denied') {
+                return;
+            }
+
+            try {
+                const registration = await navigator.serviceWorker.register('{{ asset('sw.js') }}');
+
+                if (Notification.permission === 'default') {
+                    try {
+                        await Notification.requestPermission();
+                    } catch (e) {
+                        // Safari/iOS menolak request tanpa gestur user.
+                    }
+                }
+
+                if (Notification.permission === 'default') {
+                    await new Promise((resolve) => document.addEventListener('click', resolve, { once: true }));
+                    await Notification.requestPermission();
+                }
+
+                if (Notification.permission !== 'granted') {
                     return;
                 }
 
-                notifications.forEach((item) => {
-                    const pushNotification = new Notification(item.title, {
-                        body: item.body,
-                        tag: item.id,
-                        icon: '{{ asset('img/logo/logo-hma2.png') }}',
-                    });
+                let subscription = await registration.pushManager.getSubscription();
 
-                    pushNotification.onclick = () => {
-                        window.focus();
-                        window.location.href = item.url;
-                    };
-                });
-            });
-        });
+                if (!subscription) {
+                    subscription = await registration.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+                    });
+                }
+
+                Livewire.dispatch('push-subscribed', { subscription: subscription.toJSON() });
+            } catch (error) {
+                console.warn('Web push registration failed:', error);
+            }
+        }
 
     </script>
 </body>

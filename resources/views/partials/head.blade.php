@@ -5,7 +5,15 @@
 
 <link rel="icon" href="{{ asset('img/logo/logo-hma2.png') }}" sizes="any">
 <link rel="icon" href="{{ asset('img/logo/logo-hma2.png') }}" type="image/svg+xml">
-<link rel="apple-touch-icon" href="{{ asset('img/logo/logo-hma2.png') }}">
+<link rel="apple-touch-icon" href="{{ asset('img/logo/apple-touch-icon-180.png') }}">
+
+{{-- PWA --}}
+<link rel="manifest" href="{{ asset('manifest.json') }}">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="HMA Workspace">
 
 {{-- Open Graph / link preview (WhatsApp, Telegram, dll.) --}}
 <meta property="og:type" content="website" />
