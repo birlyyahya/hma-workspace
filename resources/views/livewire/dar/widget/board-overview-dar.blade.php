@@ -199,14 +199,14 @@ new class extends Component {
 }; ?>
 
 <div>
-    <div class="py-6">
+    <div class="py-2 sm:py-6">
         <div class="">
-            <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div class="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
 
                 {{-- MESSAGE BOARD --}}
                 @php $unreadTotal = collect($messages)->sum('unread'); @endphp
                 <section class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
-                    <header class="flex items-center justify-between border-b border-slate-200/70 px-5 py-4">
+                    <header class="flex items-center justify-between border-b border-slate-200/70 px-4 py-4 sm:px-5">
                         <div class="flex items-center gap-3">
                             <span class="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-700">
                                 <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -238,7 +238,7 @@ new class extends Component {
                         @endif
                     </header>
 
-                    <div class="p-5" wire:poll.visible.5s="refreshMessages">
+                    <div class="p-4 sm:p-5" wire:poll.visible.5s="refreshMessages">
                         <div class="space-y-3 overflow-scroll max-h-65">
                             @forelse($messages as $msg)
                             <button
@@ -288,7 +288,7 @@ new class extends Component {
 
                 {{-- TO-DO --}}
                 <section class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
-                    <header class="flex items-center justify-between border-b border-slate-200/70 px-5 py-4">
+                    <header class="flex items-center justify-between border-b border-slate-200/70 px-4 py-4 sm:px-5">
                         <div class="flex items-center gap-3">
                             <span class="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-700">
                                 <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -314,7 +314,7 @@ new class extends Component {
                         </button>
                     </header>
 
-                    <div class="p-5">
+                    <div class="p-4 sm:p-5">
                         <div class="space-y-5 overflow-scroll max-h-65">
 
                             {{-- Section --}}
@@ -378,7 +378,7 @@ new class extends Component {
 
                 {{-- SCHEDULE (pengganti Docs & Files) --}}
                 <section class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70">
-                    <header class="flex items-center justify-between border-b border-slate-200/70 px-5 py-4">
+                    <header class="flex items-center justify-between border-b border-slate-200/70 px-4 py-4 sm:px-5">
                         <div class="flex items-center gap-3">
                             <span class="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-700">
                                 <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -404,7 +404,7 @@ new class extends Component {
                         </button>
                     </header>
 
-                    <div class="p-5">
+                    <div class="p-4 sm:p-5">
                         @php
                         $scheduleGroups = collect($schedules ?? [])->groupBy(function ($item) {
                         return \Carbon\Carbon::parse($item->start_date)->toDateString();

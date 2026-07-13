@@ -488,15 +488,15 @@ new class extends Component {
         },
     }" x-init="$nextTick(() => filter())" @dar-tasks-updated.window="$nextTick(() => filter())">
         {{-- Basecamp-ish section header --}}
-        <header class="space-y-4 px-5 py-4">
-            <div class="flex items-center gap-3">
+        <header class="space-y-4 px-0 py-4 sm:px-2">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <flux:modal.trigger name="create-task">
-                    <flux:button icon="plus-circle" iconClasses="size-6" variant="outline">
+                    <flux:button icon="plus-circle" iconClasses="size-6" variant="outline" class="w-full sm:w-auto">
                         Tambah Tugas
                     </flux:button>
                 </flux:modal.trigger>
 
-                <div class="flex flex-1 items-center gap-4">
+                <div class="order-first flex flex-1 items-center gap-4 sm:order-0">
                     <div class="h-px flex-1 bg-slate-200/70"></div>
                     <h2 class="text-lg font-semibold tracking-tight text-slate-800">Tugas</h2>
                     <div class="h-px flex-1 bg-slate-200/70"></div>
@@ -507,17 +507,17 @@ new class extends Component {
 
             {{-- Tabs tipe + filter project/user --}}
             <div class="flex flex-wrap items-center justify-between gap-3">
-                <div class="inline-flex items-center rounded-xl bg-slate-100 p-1">
+                <div class="flex w-full items-center rounded-xl bg-slate-100 p-1 sm:w-auto sm:inline-flex">
                     @foreach ($tabOptions as $key => $label)
                         <button type="button" @click="switchTab('{{ $key }}')"
-                            class="rounded-lg px-3 py-1.5 text-sm font-medium transition"
+                            class="flex-1 rounded-lg px-3 py-1.5 text-center text-sm font-medium transition sm:flex-none"
                             :class="tab === '{{ $key }}' ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:text-slate-900'">
                             {{ $label }}
                         </button>
                     @endforeach
                 </div>
 
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                     @php
                         $filterProjects = $isSuperadmin
                             ? $allProjects
@@ -526,7 +526,7 @@ new class extends Component {
                             ? (collect($allProjects)->firstWhere('id', (int) $projectFilter)['name'] ?? 'Semua project')
                             : 'Semua project';
                     @endphp
-                    <div x-show="tab === 'project'" x-cloak class="relative w-56" x-data="{ open: false, query: '' }" @click.away="open = false" @keydown.escape.window="open = false">
+                    <div x-show="tab === 'project'" x-cloak class="relative w-full sm:w-56" x-data="{ open: false, query: '' }" @click.away="open = false" @keydown.escape.window="open = false">
                             <button type="button" @click="open = !open; if (open) $nextTick(() => $refs.projectSearch?.focus())"
                                 class="flex w-full items-center justify-between gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 transition hover:border-zinc-300">
                                 <span class="truncate">{{ $projectLabel }}</span>
@@ -561,7 +561,7 @@ new class extends Component {
                                 ? (collect($allUsers)->firstWhere('id', (int) $userFilter)['name'] ?? 'Semua user')
                                 : 'Semua user';
                         @endphp
-                        <div class="relative w-56" x-data="{ open: false, query: '' }" @click.away="open = false" @keydown.escape.window="open = false">
+                        <div class="relative w-full sm:w-56" x-data="{ open: false, query: '' }" @click.away="open = false" @keydown.escape.window="open = false">
                             <button type="button" @click="open = !open; if (open) $nextTick(() => $refs.userSearch?.focus())"
                                 class="flex w-full items-center justify-between gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 transition hover:border-zinc-300">
                                 <span class="truncate">{{ $userLabel }}</span>
@@ -613,7 +613,7 @@ new class extends Component {
             </div>
         </header>
 
-        <div class="px-5 pb-5">
+        <div class="px-0 pb-5 sm:px-2">
             @if($loading)
             <div class="rounded-2xl bg-white p-6 text-sm text-slate-600 ring-1 ring-slate-200/70 shadow-sm">
                 Loading tasks...
@@ -668,7 +668,7 @@ new class extends Component {
                     {{-- Top status accent --}}
                     <div class="h-1 w-full bg-linear-to-r {{ $statusMeta['accent'] }}"></div>
 
-                    <div class="flex flex-1 flex-col p-5">
+                    <div class="flex flex-1 flex-col p-4 sm:p-5">
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0 relative z-10">
                                 <div class="flex flex-wrap items-center gap-2">
@@ -765,7 +765,7 @@ new class extends Component {
                         </div>
                     </div>
 
-                    <footer class="relative z-10 mt-auto flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3">
+                    <footer class="relative z-10 mt-auto flex items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 sm:px-5">
                         {{-- Anggota tim --}}
                         @php
                             $maxVisible = 3;
@@ -874,8 +874,8 @@ new class extends Component {
     <x-confirm-modal name="delete-task" confirm="deleteTask" title="Hapus aktivitas ini?"
         description="Aktivitas DAR akan dihapus secara permanen. Tindakan ini tidak dapat dibatalkan." />
 
-    <flux:modal name="create-task" class="min-w-screen overflow-auto md:min-w-3xl lg:min-w-5xl xl:min-w-6xl">
-        <form wire:submit="createActivity" class="space-y-5">
+    <flux:modal name="create-task" class="min-w-xs overflow-auto max-sm:max-h-[85dvh] md:min-w-3xl lg:min-w-5xl xl:min-w-6xl">
+        <form wire:submit="createActivity" class="space-y-4 sm:space-y-5">
             {{-- ── Header ── --}}
             <div class="flex items-start gap-3 border-b border-zinc-100 pb-4">
                 <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-zinc-100 text-zinc-700">
@@ -888,7 +888,7 @@ new class extends Component {
             </div>
 
             {{-- ── Body grid: 2 kolom di desktop, stacked di mobile ── --}}
-            <div class="grid grid-cols-1 gap-x-8 gap-y-5 lg:grid-cols-2">
+            <div class="grid grid-cols-1 gap-x-8 gap-y-4 sm:gap-y-5 lg:grid-cols-2">
 
                 {{-- ── Section: Detail (kolom kiri, span 2 di desktop) ── --}}
                 <div class="space-y-3 lg:col-span-2">
@@ -986,7 +986,7 @@ new class extends Component {
 
                 {{-- ── Section: Tim & Status ── --}}
                 <div class="space-y-3 lg:col-span-2">
-                    <div class="grid grid-cols-2 gap-4 items-start">
+                    <div class="grid grid-cols-1 gap-4 items-start sm:grid-cols-2">
                         <div x-data="{ open: false, query: '', matches(name) { return !this.query || name.toLowerCase().includes(this.query.toLowerCase()); } }" @click.away="open = false" @keydown.escape.window="open = false" class="relative">
                             @php
                             $selectedTeam = collect($this->form->team_user ?? [])->map(fn ($id) => (int) $id)->all();
@@ -1057,11 +1057,11 @@ new class extends Component {
             {{-- ── /Body grid ── --}}
 
             {{-- ── Footer ── --}}
-            <div class="flex items-center justify-end gap-2 border-t border-zinc-100 pt-4">
+            <div class="flex flex-col-reverse gap-2 border-t border-zinc-100 pt-4 sm:flex-row sm:items-center sm:justify-end">
                 <flux:modal.close>
-                    <flux:button variant="ghost" type="button">Batal</flux:button>
+                    <flux:button variant="ghost" type="button" class="w-full sm:w-auto">Batal</flux:button>
                 </flux:modal.close>
-                <flux:button type="submit" variant="primary" icon="check" wire:loading.attr="disabled" wire:target="createActivity">
+                <flux:button type="submit" variant="primary" icon="check" class="w-full sm:w-auto" wire:loading.attr="disabled" wire:target="createActivity">
                     <span wire:loading.remove wire:target="createActivity">Buat tugas</span>
                     <span wire:loading wire:target="createActivity">Menyimpan...</span>
                 </flux:button>

@@ -589,24 +589,24 @@ class extends Component
     <div
         x-data="darShow"
         x-on:comment-added.window="scrollToLatestComment()"
-        class="min-h-screen bg-linear-to-b from-zinc-50 to-white px-4 py-6 sm:px-6 lg:px-8"
+        class="min-h-screen bg-linear-to-b from-zinc-50 to-white md:py-4 py-6 lg:px-8"
     >
         <div class="mx-auto max-w-6xl">
 
             {{-- ── Top bar ── --}}
-            <div class="mb-6 flex items-center justify-between gap-4">
-                <div class="flex items-center gap-2 text-sm">
+            <div class="mb-4 flex items-center justify-between gap-3 sm:mb-6 sm:gap-4">
+                <div class="flex min-w-0 items-center gap-2 text-sm">
                     <a
                         href="{{ route('dar') }}"
-                        class="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 font-medium text-zinc-700 ring-1 ring-zinc-200 shadow-sm hover:bg-zinc-50"
+                        class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3 py-1.5 font-medium text-zinc-700 ring-1 ring-zinc-200 shadow-sm hover:bg-zinc-50"
                     >
                         <flux:icon name="arrow-left" class="h-4 w-4" />
                         Back
                     </a>
+                    <span class="hidden text-zinc-300 sm:inline">/</span>
+                    <span class="hidden font-medium text-zinc-500 sm:inline">DAR</span>
                     <span class="text-zinc-300">/</span>
-                    <span class="font-medium text-zinc-500">DAR</span>
-                    <span class="text-zinc-300">/</span>
-                    <span class="font-semibold text-zinc-800">Task #{{ $task['id'] ?? $id }}</span>
+                    <span class="truncate font-semibold text-zinc-800">Task #{{ $task['id'] ?? $id }}</span>
                 </div>
 
                 @if (! empty($task))
@@ -697,9 +697,9 @@ class extends Component
                     }
                 @endphp
 
-                <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                <div class="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-3">
                     {{-- ── LEFT: Task content ── --}}
-                    <article class="lg:col-span-2 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-zinc-200/70 sm:p-8">
+                    <article class="lg:col-span-2 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-200/70 sm:p-8">
                         @if ($editing)
                             {{-- ── Edit Mode ── --}}
                             <div class="space-y-6">
@@ -939,7 +939,7 @@ class extends Component
                                     @endif
                                 </div>
 
-                                <h1 class="mt-3 text-2xl font-semibold tracking-tight text-zinc-900 sm:text-3xl">
+                                <h1 class="mt-3 text-xl font-semibold tracking-tight text-zinc-900 sm:text-3xl">
                                     {{ $task['activity'] }}
                                 </h1>
 
@@ -967,7 +967,7 @@ class extends Component
                                 </div>
                             </div>
 
-                            <div class="mt-6 py-20 border-t border-zinc-100 pt-6">
+                            <div class="mt-6 border-t border-zinc-100 pt-6 sm:pb-20">
                                 <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">Description</h2>
                                 @if (! empty($task['description']))
                                     <div class="dar-prose">{!! $task['description'] !!}</div>
@@ -993,9 +993,9 @@ class extends Component
                     </article>
 
                     {{-- ── RIGHT: Sidebar ── --}}
-                    <aside class="space-y-5">
+                    <aside class="space-y-4 sm:space-y-5">
                         {{-- Status card --}}
-                        <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-zinc-200/70">
+                        <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-200/70 sm:p-5">
                             <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Details</h3>
                             <dl class="mt-3 space-y-3 text-sm">
                                 <div class="flex items-center justify-between">
@@ -1033,7 +1033,7 @@ class extends Component
                         </div>
 
                         {{-- Attachments overview --}}
-                        <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-zinc-200/70">
+                        <div class="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-200/70 sm:p-5">
                             <div class="flex items-center justify-between">
                                 <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">Attachments</h3>
                                 <span class="text-xs font-semibold text-zinc-400">{{ $this->allAttachments->count() }}</span>
@@ -1055,8 +1055,8 @@ class extends Component
                 </div>
 
                 {{-- ── Comments section ── --}}
-                <section wire:init="loadLogs" class="mt-5 rounded-2xl bg-white shadow-sm ring-1 ring-zinc-200/70">
-                    <header class="flex items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4">
+                <section wire:init="loadLogs" class="mt-4 rounded-2xl bg-white shadow-sm ring-1 ring-zinc-200/70 sm:mt-5">
+                    <header class="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 px-4 py-4 sm:gap-3 sm:px-5">
                         <div class="flex items-center gap-2">
                             <flux:icon name="chat-bubble-left-right" class="h-4 w-4 text-zinc-500" />
                             <h2 class="text-sm font-semibold text-zinc-900">Comments</h2>
@@ -1069,14 +1069,15 @@ class extends Component
                                 class="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-zinc-600 ring-1 ring-zinc-200 shadow-sm hover:bg-zinc-50"
                             >
                                 <flux:icon name="clock" class="h-3.5 w-3.5" />
-                                Riwayat Perubahan
+                                <span class="hidden sm:inline">Riwayat Perubahan</span>
+                                <span class="sm:hidden">Riwayat</span>
                                 <span class="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600">{{ count($logs) }}</span>
                             </button>
                         </flux:modal.trigger>
                     </header>
 
                     {{-- ── Compose (di atas list, ala Instagram) ── --}}
-                    <div class="border-b border-zinc-100 px-5 py-4">
+                    <div class="border-b border-zinc-100 px-4 py-4 sm:px-5">
                         <div
                             x-data="{ dragging: false }"
                             @dragover.prevent="dragging = true"
@@ -1176,7 +1177,7 @@ class extends Component
                     {{-- Comment list (terbaru paling atas) --}}
                     <div x-ref="commentList" class="divide-y divide-zinc-100">
                         {{-- Loading skeleton --}}
-                        <div wire:loading.flex wire:target="addComment" class="hidden gap-3 px-5 py-4">
+                        <div wire:loading.flex wire:target="addComment" class="hidden gap-3 px-4 py-4 sm:px-5">
                             <div class="h-8 w-8 shrink-0 animate-pulse rounded-full bg-zinc-100"></div>
                             <div class="flex-1 space-y-2">
                                 <div class="h-3 w-24 animate-pulse rounded bg-zinc-100"></div>
@@ -1192,7 +1193,7 @@ class extends Component
                                 'isEditing' => $editingCommentId !== null && isset($c['id']) && $editingCommentId === $c['id'],
                             ])
                         @empty
-                            <div class="px-5 py-10 text-center">
+                            <div class="px-4 py-10 text-center sm:px-5">
                                 <div class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-zinc-100 text-zinc-400">
                                     <flux:icon name="chat-bubble-left-right" class="h-6 w-6" />
                                 </div>
@@ -1246,7 +1247,7 @@ class extends Component
                         ->values();
                 @endphp
 
-                <flux:modal name="activity-log-flyout" class="w-md" flyout>
+                <flux:modal name="activity-log-flyout" class="w-md max-w-full" flyout>
                     <div class="space-y-6">
                         <div>
                             <flux:heading size="lg">Riwayat Perubahan</flux:heading>

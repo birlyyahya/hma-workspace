@@ -262,7 +262,7 @@ new class extends Component {
     <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/70 overflow-hidden">
 
         {{-- HEADER --}}
-        <header class="flex items-center justify-between border-b border-slate-200/70 px-5 py-4">
+        <header class="flex flex-col gap-3 border-b border-slate-200/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div class="flex items-center gap-3">
                 <span class="grid h-9 w-9 place-items-center rounded-xl bg-slate-100 text-slate-700">
                     <flux:icon name="clock" class="size-5" />
@@ -273,7 +273,7 @@ new class extends Component {
                 </div>
             </div>
 
-            <div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
                 @if(! empty($overdue))
                     <span class="flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-red-700 ring-1 ring-red-200">
                         <flux:icon name="exclamation-triangle" class="size-3.5" />
@@ -290,9 +290,9 @@ new class extends Component {
         </header>
 
         @if($loading)
-            <div class="px-5 py-8 text-sm text-slate-500">Memuat timeline...</div>
+            <div class="px-4 py-8 text-sm text-slate-500 sm:px-5">Memuat timeline...</div>
         @elseif(empty($events) && empty($overdue))
-            <div class="px-5 py-10 text-center text-sm text-slate-500">
+            <div class="px-4 py-10 text-center text-sm text-slate-500 sm:px-5">
                 Belum ada task untuk ditampilkan pada timeline.
             </div>
         @else
@@ -380,14 +380,14 @@ new class extends Component {
             {{-- Task terlambat (Open, end_date sudah lewat) — daftar yang bisa dibuka --}}
             @if(! empty($overdue))
                 <div x-data="{ open: false }" class="border-t border-red-100 bg-red-50/50">
-                    <button type="button" @click="open = ! open" class="flex w-full items-center justify-between px-5 py-3 text-xs font-semibold text-red-700">
+                    <button type="button" @click="open = ! open" class="flex w-full items-center justify-between px-4 py-3 text-xs font-semibold text-red-700 sm:px-5">
                         <span class="flex items-center gap-1.5">
                             <flux:icon name="exclamation-triangle" class="size-4" />
                             {{ count($overdue) }} task terlambat
                         </span>
                         <span class="flex items-center gap-1 text-red-500" x-text="open ? 'tutup' : 'buka'"></span>
                     </button>
-                    <div x-show="open" x-collapse class="space-y-2 px-5 pb-3">
+                    <div x-show="open" x-collapse class="space-y-2 px-4 pb-3 sm:px-5">
                         @foreach($overdue as $i => $o)
                             <div wire:key="ov-c-{{ $i }}" class="flex items-center gap-2 rounded-lg bg-white px-3 py-2 ring-1 ring-red-200">
                                 <flux:icon name="exclamation-triangle" class="size-4 shrink-0 text-red-500" />

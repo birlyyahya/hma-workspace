@@ -19,7 +19,7 @@
     $docs = collect($files)->filter(fn ($f) => ! isImageFile($f['filename'] ?? '', $f['type'] ?? null))->values();
 @endphp
 
-<article wire:key="comment-{{ $c['id'] }}" class="group flex gap-3 px-5 py-4 transition hover:bg-zinc-50/50">
+<article wire:key="comment-{{ $c['id'] }}" class="group flex gap-2.5 px-4 py-4 transition hover:bg-zinc-50/50 sm:gap-3 sm:px-5">
     <flux:avatar circle name="{{ $name }}" size="sm" class="shrink-0" />
 
     <div class="min-w-0 flex-1">
@@ -67,7 +67,7 @@
                 </div>
             </div>
         @else
-            <div class="mt-1.5 inline-block max-w-full rounded-2xl rounded-tl-md bg-zinc-50 px-4 py-2.5 ring-1 ring-zinc-200/60">
+            <div class="mt-1.5 inline-block max-w-full rounded-2xl rounded-tl-md bg-zinc-50 px-3 py-2.5 ring-1 ring-zinc-200/60 sm:px-4">
                 <p class="whitespace-pre-wrap break-words text-sm leading-relaxed text-zinc-800">{{ $c['body'] ?? '' }}</p>
             </div>
 
@@ -90,7 +90,7 @@
     </div>
 
     @if (! $isEditing && $isOwn && ! empty($c['id']))
-        <div x-data="{ open: false }" class="relative shrink-0 opacity-0 transition group-hover:opacity-100">
+        <div x-data="{ open: false }" class="relative shrink-0 transition sm:opacity-0 sm:group-hover:opacity-100">
             <button
                 type="button"
                 @click="open = !open"

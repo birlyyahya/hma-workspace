@@ -1,9 +1,9 @@
 <x-layouts.app :title="__('DAR - HMA Workspace')">
 
     <div class="bg-zinc-50/50 min-h-screen">
-        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <div class="max-w-screen-2xl mx-auto px-0 py-4 md:space-y-6 space-y-4">
                {{-- HERO HEADER --}}
-            <div class="relative overflow-hidden rounded-2xl border border-white/15 bg-linear-to-br from-red-700 via-red-600 to-rose-600 px-6 sm:px-8 py-6 text-white shadow-sm">
+            <div class="relative overflow-hidden rounded-2xl border border-white/15 bg-linear-to-br from-red-700 via-red-600 to-rose-600 px-4 py-5 sm:px-8 sm:py-6 text-white shadow-sm">
                 <div class="pointer-events-none absolute inset-0">
                     <div class="absolute -right-20 -top-24 size-72 rounded-full bg-white/10 blur-3xl"></div>
                     <div class="absolute -left-24 -bottom-28 size-72 rounded-full bg-black/15 blur-3xl"></div>
