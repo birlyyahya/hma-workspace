@@ -240,41 +240,39 @@ new class extends Component
             </div>
 
             <div class="relative">
-                <div wire:loading.class="opacity-40" wire:target="prevMonth,nextMonth,goToday"
-                    class="grid grid-cols-7 gap-y-1 auto-rows-fr min-h-82 text-sm transition-opacity duration-200">
-                @for ($i = $startDay - 1; $i >= 0; $i--)
-                <div class="size-11 m-auto flex items-center justify-center text-zinc-300">
-                    {{ $daysInPrevMonth - $i }}
-                </div>
-                @endfor
+                <div wire:loading.class="opacity-40" wire:target="prevMonth,nextMonth,goToday" class="grid grid-cols-7 gap-y-1 auto-rows-fr min-h-82 text-sm transition-opacity duration-200">
+                    @for ($i = $startDay - 1; $i >= 0; $i--)
+                    <div class="size-11 m-auto flex items-center justify-center text-zinc-300">
+                        {{ $daysInPrevMonth - $i }}
+                    </div>
+                    @endfor
 
-                @for ($day = 1; $day <= $daysInMonth; $day++) @php $date=$currentMonth->copy()->day($day);
-                    $dateString = $date->toDateString();
-                    $isToday = $date->isToday();
-                    $isSelected = $selectedDate === $dateString;
-                    $hasEvent = isset($this->eventDates[$dateString]);
-                    @endphp
+                    @for ($day = 1; $day <= $daysInMonth; $day++) @php $date=$currentMonth->copy()->day($day);
+                        $dateString = $date->toDateString();
+                        $isToday = $date->isToday();
+                        $isSelected = $selectedDate === $dateString;
+                        $hasEvent = isset($this->eventDates[$dateString]);
+                        @endphp
 
-                    <button type="button" wire:click="selectDate('{{ $dateString }}')" wire:key="d-{{ $dateString }}" class="relative cursor-pointer size-11 m-auto flex items-center justify-center rounded-full transition
+                        <button type="button" wire:click="selectDate('{{ $dateString }}')" wire:key="d-{{ $dateString }}" class="relative cursor-pointer size-11 m-auto flex items-center justify-center rounded-full transition
                             {{ $isSelected ? 'bg-violet-600 text-white font-semibold shadow-sm shadow-violet-200'
                                 : ($isToday ? 'ring-1 ring-violet-400 text-violet-700 font-semibold'
                                 : 'text-zinc-700 hover:bg-zinc-100') }}">
-                        {{ $day }}
-                        @if ($hasEvent && ! $isSelected)
-                        <span class="absolute bottom-1 size-1 w-5 rounded-sm bg-violet-500"></span>
-                        @endif
-                    </button>
-                    @endfor
+                            {{ $day }}
+                            @if ($hasEvent && ! $isSelected)
+                            <span class="absolute bottom-1 size-1 w-5 rounded-sm bg-violet-500"></span>
+                            @endif
+                        </button>
+                        @endfor
 
-                    @for ($i = 1; $i <= $nextDays; $i++) <div class="size-11 m-auto flex items-center justify-center text-zinc-300">{{ $i }}</div>
-            @endfor
-                </div>
+                        @for ($i = 1; $i <= $nextDays; $i++) <div class="size-11 m-auto flex items-center justify-center text-zinc-300">{{ $i }}</div>
+                @endfor
             </div>
         </div>
+    </div>
 
-        {{-- Event List --}}
-        <div wire:target="prevMonth,nextMonth,goToday"
-        class="min-w-0 p-5 lg:col-span-2 bg-zinc-50/40 transition-opacity duration-200">
+    {{-- Event List --}}
+    <div wire:target="prevMonth,nextMonth,goToday" class="min-w-0 p-5 lg:col-span-2 bg-zinc-50/40 transition-opacity duration-200">
         @php
         $selected = Carbon::parse($selectedDate);
         @endphp
@@ -342,32 +340,32 @@ new class extends Component
                                         Teams :
                                     </span>
                                     @endif
-                                @php
+                                    @php
                                     $supportCount = count($event['team_user']);
-                                @endphp
-                                @if($supportCount > 0 || ! empty($event['user_name']))
-                                <flux:avatar.group>
-                                    @if(! empty($event['user_name']))
+                                    @endphp
+                                    @if($supportCount > 0 || ! empty($event['user_name']))
+                                    <flux:avatar.group>
+                                        @if(! empty($event['user_name']))
                                         <flux:tooltip content="Pembuat: {{ $event['user_name'] }}">
                                             <flux:avatar size="xs" circle name="{{ $event['user_name'] }}" color="auto" color:seed="{{ $event['user_name'] }}" class="ring-2 ring-violet-400" />
                                         </flux:tooltip>
-                                    @endif
-                                    @foreach (array_slice($event['team_user'], 0, 4) as $user)
+                                        @endif
+                                        @foreach (array_slice($event['team_user'], 0, 4) as $user)
                                         @php $label = $user['name'] ?? $user['user_id']; @endphp
                                         <flux:tooltip wire:key="team-{{ $event['id'] }}-{{ $user['user_id'] }}" content="{{ $label }}">
                                             <flux:avatar size="xs" circle name="{{ $label }}" color="auto" color:seed="{{ $user['user_id'] }}" />
                                         </flux:tooltip>
-                                    @endforeach
+                                        @endforeach
 
-                                    @if($supportCount > 4)
+                                        @if($supportCount > 4)
                                         <flux:tooltip content="{{ collect(array_slice($event['team_user'], 4))->map(fn ($u) => $u['name'] ?? $u['user_id'])->implode(', ') }}">
                                             <flux:avatar circle size="xs" class="ring-2 ring-white">
                                                 +{{ $supportCount - 4 }}
                                             </flux:avatar>
                                         </flux:tooltip>
+                                        @endif
+                                    </flux:avatar.group>
                                     @endif
-                                </flux:avatar.group>
-                                @endif
                                 </div>
                             </div>
                         </div>
@@ -392,5 +390,4 @@ new class extends Component
         <flux:icon name="arrow-right" class="size-3.5" />
     </a>
 </div>
-</div>
-</div>
+
