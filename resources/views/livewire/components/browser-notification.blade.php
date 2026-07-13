@@ -19,7 +19,7 @@ new class extends Component {
             $subscription['keys']['p256dh'] ?? null,
             $subscription['keys']['auth'] ?? null,
             'aes128gcm',
-        );
+        )->forceFill(['user_agent' => request()->userAgent()])->save();
     }
 }; ?>
 

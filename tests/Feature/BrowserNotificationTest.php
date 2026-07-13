@@ -17,7 +17,8 @@ test('the subscribe action stores a push subscription for the logged-in user', f
         ->assertHasNoErrors();
 
     expect($user->pushSubscriptions()->count())->toBe(1)
-        ->and($user->pushSubscriptions()->first()->endpoint)->toBe('https://push.example.com/endpoint-1');
+        ->and($user->pushSubscriptions()->first()->endpoint)->toBe('https://push.example.com/endpoint-1')
+        ->and($user->pushSubscriptions()->first()->user_agent)->not->toBeNull();
 });
 
 test('subscribing twice with the same endpoint does not duplicate the subscription', function () {
