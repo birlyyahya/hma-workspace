@@ -10,9 +10,12 @@ use App\Services\IzinWriter;
 use App\Services\ProjectCache;
 use App\Services\ProjectWriter;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
+use NotificationChannels\WebPush\Events\NotificationFailed;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -54,6 +57,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Event::listen(NotificationFailed::class, function (NotificationFailed $event) {
+            Log::warning('Web push rejected', [
+                'subscription_id' => $event->subscription->id,
+                'user_id' => $event->subscription->subscribable_id,
+                'endpoint_host' => parse_url($event->report->getEndpoint(), PHP_URL_HOST),
+                'status' => $event->report->getResponse()?->getStatusCode(),
+                'reason' => $event->report->getReason(),
+            ]);
+        });
 
         Gate::define('viewPulse', function (User $user) {
             return $user->hasRole('super-admin') || $user->hasPermission('view.pulse');
