@@ -819,7 +819,7 @@ new class extends Component {
 </section>
 
 {{-- ── Form modal (create / edit) ── --}}
-<flux:modal name="spd-form-modal" class="min-w-xs overflow-auto max-sm:max-h-[85dvh] md:min-w-3xl lg:min-w-4xl">
+<flux:modal name="spd-form-modal" class="min-w-xs w-xs sm:w-sm md:w-md lg:w-4xl overflow-auto max-sm:max-h-[85dvh] md:min-w-3xl lg:min-w-4xl">
     <form
         wire:submit="saveSpd"
         class="space-y-4 sm:space-y-5"

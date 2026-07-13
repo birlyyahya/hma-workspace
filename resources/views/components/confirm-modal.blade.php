@@ -8,7 +8,7 @@
     'cancelLabel' => 'Batal',
     'variant' => 'danger',
     'icon' => 'trash',
-    'width' => 'md:w-110',
+    'width' => 'w-xs sm:w-sm md:w-110',
 ])
 
 {{--
@@ -34,7 +34,7 @@
             </div>
             <div class="min-w-0 flex-1 space-y-1">
                 <flux:heading size="lg">{{ $title }}</flux:heading>
-                <flux:text class="text-sm text-zinc-600 dark:text-zinc-400">
+                <flux:text class="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400">
                     {{ $slot->isEmpty() ? $description : $slot }}
                 </flux:text>
             </div>

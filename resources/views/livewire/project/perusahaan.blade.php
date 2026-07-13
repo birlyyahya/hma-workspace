@@ -374,7 +374,7 @@ new #[Lazy]  class extends Component {
         @endif
 
         {{-- Create / Edit Modal --}}
-        <flux:modal wire:model="showForm" class="md:w-[640px]">
+        <flux:modal wire:model="showForm" class="w-xs md:w-[640px]">
             <div class="space-y-6">
                 <div>
                     <flux:heading size="lg">{{ $isEdit ? 'Edit Perusahaan' : 'Tambah Perusahaan' }}</flux:heading>
