@@ -1075,43 +1075,8 @@ class extends Component
                         </flux:modal.trigger>
                     </header>
 
-                    @php
-                        $sortedComments = collect($comments)
-                            ->sortBy(fn ($c) => ! empty($c['created_at']) ? Carbon::parse($c['created_at'])->timestamp : 0)
-                            ->values();
-                    @endphp
-
-                    {{-- Comment list --}}
-                    <div x-ref="commentList" class="divide-y divide-zinc-100">
-                        @forelse ($sortedComments as $c)
-                            @include('livewire.dar.partials.comment-item', [
-                                'c' => $c,
-                                'cu' => $commentUsers[$c['user_id']] ?? null,
-                                'isOwn' => ($c['user_id'] ?? null) === Auth::id() || Auth::user()->level >= 90,
-                                'isEditing' => $editingCommentId !== null && isset($c['id']) && $editingCommentId === $c['id'],
-                            ])
-                        @empty
-                            <div class="px-5 py-10 text-center">
-                                <div class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-zinc-100 text-zinc-400">
-                                    <flux:icon name="chat-bubble-left-right" class="h-6 w-6" />
-                                </div>
-                                <p class="text-sm font-medium text-zinc-700">Belum ada komentar</p>
-                                <p class="mt-1 text-xs text-zinc-500">Mulai diskusi dengan menulis komentar pertama.</p>
-                            </div>
-                        @endforelse
-
-                        {{-- Loading skeleton --}}
-                        <div wire:loading.flex wire:target="addComment" class="hidden gap-3 px-5 py-4">
-                            <div class="h-8 w-8 shrink-0 animate-pulse rounded-full bg-zinc-100"></div>
-                            <div class="flex-1 space-y-2">
-                                <div class="h-3 w-24 animate-pulse rounded bg-zinc-100"></div>
-                                <div class="h-10 w-3/4 animate-pulse rounded-xl bg-zinc-100"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {{-- ── Compose ── --}}
-                    <div class="border-t border-zinc-100 px-5 py-4">
+                    {{-- ── Compose (di atas list, ala Instagram) ── --}}
+                    <div class="border-b border-zinc-100 px-5 py-4">
                         <div
                             x-data="{ dragging: false }"
                             @dragover.prevent="dragging = true"
@@ -1200,6 +1165,41 @@ class extends Component
                         <p class="mt-2 text-[11px] text-zinc-400">
                             Drag &amp; drop file ke area di atas, atau klik <span class="font-medium">Attach</span>. Max 10MB per file.
                         </p>
+                    </div>
+
+                    @php
+                        $sortedComments = collect($comments)
+                            ->sortByDesc(fn ($c) => ! empty($c['created_at']) ? Carbon::parse($c['created_at'])->timestamp : 0)
+                            ->values();
+                    @endphp
+
+                    {{-- Comment list (terbaru paling atas) --}}
+                    <div x-ref="commentList" class="divide-y divide-zinc-100">
+                        {{-- Loading skeleton --}}
+                        <div wire:loading.flex wire:target="addComment" class="hidden gap-3 px-5 py-4">
+                            <div class="h-8 w-8 shrink-0 animate-pulse rounded-full bg-zinc-100"></div>
+                            <div class="flex-1 space-y-2">
+                                <div class="h-3 w-24 animate-pulse rounded bg-zinc-100"></div>
+                                <div class="h-10 w-3/4 animate-pulse rounded-xl bg-zinc-100"></div>
+                            </div>
+                        </div>
+
+                        @forelse ($sortedComments as $c)
+                            @include('livewire.dar.partials.comment-item', [
+                                'c' => $c,
+                                'cu' => $commentUsers[$c['user_id']] ?? null,
+                                'isOwn' => ($c['user_id'] ?? null) === Auth::id() || Auth::user()->level >= 90,
+                                'isEditing' => $editingCommentId !== null && isset($c['id']) && $editingCommentId === $c['id'],
+                            ])
+                        @empty
+                            <div class="px-5 py-10 text-center">
+                                <div class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-zinc-100 text-zinc-400">
+                                    <flux:icon name="chat-bubble-left-right" class="h-6 w-6" />
+                                </div>
+                                <p class="text-sm font-medium text-zinc-700">Belum ada komentar</p>
+                                <p class="mt-1 text-xs text-zinc-500">Mulai diskusi dengan menulis komentar pertama.</p>
+                            </div>
+                        @endforelse
                     </div>
                 </section>
 
@@ -1413,11 +1413,11 @@ class extends Component
                     const list = this.$refs.commentList;
                     if (!list) return;
                     const items = list.querySelectorAll('article');
-                    const last = items[items.length - 1];
-                    if (last) {
-                        last.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        last.classList.add('ring-2', 'ring-zinc-300');
-                        setTimeout(() => last.classList.remove('ring-2', 'ring-zinc-300'), 1500);
+                    const latest = items[0];
+                    if (latest) {
+                        latest.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        latest.classList.add('ring-2', 'ring-zinc-300');
+                        setTimeout(() => latest.classList.remove('ring-2', 'ring-zinc-300'), 1500);
                     }
                 });
             },
