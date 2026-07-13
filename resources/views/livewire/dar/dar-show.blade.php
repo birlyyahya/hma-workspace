@@ -1246,7 +1246,7 @@ class extends Component
                         ->values();
                 @endphp
 
-                <flux:modal name="activity-log-flyout" flyout class="w-full sm:max-w-md">
+                <flux:modal name="activity-log-flyout" class="w-xl" flyout>
                     <div class="space-y-6">
                         <div>
                             <flux:heading size="lg">Riwayat Perubahan</flux:heading>
@@ -1254,15 +1254,9 @@ class extends Component
                         </div>
 
                         @if ($sortedLogs->isEmpty())
-                            <div class="rounded-xl bg-zinc-50 px-4 py-8 text-center">
-                                <div class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-zinc-100 text-zinc-400">
-                                    <flux:icon name="clock" class="h-6 w-6" />
-                                </div>
-                                <p class="text-sm font-medium text-zinc-700">Belum ada riwayat perubahan</p>
-                                <p class="mt-1 text-xs text-zinc-500">Setiap perubahan pada task akan tercatat di sini.</p>
-                            </div>
+                            <p class="py-4 text-center text-sm text-zinc-400">Belum ada riwayat perubahan.</p>
                         @else
-                            <ol class="relative ms-2.5 space-y-6 border-s-2 border-zinc-100 ps-6">
+                            <ol>
                                 @foreach ($sortedLogs as $log)
                                     @php
                                         $logAt = ! empty($log['created_at']) ? Carbon::parse($log['created_at']) : null;
@@ -1280,37 +1274,45 @@ class extends Component
                                         };
                                     @endphp
 
-                                    <li wire:key="flyout-log-{{ $log['id'] ?? 'i'.$loop->index }}" class="relative">
-                                        <span class="absolute -start-9.5 top-0 grid h-6 w-6 place-items-center rounded-full bg-white ring-2 ring-zinc-200">
-                                            <flux:icon name="{{ $iconName }}" class="h-3.5 w-3.5 text-zinc-500" />
+                                    <li wire:key="flyout-log-{{ $log['id'] ?? 'i'.$loop->index }}" class="relative flex gap-3 pb-6 last:pb-0">
+                                        {{-- Stepper connector --}}
+                                        @unless ($loop->last)
+                                            <span class="absolute start-3.5 top-8 bottom-0 w-px bg-zinc-200"></span>
+                                        @endunless
+
+                                        {{-- Stepper node --}}
+                                        <span class="z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-zinc-100 ring-1 ring-zinc-200">
+                                            <flux:icon name="{{ $iconName }}" class="h-3.5 w-3.5 text-zinc-600" />
                                         </span>
 
-                                        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                                            <p class="text-sm font-semibold text-zinc-900">{{ $label }}</p>
-                                            @if ($logAt)
-                                                <span class="text-xs text-zinc-400" title="{{ $logAt->format('d M Y, H:i') }}">{{ $logAt->diffForHumans() }}</span>
+                                        <div class="min-w-0 flex-1 pt-1">
+                                            <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                                <p class="text-sm font-medium text-zinc-900">{{ $label }}</p>
+                                                @if ($logAt)
+                                                    <span class="text-xs text-zinc-500" title="{{ $logAt->format('d M Y, H:i') }}">{{ $logAt->diffForHumans() }}</span>
+                                                @endif
+                                            </div>
+
+                                            @if (! empty($changes) && is_array($changes))
+                                                <div class="mt-2 space-y-2">
+                                                    @foreach ($changes as $field => $diff)
+                                                        @php
+                                                            $fieldLabel = $fieldLabels[$field] ?? \Illuminate\Support\Str::headline($field);
+                                                            $oldVal = $formatLogValue($field, $diff['old'] ?? null);
+                                                            $newVal = $formatLogValue($field, $diff['new'] ?? null);
+                                                        @endphp
+                                                        <div class="rounded-lg border border-zinc-200 p-3">
+                                                            <p class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{{ $fieldLabel }}</p>
+                                                            <div class="mt-1.5 flex flex-col items-start gap-1 text-xs">
+                                                                <span class="rounded bg-red-50 px-2 py-1 text-red-600 line-through decoration-red-300">{{ $oldVal }}</span>
+                                                                <flux:icon name="arrow-down" class="ms-2 h-3 w-3 text-zinc-400" />
+                                                                <span class="rounded bg-emerald-50 px-2 py-1 text-emerald-700">{{ $newVal }}</span>
+                                                            </div>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
                                             @endif
                                         </div>
-
-                                        @if (! empty($changes) && is_array($changes))
-                                            <div class="mt-2 space-y-2">
-                                                @foreach ($changes as $field => $diff)
-                                                    @php
-                                                        $fieldLabel = $fieldLabels[$field] ?? \Illuminate\Support\Str::headline($field);
-                                                        $oldVal = $formatLogValue($field, $diff['old'] ?? null);
-                                                        $newVal = $formatLogValue($field, $diff['new'] ?? null);
-                                                    @endphp
-                                                    <div class="rounded-xl bg-zinc-50 p-3 ring-1 ring-zinc-100">
-                                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{{ $fieldLabel }}</p>
-                                                        <div class="mt-1.5 flex flex-col items-start gap-1 text-xs">
-                                                            <span class="rounded bg-red-50 px-2 py-1 text-red-600 line-through decoration-red-300">{{ $oldVal }}</span>
-                                                            <flux:icon name="arrow-down" class="ms-2 h-3 w-3 text-zinc-400" />
-                                                            <span class="rounded bg-emerald-50 px-2 py-1 text-emerald-700">{{ $newVal }}</span>
-                                                        </div>
-                                                    </div>
-                                                @endforeach
-                                            </div>
-                                        @endif
                                     </li>
                                 @endforeach
                             </ol>
