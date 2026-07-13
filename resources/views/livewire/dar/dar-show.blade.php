@@ -1272,17 +1272,22 @@ class extends Component
                                             'deleted' => 'trash',
                                             default => 'pencil-square',
                                         };
+                                        $nodeColor = match ($action) {
+                                            'created' => 'bg-emerald-50 text-emerald-600 ring-emerald-200',
+                                            'deleted' => 'bg-red-50 text-red-600 ring-red-200',
+                                            default => 'bg-blue-50 text-blue-600 ring-blue-200',
+                                        };
                                     @endphp
 
                                     <li wire:key="flyout-log-{{ $log['id'] ?? 'i'.$loop->index }}" class="relative flex gap-3 pb-6 last:pb-0">
                                         {{-- Stepper connector --}}
                                         @unless ($loop->last)
-                                            <span class="absolute start-3.5 top-8 bottom-0 w-px bg-zinc-200"></span>
+                                            <span class="absolute start-3.5 top-8 bottom-1 w-px bg-zinc-200"></span>
                                         @endunless
 
                                         {{-- Stepper node --}}
-                                        <span class="z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-zinc-100 ring-1 ring-zinc-200">
-                                            <flux:icon name="{{ $iconName }}" class="h-3.5 w-3.5 text-zinc-600" />
+                                        <span class="z-10 grid h-7 w-7 shrink-0 place-items-center rounded-full ring-1 {{ $nodeColor }}">
+                                            <flux:icon name="{{ $iconName }}" class="h-3.5 w-3.5" />
                                         </span>
 
                                         <div class="min-w-0 flex-1 pt-1">
@@ -1294,19 +1299,19 @@ class extends Component
                                             </div>
 
                                             @if (! empty($changes) && is_array($changes))
-                                                <div class="mt-2 space-y-2">
+                                                <div class="mt-2 divide-y divide-zinc-100 overflow-hidden rounded-lg border border-zinc-200">
                                                     @foreach ($changes as $field => $diff)
                                                         @php
                                                             $fieldLabel = $fieldLabels[$field] ?? \Illuminate\Support\Str::headline($field);
                                                             $oldVal = $formatLogValue($field, $diff['old'] ?? null);
                                                             $newVal = $formatLogValue($field, $diff['new'] ?? null);
                                                         @endphp
-                                                        <div class="rounded-lg border border-zinc-200 p-3">
-                                                            <p class="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{{ $fieldLabel }}</p>
-                                                            <div class="mt-1.5 flex flex-col items-start gap-1 text-xs">
-                                                                <span class="rounded bg-red-50 px-2 py-1 text-red-600 line-through decoration-red-300">{{ $oldVal }}</span>
-                                                                <flux:icon name="arrow-down" class="ms-2 h-3 w-3 text-zinc-400" />
-                                                                <span class="rounded bg-emerald-50 px-2 py-1 text-emerald-700">{{ $newVal }}</span>
+                                                        <div class="flex flex-col gap-1.5 px-3 py-2.5 sm:flex-row sm:items-baseline sm:gap-3">
+                                                            <span class="w-28 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">{{ $fieldLabel }}</span>
+                                                            <div class="flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
+                                                                <span class="rounded-md bg-red-50 px-2 py-0.5 text-red-600 line-through decoration-red-300 ring-1 ring-red-100">{{ $oldVal }}</span>
+                                                                <flux:icon name="arrow-right" class="h-3 w-3 shrink-0 text-zinc-400" />
+                                                                <span class="rounded-md bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700 ring-1 ring-emerald-100">{{ $newVal }}</span>
                                                             </div>
                                                         </div>
                                                     @endforeach
