@@ -1246,7 +1246,7 @@ class extends Component
                         ->values();
                 @endphp
 
-                <flux:modal name="activity-log-flyout" class="w-xl" flyout>
+                <flux:modal name="activity-log-flyout" class="w-md" flyout>
                     <div class="space-y-6">
                         <div>
                             <flux:heading size="lg">Riwayat Perubahan</flux:heading>

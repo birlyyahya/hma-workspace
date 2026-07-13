@@ -310,7 +310,7 @@ new class extends Component {
                 <div class="relative" style="min-width: {{ $totalWidth }}px;">
 
                     {{-- HOURS HEADER --}}
-                    <div class="sticky top-0 z-20 flex border-b border-slate-200/70 bg-slate-50/80 backdrop-blur" style="height: {{ $headerHeight }}px;">
+                    <div class="sticky top-0 z-10 flex border-b border-slate-200/70 bg-slate-50/80 backdrop-blur" style="height: {{ $headerHeight }}px;">
                         @foreach($hours as $hour)
                             <div class="flex shrink-0 items-center justify-center text-[11px] font-semibold uppercase tracking-wide text-slate-500" style="width: {{ $hourWidth }}px;">
                                 {{ $hour }}
