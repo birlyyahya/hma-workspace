@@ -2,6 +2,7 @@
 
 use App\Notifications\DarCommentReceived;
 use App\Services\DarCache;
+use App\Services\DarNotifier;
 use App\Services\DarWriter;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
@@ -179,6 +180,14 @@ new class extends Component {
         $newStatus = $todo['status'] == 1 ? 4 : 1;
 
         app(DarWriter::class)->updateStatus((int) $id, $newStatus);
+
+        if ($newStatus === 4) {
+            $detail = app(DarCache::class)->activity((int) $id)['data'] ?? [];
+
+            if (! empty($detail)) {
+                app(DarNotifier::class)->activityClosed($detail, (int) Auth::id());
+            }
+        }
 
         Toaster::success('Todo status updated');
 

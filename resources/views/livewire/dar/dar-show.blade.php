@@ -3,6 +3,7 @@
 use App\Models\User;
 use App\Notifications\DarCommentReceived;
 use App\Services\DarCache;
+use App\Services\DarNotifier;
 use App\Services\DarWriter;
 use App\Services\ProjectCache;
 use Carbon\Carbon;
@@ -305,6 +306,8 @@ class extends Component
             ]);
 
             if ($result['ok']) {
+                $wasClosed = (int) ($this->task['status'] ?? 0) === 4;
+
                 $this->task = [
                     ...$this->task,
                     'activity' => $this->editActivity,
@@ -317,6 +320,10 @@ class extends Component
                     'project_id' => $projectId,
                     'project_category_id' => $categoryId,
                 ];
+                if (! $wasClosed && (int) $this->editStatus === 4) {
+                    app(DarNotifier::class)->activityClosed([...$this->task, 'id' => (int) $this->id], (int) Auth::id());
+                }
+
                 $this->editing = false;
                 $this->loadLogs();
                 Toaster::success('Task updated successfully!');
@@ -345,7 +352,13 @@ class extends Component
         $result = app(DarWriter::class)->updateStatus((int) $this->id, 4);
 
         if ($result['ok']) {
+            $wasClosed = (int) ($this->task['status'] ?? 0) === 4;
             $this->task['status'] = 4;
+
+            if (! $wasClosed) {
+                app(DarNotifier::class)->activityClosed([...$this->task, 'id' => (int) $this->id], (int) Auth::id());
+            }
+
             Toaster::success('Task marked as done!');
 
             return;

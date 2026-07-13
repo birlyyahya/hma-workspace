@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Notifications\SpdApproved;
 use App\Services\IzinCache;
 use App\Services\IzinWriter;
 use App\Services\SpdPdfComposer;
@@ -366,6 +367,12 @@ new class extends Component {
             }
 
             NotificationService::send($user, 'SPD Anda sudah disetujui, silakan cek email Anda.', $data);
+
+            $user->notify(new SpdApproved(
+                spdId: (int) ($data['id'] ?? $this->editingId ?? 0),
+                task: (string) ($data['task'] ?? $this->task ?? ''),
+                destination: (string) ($data['destination'] ?? $this->destination ?? ''),
+            ));
         } catch (\Throwable $e) {
             Log::error('SPD notify exception', ['message' => $e->getMessage()]);
         }

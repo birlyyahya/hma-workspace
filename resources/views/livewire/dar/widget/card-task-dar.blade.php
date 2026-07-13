@@ -3,6 +3,7 @@
 use App\Livewire\Forms\ActivityForm;
 use App\Models\User;
 use App\Services\DarCache;
+use App\Services\DarNotifier;
 use App\Services\DarWriter;
 use App\Services\ProjectCache;
 use Flux\Flux;
@@ -349,6 +350,13 @@ new class extends Component {
         }
 
         Toaster::success('Create Activity successfully');
+
+        app(DarNotifier::class)->activityCreated([
+            'id' => $result['body']['data']['id'] ?? 0,
+            'activity' => $this->form->activity,
+            'user_id' => Auth::id(),
+            'team_user' => ! empty($this->form->team_user) ? $this->form->team_user : ($this->form->team ?? []),
+        ], (int) Auth::id());
 
         $this->resetForm();
         $this->projectSelected = null;
