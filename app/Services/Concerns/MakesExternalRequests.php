@@ -13,8 +13,8 @@ trait MakesExternalRequests
      * - Timeout default pendek (3s) — read seharusnya cepat.
      * - Retry 5xx + connection error (aman karena GET idempotent).
      *
-     * Untuk endpoint dengan payload besar (mis. DarCache::list perPage=1M),
-     * panggil dengan timeout custom: $this->externalRead(timeout: 15).
+     * Untuk endpoint dengan payload besar, panggil dengan timeout custom:
+     * $this->externalRead(timeout: 15).
      */
     protected function externalRead(int $timeout = 3, int $connect = 2, ?string $token = null): PendingRequest
     {

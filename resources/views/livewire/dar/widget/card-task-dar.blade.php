@@ -124,6 +124,17 @@ new class extends Component {
         $this->fetchTasks();
     }
 
+    /**
+     * Filter status di sisi server (API DARBE mendukung single-status). Refetch
+     * dari halaman pertama agar pagination + total akurat per status; tab
+     * project/non-project tetap di client (API tak bisa memfilter project_id null).
+     */
+    public function setStatus(string $status): void
+    {
+        $this->statusFilter = $status;
+        $this->fetchTasks();
+    }
+
     public function updatedProjectSelected(): void
     {
         $this->timelines = app(ProjectCache::class)->timelines((int) $this->projectSelected);
@@ -155,6 +166,10 @@ new class extends Component {
 
         if ($this->search !== '') {
             $params['search'] = $this->search;
+        }
+
+        if ($this->statusFilter !== 'all') {
+            $params['status'] = $this->statusFilter;
         }
 
         if (Auth::user()->viewScopeFor('dar') === 'all') {
@@ -446,22 +461,14 @@ new class extends Component {
 
     <section x-data="{
         tab: @js($tab),
-        status: @js($statusFilter),
-        counts: { all: 0, 1: 0, 2: 0, 3: 0, 4: 0 },
         visible: 0,
         filter() {
-            const c = { all: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
             let vis = 0;
             this.$root.querySelectorAll('[data-dar-card]').forEach(el => {
-                const s = el.dataset.status;
                 const isProject = el.dataset.type === 'project';
                 const inTab = this.tab === 'all' || (this.tab === 'project' && isProject) || (this.tab === 'nonproject' && !isProject);
-                if (!inTab) { return; }
-                c.all++;
-                c[s] = (c[s] ?? 0) + 1;
-                if (this.status === 'all' || this.status === s) { vis++; }
+                if (inTab) { vis++; }
             });
-            this.counts = c;
             this.visible = vis;
         },
         switchTab(next) {
@@ -579,30 +586,22 @@ new class extends Component {
                 </div>
             </div>
 
-            {{-- Status pills dengan counter --}}
-            <div class="flex flex-wrap items-center gap-2">
-              @foreach ($statusOptions as $key => $opt)
-    <button
-        type="button"
-        @click="status = '{{ $key }}'; filter()"
-        class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 transition"
-        :class="status === '{{ $key }}'
-            ? '{{ $opt['active'] }} shadow-sm'
-            : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'">
-
-        <span>{{ $opt['label'] }}</span>
-
-        <span
-            class="rounded-full px-1.5 text-[10px] font-bold"
-            :class="status === '{{ $key }}' ? 'bg-white/25' : 'bg-slate-100'"
-            @if($key === 'all')
-                x-text="$wire.total"
-            @else
-                x-text="counts['{{ $key }}'] ?? 0"
-            @endif
-        ></span>
-    </button>
-@endforeach
+            {{-- Status pills — filter server-side (single-status), total akurat per filter --}}
+            <div class="flex flex-wrap items-center gap-2" wire:target="setStatus" wire:loading.class="opacity-60 pointer-events-none">
+                @foreach ($statusOptions as $key => $opt)
+                    @php $isActiveStatus = (string) $statusFilter === (string) $key; @endphp
+                    <button type="button" wire:click="setStatus('{{ $key }}')"
+                        @class([
+                            'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 transition',
+                            $opt['active'].' shadow-sm' => $isActiveStatus,
+                            'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50' => ! $isActiveStatus,
+                        ])>
+                        <span>{{ $opt['label'] }}</span>
+                        @if ($isActiveStatus)
+                            <span class="rounded-full bg-white/25 px-1.5 text-[10px] font-bold">{{ $total }}</span>
+                        @endif
+                    </button>
+                @endforeach
             </div>
         </header>
 
@@ -612,7 +611,7 @@ new class extends Component {
                 Loading tasks...
             </div>
             @else
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" wire:loading.remove wire:target="fetchTasks">
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" wire:loading.remove wire:target="fetchTasks, setStatus, projectFilter, userFilter">
                 @php
                     $projectMap = collect($allProjects)->keyBy('id');
                     $userMap = collect($allUsers)->keyBy('id');
@@ -645,23 +644,23 @@ new class extends Component {
 
                 $taskProjectId = $task['project_id'] ?? null;
                 $taskProjectName = $taskProjectId ? ($projectMap[$taskProjectId]['name'] ?? 'Project') : null;
-                $ownerName = $isSuperadmin && ! empty($task['user_id']) ? ($userMap[$task['user_id']]['name'] ?? null) : null;
+                $ownerName = ! empty($task['user_id'])
+                        ? ($userMap[$task['user_id']]['name'] ?? null)
+                        : null;
                 @endphp
 
                 <article wire:key="dar-card-{{ $taskId }}"
                     x-data="{ menuOpen: false }"
                     data-dar-card
-                    data-status="{{ $status }}"
                     data-type="{{ $taskProjectId ? 'project' : 'nonproject' }}"
-                    wire:key='{{ $taskProjectId }}'
-                    x-show="(tab === 'all' || (tab === 'project' ? {{ $taskProjectId ? 'true' : 'false' }} : !{{ $taskProjectId ? 'true' : 'false' }})) && (status === 'all' || status === '{{ $status }}')"
-                    class="group relative overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/70 shadow-sm transition hover:z-50 hover:-translate-y-0.5 hover:shadow-lg hover:ring-slate-300/70">
+                    x-show="tab === 'all' || (tab === 'project' ? {{ $taskProjectId ? 'true' : 'false' }} : !{{ $taskProjectId ? 'true' : 'false' }})"
+                    class="group relative flex h-full flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200/70 shadow-sm transition hover:z-50 hover:-translate-y-0.5 hover:shadow-lg hover:ring-slate-300/70">
                     <a href="{{ $taskUrl }}" wire:navigate class="absolute inset-0 z-0" aria-label="Open task"></a>
 
                     {{-- Top status accent --}}
                     <div class="h-1 w-full bg-linear-to-r {{ $statusMeta['accent'] }}"></div>
 
-                    <div class="p-5">
+                    <div class="flex flex-1 flex-col p-5">
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0 relative z-10">
                                 <div class="flex flex-wrap items-center gap-2">
@@ -680,10 +679,14 @@ new class extends Component {
                                         </span>
                                     @endif
                                 </div>
-
-                                <a href="{{ $taskUrl }}" wire:navigate class="mt-1.5 block text-base font-semibold leading-snug text-slate-900 line-clamp-1 group-hover:text-slate-950">
-                                    {{ ucwords($task['activity'] ?? 'Untitled task') }}
-                                </a>
+                                 <flux:tooltip>
+                                    <a href="{{ $taskUrl }}" wire:navigate class="mt-1.5 block text-base !line-clamp-2 font-semibold leading-snug text-slate-900 group-hover:text-slate-950">
+                                        {{ ucwords($task['activity'] ?? 'Untitled task') }}
+                                    </a>
+                                    <flux:tooltip.content class="!max-w-[21rem] space-y-2">
+                                        {{ ucwords($task['activity'] ?? 'Untitled task') }}
+                                    </flux:tooltip.content>
+                                </flux:tooltip>
                                 <a href="{{ $taskUrl }}" wire:navigate class="mt-1 block text-sm leading-relaxed text-slate-500 line-clamp-1 truncate">
                                     {{ strip_tags($task['description'])  ?? 'Tidak ada deskripsi.' }}
                                 </a>
@@ -754,33 +757,41 @@ new class extends Component {
                         </div>
                     </div>
 
-                    <footer class="relative z-10 flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3">
-                        <div class="flex -space-x-2">
-                            @php
-                                $maxVisible = 4;
-                                $visible = array_slice($assignees, 0, $maxVisible);
-                                $remaining = count($assignees) - $maxVisible;
-                            @endphp
-
-                            @foreach($visible as $assignee)
-                                <flux:avatar name="{{ $assignee }}" circle class="size-7 text-xs ring-2 ring-white" />
-                            @endforeach
-
-                            @if($remaining > 0)
-                                <flux:avatar circle class="size-7 text-[11px] font-semibold ring-2 ring-white bg-slate-100 text-slate-600">
-                                    +{{ $remaining }}
-                                </flux:avatar>
+                    <footer class="relative z-10 mt-auto flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-3">
+                        {{-- Anggota tim --}}
+                        @php
+                            $maxVisible = 3;
+                            $visibleAssignees = array_slice($assignees, 0, $maxVisible);
+                            $remaining = count($assignees) - $maxVisible;
+                        @endphp
+                        <div class="flex shrink-0 items-center">
+                            @if (count($assignees) > 0)
+                                <div class="flex -space-x-2">
+                                    @foreach($visibleAssignees as $assignee)
+                                        <flux:avatar name="{{ $assignee }}" circle class="size-7 text-xs ring-2 ring-white" />
+                                    @endforeach
+                                    @if($remaining > 0)
+                                        <flux:avatar circle class="size-7 text-[11px] font-semibold ring-2 ring-white bg-slate-100 text-slate-600">
+                                            +{{ $remaining }}
+                                        </flux:avatar>
+                                    @endif
+                                </div>
+                            @else
+                                <span class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-300">
+                                    <flux:icon name="user-plus" class="h-3.5 w-3.5" />
+                                    Tanpa anggota
+                                </span>
                             @endif
                         </div>
 
-                        <div class="flex items-center gap-3">
-                            @if ($ownerName)
-                                <span class="inline-flex max-w-32 items-center gap-1 truncate text-[11px] font-medium text-slate-500">
-                                    <flux:icon name="user" class="h-3 w-3 shrink-0" />
-                                    <span class="truncate">{{ $ownerName }}</span>
-                                </span>
-                            @endif
-                            <span class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400">
+                        {{-- Pembuat + waktu buat --}}
+                        <div class="flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-slate-400">
+                            <span class="inline-flex min-w-0 items-center gap-1">
+                                <flux:icon name="user" class="h-3 w-3 shrink-0" />
+                                <span class="truncate">{{ $ownerName }}</span>
+                            </span>
+                            <span class="shrink-0 text-slate-300">·</span>
+                            <span class="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
                                 <flux:icon name="clock" class="h-3 w-3" />
                                 {{ \Carbon\Carbon::parse($task['start_date'])->subHours(2)->diffForHumans() }}
                             </span>
@@ -811,7 +822,7 @@ new class extends Component {
                 @endif
             </div>
             @endif
-            <div class="w-1/3" wire:loading wire:target="fetchTasks">
+            <div class="w-1/3" wire:loading wire:target="fetchTasks, setStatus, projectFilter, userFilter">
                 <div class="rounded-2xl bg-white ring-1 ring-slate-200/70 shadow-sm animate-pulse">
                     <div class="p-5">
                         <div class="flex items-start justify-between gap-3">

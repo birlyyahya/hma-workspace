@@ -44,14 +44,14 @@ test('fetchTasks loads tasks and visibleTasks preserves the API order', function
     expect($statuses)->toBe([4, 1, 2]);
 });
 
-test('fetchTasks requests the first page with perPage 20', function () {
+test('fetchTasks requests the first page with perPage 21', function () {
     Http::fake(['*global/dar/list*' => Http::response(['data' => []])]);
 
     Volt::actingAs(User::factory()->create())
         ->test('dar.widget.card-task-dar');
 
     Http::assertSent(fn ($request) => str_contains($request->url(), 'global/dar/list')
-        && ($request->data()['perPage'] ?? null) === 20
+        && ($request->data()['perPage'] ?? null) === 21
         && ($request->data()['page'] ?? null) === 1);
 });
 
@@ -169,6 +169,36 @@ test('selecting a project filter sends project_id to the API', function () {
 
     Http::assertSent(fn ($request) => str_contains($request->url(), 'global/dar/list')
         && ($request->data()['project_id'] ?? null) === '77');
+});
+
+test('setStatus filters by status server-side and resets to the first page', function () {
+    Http::fake(['*global/dar/list*' => Http::response(['data' => []])]);
+
+    Volt::actingAs(User::factory()->create())
+        ->test('dar.widget.card-task-dar')
+        ->call('loadMore') // bump the page so we can prove setStatus resets it
+        ->call('setStatus', '1');
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'global/dar/list')
+        && ($request->data()['status'] ?? null) === '1'
+        && ($request->data()['page'] ?? null) === 1);
+});
+
+test('the all status filter omits the status param and toggling updates the state', function () {
+    Http::fake(['*global/dar/list*' => Http::response(['data' => []])]);
+
+    $component = Volt::actingAs(User::factory()->create())
+        ->test('dar.widget.card-task-dar');
+
+    // Default state is "all" → the mount request must not carry a status.
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'global/dar/list')
+        && ! array_key_exists('status', $request->data()));
+
+    $component->call('setStatus', '3');
+    expect($component->get('statusFilter'))->toBe('3');
+
+    $component->call('setStatus', 'all');
+    expect($component->get('statusFilter'))->toBe('all');
 });
 
 test('fetchTasks forwards the current search term to the API', function () {
