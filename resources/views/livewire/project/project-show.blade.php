@@ -154,7 +154,7 @@ new #[Lazy] class extends Component {
         >
             {{-- ============ STICKY HEADER ============ --}}
             <div class="bg-white/90 backdrop-blur ">
-                <div class="px-0 sm:px-6 pt-4 pb-4">
+                <div class="px-0 sm:px-6 pt-4 pb-4 rounded-xl">
                     {{-- Breadcrumb --}}
                     <nav class="flex items-center gap-1.5 text-xs text-zinc-500 mb-3">
                         @if(!Auth::user()->level >= 60)
@@ -270,7 +270,7 @@ new #[Lazy] class extends Component {
 
                 </div>
             </div>
-            <div class="md:sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-zinc-200 px-0 sm:px-6 pb-0">
+            <div class="md:sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-zinc-200 shadow-sm rounded-xl px-0 sm:px-6 pb-0">
                 {{-- ============ TAB NAVIGATION ============ --}}
                 <nav class=" -mb-px flex items-center gap-1 overflow-x-auto">
                     @foreach($tabs as $tab)
@@ -290,7 +290,7 @@ new #[Lazy] class extends Component {
             </div>
 
             {{-- ============ TAB CONTENT ============ --}}
-            <div class="px-0 py-4 sm:px-6 sm:py-6">
+            <div class="px-0 py-4 sm:py-6">
                 <div x-show="active === 'overview'" wire:key="overview-{{ $this->id }}" x-transition.opacity.duration.150ms>
                     <livewire:project.components.project-overview-tabs defer :project="$this->project" />
                 </div>

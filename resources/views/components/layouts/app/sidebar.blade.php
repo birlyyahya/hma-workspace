@@ -34,9 +34,9 @@
             <flux:sidebar.item icon="envelope" :href="route('izin')" :current="request()->routeIs('izin') || request()->routeIs('izin.show') || request()->routeIs('izin.laporan-pengajuan')" wire:navigate >
                 Izin
             </flux:sidebar.item>
-            <flux:sidebar.item icon="shopping-cart" :href="route('pengajuan-barang')" :current="request()->routeIs('pengajuan-barang') || request()->routeIs('pengajuan-barang.*')" wire:navigate>
+            {{-- <flux:sidebar.item icon="shopping-cart" :href="route('pengajuan-barang')" :current="request()->routeIs('pengajuan-barang') || request()->routeIs('pengajuan-barang.*')" wire:navigate>
                 Pengajuan Barang
-            </flux:sidebar.item>
+            </flux:sidebar.item> --}}
         </flux:sidebar.nav>
 
         <flux:spacer />

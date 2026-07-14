@@ -1077,7 +1077,7 @@ class extends Component
                     </header>
 
                     {{-- ── Compose (di atas list, ala Instagram) ── --}}
-                    <div class="border-b border-zinc-100 px-4 py-4 sm:px-5">
+                    <div class="border-b border-zinc-100 px-4 py-4">
                         <div
                             x-data="{ dragging: false }"
                             @dragover.prevent="dragging = true"
@@ -1257,7 +1257,7 @@ class extends Component
                         @if ($sortedLogs->isEmpty())
                             <p class="py-4 text-center text-sm text-zinc-400">Belum ada riwayat perubahan.</p>
                         @else
-                            <ol>
+                            <ol class="!p-0">
                                 @foreach ($sortedLogs as $log)
                                     @php
                                         $logAt = ! empty($log['created_at']) ? Carbon::parse($log['created_at']) : null;
