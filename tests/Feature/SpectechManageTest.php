@@ -55,7 +55,7 @@ test('a queued draft can be removed', function () {
 
 test('save sends all drafts to the bulk endpoint and clears the queue', function () {
     Http::fake([
-        '*spekteks/bulk' => Http::response(['status' => 201], 201),
+        '*spekteks/bulkCreate' => Http::response(['status' => 201], 201),
     ]);
 
     $this->actingAs(User::factory()->create());
@@ -75,11 +75,12 @@ test('save sends all drafts to the bulk endpoint and clears the queue', function
         ->assertCount('drafts', 0)
         ->assertDispatched('spectechSaved');
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), 'spekteks/bulk')
-        && (int) $request['project_id'] === 42
-        && count($request['items']) === 2
-        && $request['items'][0]['type'] === 'hardware'
-        && $request['items'][1]['type'] === 'software');
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'spekteks/bulkCreate')
+        && count($request->data()) === 2
+        && (int) $request->data()[0]['project_id'] === 42
+        && $request->data()[0]['type'] === 'hardware'
+        && (int) $request->data()[0]['qty_recived'] === 0
+        && $request->data()[1]['type'] === 'software');
 });
 
 test('save does nothing when the queue is empty', function () {

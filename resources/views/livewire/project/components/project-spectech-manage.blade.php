@@ -113,18 +113,16 @@ new class extends Component {
             return;
         }
 
-        $payload = [
-            'project_id' => $this->id,
-            'items'      => array_map(fn (array $item): array => [
-                'name'          => $item['name'],
-                'qty_total'     => $item['quantity'],
-                'total_nominal' => $item['price'],
-                'type'          => $item['type'],
-            ], $this->drafts),
-        ];
+        $payload = array_map(fn (array $item): array => [
+            'name'          => $item['name'],
+            'type'          => $item['type'],
+            'qty_total'     => $item['quantity'],
+            'qty_recived'   => 0,
+            'total_nominal' => $item['price'],
+            'note'          => $item['note'],
+            'project_id'    => (int) $this->id,
+        ], $this->drafts);
 
-        // TODO: endpoint bulk belum tersedia di BEPM. Payload sudah disiapkan
-        // sesuai kontrak per-item agar tinggal dihubungkan saat API siap.
         $result = app(ProjectWriter::class)->bulkSpectech((int) $this->id, $payload);
 
         if (! $result['ok']) {

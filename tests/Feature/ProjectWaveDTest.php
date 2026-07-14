@@ -46,7 +46,7 @@ test('spectech-tabs deleteSpectech sends the DELETE through ProjectWriter', func
 
 test('spectech-manage save posts the bulk payload through ProjectWriter', function () {
     Http::fake([
-        '*spekteks/bulk' => Http::response(['status' => 200], 200),
+        '*spekteks/bulkCreate' => Http::response(['status' => 200], 200),
     ]);
     $this->actingAs(User::factory()->create());
 
@@ -57,6 +57,6 @@ test('spectech-manage save posts the bulk payload through ProjectWriter', functi
         ->call('save');
 
     Http::assertSent(fn ($request) => $request->method() === 'POST'
-        && str_ends_with($request->url(), '/spekteks/bulk')
-        && $request['project_id'] === 100);
+        && str_ends_with($request->url(), '/spekteks/bulkCreate')
+        && (int) $request->data()[0]['project_id'] === 100);
 });

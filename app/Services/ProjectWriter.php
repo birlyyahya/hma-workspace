@@ -346,15 +346,17 @@ class ProjectWriter
     }
 
     /**
-     * Simpan spektek massal. Sukses = HTTP 2xx.
+     * Simpan spektek massal lewat endpoint bulkCreate. Payload berupa LIST
+     * item (bukan objek) sesuai kontrak API: tiap item berisi name, type,
+     * qty_total, qty_recived, total_nominal, project_id. Sukses = HTTP 2xx.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<int, array<string, mixed>>  $payload
      * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
      */
     public function bulkSpectech(int $projectId, array $payload): array
     {
         try {
-            $response = $this->externalWrite(timeout: 30)->post($this->apiBase.'/spekteks/bulk', $payload);
+            $response = $this->externalWrite(timeout: 30)->post($this->apiBase.'/spekteks/bulkCreate', $payload);
             $body = (array) $response->json();
 
             return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushSpectech($projectId), [
