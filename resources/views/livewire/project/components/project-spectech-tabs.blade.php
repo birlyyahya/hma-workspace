@@ -1070,7 +1070,7 @@ new class extends Component {
                                         <td colspan="5" class="p-0">
                                             {{-- x-collapse pada div block agar tinggi bisa dianimasikan (tak bisa di <tr>) --}}
                                             <div x-show="openId === {{ (int) $data['id'] }}" x-collapse x-cloak>
-                                                <div class="ml-3 rounded-xl px-4 pb-5 pt-0 space-y-4">
+                                                <div class="ml-3 rounded-xl px-4 pb-5 pt-4 md:pt-3 space-y-4">
                                                 <div class="flex items-center justify-between gap-3">
                                                     <p class="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-zinc-500">
                                                         <flux:icon.squares-2x2 class="w-3.5 h-3.5" />
@@ -1199,7 +1199,6 @@ new class extends Component {
                             $qtyTotal = (int) ($data['qty_total'] ?? 0);
                             $percentage = (float) ($data['percentage'] ?? 0);
                             $isComplete = $percentage >= 100;
-                            $statusLabel = $isComplete ? 'Selesai' : ($qtyRecv > 0 ? 'Berjalan' : 'Belum Mulai');
                             $statusColor = $isComplete
                                 ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
                                 : ($qtyRecv > 0 ? 'bg-amber-50 text-amber-700 ring-amber-600/20' : 'bg-zinc-50 text-zinc-600 ring-zinc-500/20');
@@ -1236,9 +1235,6 @@ new class extends Component {
                                 <div class="min-w-0 flex-1">
                                     <p class="font-medium text-zinc-900 truncate">{{ $data['name'] }}</p>
                                     <div class="flex items-center gap-1.5 flex-wrap mt-1">
-                                        <span class="inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full ring-1 ring-inset {{ $statusColor }}">
-                                            {{ $statusLabel }}
-                                        </span>
                                         @if($subCount > 0)
                                             <span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-medium rounded-full bg-zinc-100 text-zinc-600">
                                                 <flux:icon.squares-2x2 class="w-3 h-3" />
