@@ -219,7 +219,8 @@ class ProjectCache
     /**
      * Daftar spektek (activity categories) milik satu project — sumber kanonik
      * untuk tab Spektek & ringkasan Overview. Endpoint terpaginasi, jadi ambil
-     * semua sekaligus dengan limit besar.
+     * semua sekaligus dengan limit besar. Sub spektek ikut disematkan
+     * (with_sub=true) sehingga panel expand tidak perlu hit API terpisah.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -240,45 +241,11 @@ class ProjectCache
                 }, throw: false)
                 ->get($this->apiBase.'/spekteks/search', [
                     'project_id' => $projectId,
+                    'with_sub' => 'true',
                     'limit' => 99999,
                 ])->json('data') ?? [];
         } catch (ConnectionException $e) {
             Log::warning('ProjectCache spectechFor gagal', ['project_id' => $projectId, 'error' => $e->getMessage()]);
-
-            return [];
-        }
-
-        Cache::tags($tags)->put($key, $data, self::TTL_USER);
-
-        return $data;
-    }
-
-    /**
-     * Daftar sub spektek milik satu spektek — dipakai panel expand di tab
-     * Spektek. Ikut tag TAG_SPECTECH agar flush spektek juga membuang sub.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    public function subSpectechFor(int $spektekId): array
-    {
-        $tags = [self::TAG_SPECTECH, "subspectech:spektek:{$spektekId}"];
-        $key = "subspectech:spektek:{$spektekId}";
-
-        if (is_array($cached = Cache::tags($tags)->get($key))) {
-            return $cached;
-        }
-
-        try {
-            $data = Http::timeout(15)
-                ->retry(2, 200, function ($e) {
-                    return $e instanceof ConnectionException
-                        || (method_exists($e, 'response') && optional($e->response)->serverError());
-                }, throw: false)
-                ->get($this->apiBase.'/sub-spekteks/search', [
-                    'spektek_id' => $spektekId,
-                ])->json('data') ?? [];
-        } catch (ConnectionException $e) {
-            Log::warning('ProjectCache subSpectechFor gagal', ['spektek_id' => $spektekId, 'error' => $e->getMessage()]);
 
             return [];
         }

@@ -5,12 +5,14 @@ use Illuminate\Support\Facades\Http;
 use Livewire\Volt\Volt;
 
 /**
+ * Sub spektek tersemat di response spekteks/search (with_sub=true), jadi
+ * tidak ada fake untuk endpoint baca sub — hanya endpoint tulisnya.
+ *
  * @param  array<int, array<string, mixed>>  $subs
  */
 function fakeSubSpectechApi(array $subs = []): void
 {
     Http::fake([
-        '*sub-spekteks/search*' => Http::response(['status' => 200, 'data' => $subs], 200),
         '*sub-spekteks/*' => Http::response(['status' => 200, 'data' => []], 200),
         '*sub-spekteks' => Http::response(['status' => 201, 'data' => []], 201),
         '*spekteks/search*' => Http::response(['status' => 200, 'data' => [
@@ -26,6 +28,7 @@ function fakeSubSpectechApi(array $subs = []): void
                 'detail' => '',
                 'images' => [],
                 'type' => 'hardware',
+                'sub_spekteks' => $subs,
             ],
         ]], 200),
     ]);
@@ -48,7 +51,7 @@ function subSpectechItem(): array
     ];
 }
 
-test('expanding a row lazy-loads its sub spekteks', function () {
+test('expanding a row shows subs embedded in the spektek payload without extra API hits', function () {
     fakeSubSpectechApi([subSpectechItem()]);
 
     $this->actingAs(User::factory()->create());
@@ -58,14 +61,16 @@ test('expanding a row lazy-loads its sub spekteks', function () {
         'id' => 1,
         'progress' => 0,
     ])
+        ->assertSee('1 sub')
         ->call('toggleExpand', 5)
         ->assertSet('expandedId', 5)
         ->assertSet('showSubForm', false)
         ->assertCount('subItems', 1)
         ->assertSee('Device Finder');
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), 'sub-spekteks/search')
-        && (int) $request['spektek_id'] === 5);
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'spekteks/search')
+        && str_contains($request->url(), 'with_sub=true'));
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'sub-spekteks/search'));
 });
 
 test('expanding the same row again collapses the panel', function () {

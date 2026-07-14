@@ -87,15 +87,37 @@ new class extends Component {
             'id'            => $data['id'],
             'name'          => $data['name'],
             'qty_total'     => $data['qty_total'],
-            'qty_recived'   => $data['qty_received'],
+            'qty_recived'   => $data['qty_received'] ?? 0,
             'total_nominal' => $data['total_nominal'],
             'qty_nominal'   => $data['qty_nominal'],
-            'percentage'    => $data['progress_percentage'],
+            'percentage'    => $data['progress_percentage'] ?? 0,
             'note'          => $data['note'],
             'detail'        => $data['detail'] ?? '',
             'images'        => $data['images'] ?? [],
             // Field type belum tersedia dari API; default hardware sampai backend menambahkan kolom ini.
             'type'          => $data['type'] ?? 'hardware',
+            // Sub spektek disematkan lewat spekteks/search?with_sub=true.
+            'subs'          => array_map(
+                fn (array $sub): array => $this->mapSubItem($sub),
+                $data['sub_spekteks'] ?? [],
+            ),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @return array<string, mixed>
+     */
+    protected function mapSubItem(array $item): array
+    {
+        return [
+            'id'                  => $item['id'],
+            'name'                => $item['name'] ?? '',
+            'qty_total'           => (int) ($item['qty_total'] ?? 0),
+            'qty_received'        => (int) ($item['qty_received'] ?? 0),
+            'total_nominal'       => (float) ($item['total_nominal'] ?? 0),
+            'progress_percentage' => (float) ($item['progress_percentage'] ?? 0),
+            'type'                => $item['type'] ?? 'hardware',
         ];
     }
 
@@ -310,6 +332,10 @@ new class extends Component {
         }
     }
 
+    /**
+     * Sub sudah tersemat di data spektek (with_sub=true), jadi cukup ambil
+     * dari memori tanpa hit API tambahan.
+     */
     protected function loadSubItems(): void
     {
         if ($this->expandedId === null) {
@@ -318,17 +344,20 @@ new class extends Component {
             return;
         }
 
-        $data = app(ProjectCache::class)->subSpectechFor((int) $this->expandedId);
+        $item = collect($this->spectech)->firstWhere('id', $this->expandedId);
 
-        $this->subItems = array_map(fn (array $item): array => [
-            'id'                  => $item['id'],
-            'name'                => $item['name'] ?? '',
-            'qty_total'           => (int) ($item['qty_total'] ?? 0),
-            'qty_received'        => (int) ($item['qty_received'] ?? 0),
-            'total_nominal'       => (float) ($item['total_nominal'] ?? 0),
-            'progress_percentage' => (float) ($item['progress_percentage'] ?? 0),
-            'type'                => $item['type'] ?? 'hardware',
-        ], $data);
+        $this->subItems = $item['subs'] ?? [];
+    }
+
+    /**
+     * Setelah mutasi sub, cache spektek parent dibuang agar sematan sub
+     * terbaca ulang dari API pada request yang sama.
+     */
+    protected function refreshSubs(): void
+    {
+        app(ProjectCache::class)->flushSpectech((int) $this->id);
+        $this->loadSpectech();
+        $this->loadSubItems();
     }
 
     /**
@@ -394,7 +423,7 @@ new class extends Component {
 
         Toaster::success($this->subEditId !== null ? 'Sub spektek berhasil diperbarui' : 'Sub spektek berhasil ditambahkan');
         $this->resetSubForm();
-        $this->loadSubItems();
+        $this->refreshSubs();
     }
 
     public function editSub(int $id): void
@@ -431,7 +460,7 @@ new class extends Component {
 
         if ($result['ok']) {
             Toaster::success('Sub spektek berhasil dihapus');
-            $this->loadSubItems();
+            $this->refreshSubs();
         } else {
             Toaster::error('Gagal menghapus sub spektek');
         }
@@ -460,7 +489,7 @@ new class extends Component {
             Toaster::error('Gagal memperbarui jumlah diterima');
         }
 
-        $this->loadSubItems();
+        $this->refreshSubs();
     }
 
     public function showDetail(int $id): void
@@ -990,6 +1019,7 @@ new class extends Component {
                                     $isSelected = in_array((int) $data['id'], array_map('intval', $selectedIds), true);
                                     $hasDetail = ! empty($data['detail']);
                                     $isExpanded = ! $bulkMode && $expandedId === (int) $data['id'];
+                                    $subCount = count($data['subs'] ?? []);
                                 @endphp
                                 <tr wire:key="spectech-row-{{ $data['id'] }}"
                                     @class([
@@ -1017,7 +1047,15 @@ new class extends Component {
                                                 ]) />
                                             @endunless
                                             <div class="min-w-0">
-                                                <p class="font-medium text-zinc-900">{{ $data['name'] }}</p>
+                                                <div class="flex items-center gap-2 flex-wrap">
+                                                    <p class="font-medium text-zinc-900">{{ $data['name'] }}</p>
+                                                    @if($subCount > 0)
+                                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-medium rounded-full bg-zinc-100 text-zinc-600">
+                                                            <flux:icon.squares-2x2 class="w-3 h-3" />
+                                                            {{ $subCount }} sub
+                                                        </span>
+                                                    @endif
+                                                </div>
                                                 @if(!empty($data['note']))
                                                     <p class="text-xs text-zinc-500 mt-0.5 truncate max-w-md" title="{{ $data['note'] }}">
                                                         {{ $data['note'] }}
@@ -1185,6 +1223,7 @@ new class extends Component {
                             $isSelected = in_array((int) $data['id'], array_map('intval', $selectedIds), true);
                             $hasDetail = ! empty($data['detail']);
                             $isExpanded = ! $bulkMode && $expandedId === (int) $data['id'];
+                            $subCount = count($data['subs'] ?? []);
                         @endphp
                         <div wire:key="spectech-mobile-{{ $data['id'] }}"
                             @class([
@@ -1212,6 +1251,12 @@ new class extends Component {
                                     <span class="inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full ring-1 ring-inset {{ $statusColor }}">
                                         {{ $statusLabel }}
                                     </span>
+                                    @if($subCount > 0)
+                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-medium rounded-full bg-zinc-100 text-zinc-600">
+                                            <flux:icon.squares-2x2 class="w-3 h-3" />
+                                            {{ $subCount }} sub
+                                        </span>
+                                    @endif
                                 </div>
                                 <p class="text-xs text-zinc-500 mt-1">
                                     {{ $qtyTotal }} × Rp {{ number_format($data['qty_nominal'] ?? 0, 0, ',', '.') }}
