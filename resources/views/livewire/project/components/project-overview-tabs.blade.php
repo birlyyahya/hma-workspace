@@ -74,14 +74,14 @@ new class extends Component {
 
 <div>
     <div class="bg-zinc-50/50 min-h-screen">
-        <div class="grid grid-cols-12 gap-6">
+        <div class="grid grid-cols-12 gap-4 md:gap-6">
 
             {{-- ============ LEFT COLUMN ============ --}}
-            <div class="col-span-12 lg:col-span-8 space-y-6">
+            <div class="col-span-12 lg:col-span-8 space-y-4 md:space-y-6">
 
                 {{-- HERO HEADER --}}
                 <div class="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
-                    <div class="bg-linear-to-br from-red-600 to-red-700 px-8 py-6 text-white">
+                    <div class="bg-linear-to-br from-red-600 to-red-700 px-4 py-5 sm:px-8 sm:py-6 text-white">
                         <div class="flex items-start justify-between gap-4">
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2 flex-wrap">
@@ -195,7 +195,7 @@ new class extends Component {
                 </div>
 
                 {{-- TIMELINE PROGRESS --}}
-                <div class="bg-white rounded-2xl border border-zinc-200 p-6">
+                <div class="bg-white rounded-2xl border border-zinc-200 p-4 sm:p-6">
                     <div class="flex items-center justify-between mb-4">
                         <div>
                             <flux:heading size="sm" class="font-semibold text-zinc-900">Timeline Proyek</flux:heading>
@@ -244,7 +244,7 @@ new class extends Component {
                 </div>
 
                 {{-- COMPANY INFO --}}
-                <div class="bg-white rounded-2xl border border-zinc-200 p-6">
+                <div class="bg-white rounded-2xl border border-zinc-200 p-4 sm:p-6">
                     <flux:heading size="sm" class="font-semibold text-zinc-900 mb-4">Informasi Perusahaan</flux:heading>
 
                     <div class="flex items-start gap-4">
@@ -274,7 +274,7 @@ new class extends Component {
                 </div>
 
                 {{-- SPECTECH SUMMARY --}}
-                <div class="bg-white rounded-2xl border border-zinc-200 p-6">
+                <div class="bg-white rounded-2xl border border-zinc-200 p-4 sm:p-6">
                     <div class="flex items-center justify-between mb-4">
                         <div>
                             <flux:heading size="sm" class="font-semibold text-zinc-900">
@@ -335,10 +335,10 @@ new class extends Component {
             </div>
 
             {{-- ============ RIGHT COLUMN ============ --}}
-            <div class="col-span-12 lg:col-span-4 space-y-6">
+            <div class="col-span-12 lg:col-span-4 space-y-4 md:space-y-6">
 
                 {{-- PROJECT LEADER --}}
-                <div class="bg-white rounded-2xl border border-zinc-200 p-6 space-y-3">
+                <div class="bg-white rounded-2xl border border-zinc-200 p-4 sm:p-6 space-y-3">
                     <div class="flex items-center justify-between mb-4">
                         <flux:heading size="sm" class="font-semibold text-zinc-900">Project Leader</flux:heading>
                     </div>
@@ -372,7 +372,7 @@ new class extends Component {
                 </div>
 
                 {{-- TEAM SUPPORT --}}
-                <div class="bg-white rounded-2xl border border-zinc-200 p-6">
+                <div class="bg-white rounded-2xl border border-zinc-200 p-4 sm:p-6">
                     <div class="flex items-center justify-between mb-4">
                         <div>
                             <flux:heading size="sm" class="font-semibold text-zinc-900">Tim Pendukung</flux:heading>
@@ -440,7 +440,7 @@ new class extends Component {
                 </div>
 
                 {{-- METADATA --}}
-                <div class="bg-white rounded-2xl border border-zinc-200 p-6">
+                <div class="bg-white rounded-2xl border border-zinc-200 p-4 sm:p-6">
                     <flux:heading size="sm" class="font-semibold text-zinc-900 mb-4">Metadata</flux:heading>
 
                     <dl class="space-y-3 text-sm">

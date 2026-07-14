@@ -188,7 +188,7 @@ new #[Lazy]  class extends Component {
     }
 }; ?>
 
-<div class="space-y-6 max-h-screen overflow-auto px-2 py-4">
+<div class="space-y-4 md:space-y-6 max-h-screen overflow-auto px-0 py-4">
 
     {{-- Header --}}
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

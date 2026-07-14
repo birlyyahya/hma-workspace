@@ -281,7 +281,7 @@ new class extends Component {
     }
 }; ?>
 
-<div class="space-y-6">
+<div class="space-y-4 md:space-y-6">
     {{-- TOOLBAR --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div class="relative w-full sm:max-w-sm">
@@ -307,7 +307,7 @@ new class extends Component {
 
     {{-- TIM INTERNAL --}}
     <section class="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 overflow-hidden">
-        <header class="flex items-center justify-between gap-3 px-5 py-4 border-b border-zinc-200 dark:border-zinc-700 bg-linear-to-r from-blue-50/60 to-transparent dark:from-blue-500/5">
+        <header class="flex items-center justify-between gap-3 px-4 sm:px-5 py-4 border-b border-zinc-200 dark:border-zinc-700 bg-linear-to-r from-blue-50/60 to-transparent dark:from-blue-500/5">
             <div class="flex items-center gap-3 min-w-0">
                 <div class="shrink-0 w-10 h-10 rounded-xl bg-linear-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm shadow-blue-500/20">
                     <flux:icon name="users" class="w-5 h-5 text-white" />
@@ -329,7 +329,7 @@ new class extends Component {
             @endif
         </header>
 
-        <div class="p-5">
+        <div class="p-4 sm:p-5">
             @if (count($this->searchResults['internal']) > 0)
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     @foreach ($this->searchResults['internal'] as $tim)
@@ -338,7 +338,7 @@ new class extends Component {
                             class="group relative overflow-hidden rounded-2xl border border-zinc-200/80 dark:border-zinc-700/80 bg-white dark:bg-zinc-800/40 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/10 hover:border-blue-300 dark:hover:border-blue-500/40"
                         >
                             {{-- Decorative gradient blob --}}
-                            <div class="pointer-events-none absolute -top-12 -right-12 w-32 h-32 rounded-full bg-linear-to-br from-blue-400/20 to-indigo-500/10 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                            <div class="pointer-events-none absolute -top-12 -right-12 w-32 h-32 rounded-full bg-linear-to-br from-blue-400/20 to-indigo-500/10 blur-2xl opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-500"></div>
 
                             {{-- Top accent bar --}}
                             <div class="h-1 w-full bg-linear-to-r from-blue-500 via-indigo-500 to-blue-500"></div>
@@ -346,7 +346,7 @@ new class extends Component {
                             <div class="relative p-4">
                                 {{-- Action menu (top-right) --}}
                                 @if ($this->canManage())
-                                <div class="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div class="absolute top-3 right-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                     <flux:dropdown align="end">
                                         <flux:button size="xs" variant="ghost" icon="ellipsis-horizontal" inset />
                                         <flux:menu>
@@ -427,7 +427,7 @@ new class extends Component {
 
     {{-- TIM PENDUKUNG --}}
     <section class="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 overflow-hidden">
-        <header class="flex items-center justify-between gap-3 px-5 py-4 border-b border-zinc-200 dark:border-zinc-700 bg-linear-to-r from-amber-50/60 to-transparent dark:from-amber-500/5">
+        <header class="flex items-center justify-between gap-3 px-4 sm:px-5 py-4 border-b border-zinc-200 dark:border-zinc-700 bg-linear-to-r from-amber-50/60 to-transparent dark:from-amber-500/5">
             <div class="flex items-center gap-3 min-w-0">
                 <div class="shrink-0 w-10 h-10 rounded-xl bg-linear-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-sm shadow-amber-500/20">
                     <flux:icon name="briefcase" class="w-5 h-5 text-white" />
@@ -449,7 +449,7 @@ new class extends Component {
             @endif
         </header>
 
-        <div class="p-5">
+        <div class="p-4 sm:p-5">
             @if (count($this->searchResults['timduk']) > 0)
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     @foreach ($this->searchResults['timduk'] as $tim)
@@ -457,13 +457,13 @@ new class extends Component {
                             wire:key="timduk-{{ md5($tim) }}"
                             class="group relative overflow-hidden rounded-2xl border border-zinc-200/80 dark:border-zinc-700/80 bg-white dark:bg-zinc-800/40 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-amber-500/10 hover:border-amber-300 dark:hover:border-amber-500/40"
                         >
-                            <div class="pointer-events-none absolute -top-12 -right-12 w-32 h-32 rounded-full bg-linear-to-br from-amber-400/20 to-orange-500/10 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                            <div class="pointer-events-none absolute -top-12 -right-12 w-32 h-32 rounded-full bg-linear-to-br from-amber-400/20 to-orange-500/10 blur-2xl opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-500"></div>
 
                             <div class="h-1 w-full bg-linear-to-r from-amber-500 via-orange-500 to-amber-500"></div>
 
                             <div class="relative p-4">
                                 @if ($this->canManage())
-                                <div class="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div class="absolute top-3 right-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                     <flux:dropdown align="end">
                                         <flux:button size="xs" variant="ghost" icon="ellipsis-horizontal" inset />
                                         <flux:menu>
@@ -538,7 +538,7 @@ new class extends Component {
     </section>
 
     {{-- MODAL: INVITE INTERNAL (searchable list, no select2) --}}
-    <flux:modal name="invite-internal-modal" class="w-md" @close="$wire.set('userSearch', '')">
+    <flux:modal name="invite-internal-modal" class="w-full max-w-md max-sm:max-h-[85dvh] overflow-auto" @close="$wire.set('userSearch', '')">
         <div class="space-y-5">
             {{-- Header --}}
             <div class="flex items-start gap-3">
@@ -673,7 +673,7 @@ new class extends Component {
     </flux:modal>
 
     {{-- MODAL: INVITE PPK --}}
-    <flux:modal name="invite-ppk-modal" class="w-md">
+    <flux:modal name="invite-ppk-modal" class="w-full max-w-md max-sm:max-h-[85dvh] overflow-auto">
         <div class="space-y-5">
             <div class="flex items-start gap-3">
                 <div class="shrink-0 w-10 h-10 rounded-xl bg-linear-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-sm shadow-amber-500/20">

@@ -306,11 +306,11 @@ new class extends Component {
 
  ?>
 
-<div class="space-y-6">
+<div class="space-y-4 md:space-y-6">
     <div class="bg-white border rounded-2xl overflow-hidden">
 
         {{-- HEADER --}}
-        <div class="flex items-center justify-between px-6 py-4 border-b">
+        <div class="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-6 py-4 border-b">
             <div class="flex items-center gap-3">
                 <flux:icon name="calendar-days" class="w-5 h-5 text-gray-400" />
                 <h2 class="text-base font-semibold">Project Timeline</h2>
@@ -373,7 +373,7 @@ new class extends Component {
         @endphp
 
         @if(count($monthTimelines))
-        <div class="px-6 py-4 border-b bg-white">
+        <div class="px-4 sm:px-6 py-4 border-b bg-white">
             <p class="text-xs uppercase tracking-wide text-gray-400 mb-2">Timeline aktif</p>
             <div class="flex flex-wrap gap-2">
                 @foreach($monthTimelines as $tl)
@@ -385,7 +385,7 @@ new class extends Component {
                         –
                         {{ Carbon::parse($tl['end_date'])->locale('id')->translatedFormat('d M Y') }}
                     </span>
-                    <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition">
+                    <div class="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition">
                         <flux:tooltip content="Edit">
                             <button type="button" wire:click="openEditTimeline({{ $tl['id'] }})" class="p-1 rounded-full hover:bg-gray-200 text-gray-500">
                                 <flux:icon name="pencil-square" class="size-3.5" />
@@ -404,7 +404,7 @@ new class extends Component {
         @endif
 
         {{-- ACTIVITY LIST (vertical timeline) --}}
-        <div class="px-6 py-6 bg-white">
+        <div class="px-4 py-5 sm:px-6 sm:py-6 bg-white">
             @if(count($monthActivities))
             <ol class="relative border-l border-gray-200 ml-3 space-y-6">
                 @foreach($monthActivities as $activity)

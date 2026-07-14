@@ -5,7 +5,7 @@
             {{ __('Projects') }}
         </h2>
     </x-slot>
-    <div class="max-h-screen overflow-auto px-2 py-4">
+    <div class="max-h-screen overflow-auto px-0 py-4">
         <livewire:project.project-cards lazy />
     </div>
 

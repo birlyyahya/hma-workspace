@@ -38,7 +38,7 @@ class extends Component {
 }; ?>
 
 <div>
-    <div class="min-h-screen bg-linear-to-b from-slate-50 to-slate-100/60 px-4 py-8 sm:px-6 lg:px-10">
+    <div class="min-h-screen bg-linear-to-b from-slate-50 to-slate-100/60 px-3 py-6 sm:px-6 sm:py-8 lg:px-10">
         <div class="mx-auto max-w-5xl">
 
             {{-- Toolbar --}}
@@ -105,7 +105,7 @@ class extends Component {
             @else
                 {{-- COVER --}}
                 <article class="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200/70">
-                    <div class="relative bg-linear-to-r from-slate-900 via-slate-800 to-slate-900 px-8 py-10 text-white sm:px-10">
+                    <div class="relative bg-linear-to-r from-slate-900 via-slate-800 to-slate-900 px-5 py-8 sm:px-10 sm:py-10 text-white">
                         <div class="flex flex-wrap items-start justify-between gap-4">
                             <div class="min-w-0">
                                 <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">Project Preview</p>
@@ -136,7 +136,7 @@ class extends Component {
                     </div>
 
                     {{-- BODY --}}
-                    <div class="grid grid-cols-1 gap-8 p-8 sm:p-10 lg:grid-cols-3">
+                    <div class="grid grid-cols-1 gap-6 p-5 sm:gap-8 sm:p-10 lg:grid-cols-3">
 
                         {{-- Main info --}}
                         <div class="space-y-8 lg:col-span-2">

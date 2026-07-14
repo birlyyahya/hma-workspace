@@ -334,7 +334,7 @@ new class extends Component
 
     @if(! $this->loading)
         {{-- ============ STORAGE HEADER ============ --}}
-        <div class="bg-white border border-zinc-200 rounded-2xl p-5 mb-6">
+        <div class="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 mb-4 md:mb-6">
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div class="flex items-center gap-4">
                     <div class="shrink-0 w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center ring-1 ring-red-100">
@@ -354,6 +354,7 @@ new class extends Component
                     <flux:button
                         icon="cloud-arrow-up"
                         variant="primary"
+                        class="w-full md:w-auto"
                         x-on:click="window.dispatchEvent(new CustomEvent('upload-modal-opened'));"
                     >
                         Upload File
@@ -373,7 +374,7 @@ new class extends Component
         </div>
 
         {{-- ============ MAIN GRID ============ --}}
-        <div x-data="{ folder: 'Semua File' }" class="grid lg:grid-cols-4 grid-cols-1 gap-6">
+        <div x-data="{ folder: 'Semua File' }" class="grid lg:grid-cols-4 grid-cols-1 gap-4 md:gap-6">
 
             {{-- ============ FOLDER SIDEBAR ============ --}}
             <aside class="bg-white border border-zinc-200 rounded-2xl p-4 h-fit">
@@ -413,7 +414,7 @@ new class extends Component
             {{-- ============ FILES PANEL ============ --}}
             <div class="lg:col-span-3 bg-white border border-zinc-200 rounded-2xl">
                 {{-- Toolbar --}}
-                <div class="px-5 py-4 border-b border-zinc-200">
+                <div class="px-4 sm:px-5 py-4 border-b border-zinc-200">
                     <div class="flex items-center justify-between gap-3 flex-wrap">
                         <h2 class="text-base font-semibold text-zinc-900" x-text="folder"></h2>
                         <div class="flex items-center gap-2 flex-wrap">
@@ -483,7 +484,7 @@ new class extends Component
                                     </div>
                                 </div>
 
-                                <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                                <div class="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition">
                                     <flux:modal.trigger name="viewModal">
                                         <flux:button
                                             wire:click="$set('selectId', [{{ $item['id'] }}])"
@@ -600,7 +601,7 @@ new class extends Component
                 </div>
 
                 @if($isPdf)
-                    <iframe src="{{ $viewUrl }}" class="w-full rounded-xl border border-zinc-200 h-150" frameborder="0"></iframe>
+                    <iframe src="{{ $viewUrl }}" class="w-full rounded-xl border border-zinc-200 h-[65dvh] sm:h-150" frameborder="0"></iframe>
                 @elseif($isImage)
                     <div class="flex items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 p-4 min-h-75">
                         <img src="{{ $viewUrl }}" alt="{{ $viewFile['title'] }}"
@@ -627,7 +628,7 @@ new class extends Component
     </flux:modal>
 
     {{-- ============ UPLOAD MODAL ============ --}}
-    <flux:modal id="upload-file-modal" name="upload-file-modal" wire:close="resetViewModal" class="overflow-visible max-w-xl w-xl" enctype="multipart/form-data">
+    <flux:modal id="upload-file-modal" name="upload-file-modal" wire:close="resetViewModal" class="overflow-visible w-full max-w-xl" enctype="multipart/form-data">
         <form
             class="space-y-5"
             x-data="projectFilesChunkUploader({{ (int) $this->id }}, @js(route('project-files.upload-chunk')))"

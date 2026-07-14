@@ -439,7 +439,7 @@ new class extends Component {
 }; ?>
 
 <div>
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         {{-- ============ LEFT: SPECTECH LIST ============ --}}
         <div class="space-y-4 lg:col-span-3">
             {{-- List header --}}
@@ -499,16 +499,16 @@ new class extends Component {
             </div>
 
             {{-- Search + Status filter --}}
-            <div class="flex items-center gap-2">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <flux:input
                     wire:model.live.debounce.300ms="search"
                     icon="magnifying-glass"
                     placeholder="Cari nama spektek..."
                     size="sm"
-                    class="flex-1"
+                    class="w-full sm:flex-1"
                     clearable
                 />
-                <flux:select wire:model.live="statusFilter" size="sm" class="w-44 shrink-0">
+                <flux:select wire:model.live="statusFilter" size="sm" class="w-full sm:w-44 shrink-0">
                     <flux:select.option value="all">Semua status</flux:select.option>
                     <flux:select.option value="not_started">Belum Mulai</flux:select.option>
                     <flux:select.option value="in_progress">Berjalan</flux:select.option>
@@ -577,7 +577,7 @@ new class extends Component {
 
                     <div wire:key="spectech-card-{{ $data['id'] }}"
                          @class([
-                            'group bg-white border rounded-xl p-6 transition',
+                            'group bg-white border rounded-xl p-4 sm:p-6 transition',
                             'border-red-300 ring-1 ring-red-200 shadow-sm' => $bulkMode && $isSelected,
                             'border-zinc-200 hover:border-zinc-300 hover:shadow-sm' => !($bulkMode && $isSelected),
                             'cursor-pointer' => $bulkMode,

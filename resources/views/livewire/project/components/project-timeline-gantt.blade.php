@@ -137,7 +137,7 @@ new class extends Component {
 <div>
     <div class="bg-white border rounded-2xl overflow-hidden">
         {{-- HEADER --}}
-        <div class="flex items-center justify-between px-6 py-4 border-b">
+        <div class="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-6 py-4 border-b">
             <div class="flex items-center gap-3">
                 <flux:icon name="chart-bar" class="w-5 h-5 text-gray-400" />
                 <div>

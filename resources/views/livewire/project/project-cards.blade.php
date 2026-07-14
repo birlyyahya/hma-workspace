@@ -196,7 +196,7 @@ new class extends Component
         <x-errors.403 />
     </div>
 @else
-<div class="space-y-6">
+<div class="space-y-4 md:space-y-6">
 
     {{-- Header --}}
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -235,11 +235,12 @@ new class extends Component
             </div>
         </div>
 
+        <div class="flex items-center gap-3">
         {{-- Year Filter --}}
         <flux:select
             wire:model.live="year"
             placeholder="Semua Tahun"
-            class="w-full sm:w-44"
+            class="flex-1 sm:w-44"
         >
             <flux:select.option value="">Semua Tahun</flux:select.option>
             @foreach($availableYears as $y)
@@ -261,6 +262,7 @@ new class extends Component
                 <flux:icon name="bars-3" class="w-4 h-4"/>
                 List
             </button>
+        </div>
         </div>
     </div>
 
@@ -284,7 +286,7 @@ new class extends Component
                  class="group relative flex flex-col bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 overflow-hidden">
 
                 {{-- Action menu (top-right, above overlay) --}}
-                <div class="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                <div class="absolute top-3 right-3 z-20 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                     <flux:dropdown align="end">
                         <flux:button size="xs" variant="filled" icon="ellipsis-horizontal" class="bg-white/90 dark:bg-zinc-800/90 backdrop-blur shadow-sm" />
                         <flux:menu>
@@ -428,7 +430,7 @@ new class extends Component
     @if($viewMode === 'list')
     <div wire:loading.remove wire:target="applyFilters,goToPage,year"
          class="overflow-x-auto rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
-        <table class="min-w-full text-sm">
+        <table class="min-w-225 md:min-w-full text-sm">
             <thead class="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider">
                 <tr>
                     <th class="px-4 py-3 text-left font-semibold">Kode</th>
@@ -586,7 +588,7 @@ new class extends Component
         @endphp
 
         <div wire:loading.remove wire:target="applyFilters,goToPage,year"
-             class="flex items-center justify-center gap-1.5 pt-2">
+             class="flex flex-wrap items-center justify-center gap-1.5 pt-2">
 
             <flux:button
                 wire:click="goToPage({{ max(1, $currentPage - 1) }})"

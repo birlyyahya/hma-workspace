@@ -223,7 +223,7 @@ new class extends Component
 }
 ?>
 
-<div class="mx-auto space-y-6 py-6 px-2">
+<div class="mx-auto space-y-4 md:space-y-6 py-4 md:py-6 px-0">
 
     {{-- Breadcrumb --}}
     <flux:breadcrumbs>
@@ -242,11 +242,11 @@ new class extends Component
         </flux:button>
     </div>
 
-    <form wire:submit="store" class="space-y-6">
+    <form wire:submit="store" class="space-y-4 md:space-y-6">
 
         {{-- Section 1: Informasi Proyek --}}
         <div class="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-zinc-100 flex items-center gap-3">
+            <div class="px-4 sm:px-6 py-4 border-b border-zinc-100 flex items-center gap-3">
                 <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
                     <flux:icon name="folder" class="w-4 h-4 text-blue-600"/>
                 </div>
@@ -255,7 +255,7 @@ new class extends Component
                     <p class="text-xs text-zinc-500">Nama, kode, klien, dan status</p>
                 </div>
             </div>
-            <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div class="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div class="sm:col-span-2">
                     <flux:field>
                         <flux:label>Nama Proyek <flux:badge size="sm" color="red" class="ml-1">Wajib</flux:badge></flux:label>
@@ -297,7 +297,7 @@ new class extends Component
 
         {{-- Section 2: Kontrak --}}
         <div class="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-zinc-100 flex items-center gap-3">
+            <div class="px-4 sm:px-6 py-4 border-b border-zinc-100 flex items-center gap-3">
                 <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
                     <flux:icon name="document-check" class="w-4 h-4 text-amber-600"/>
                 </div>
@@ -306,7 +306,7 @@ new class extends Component
                     <p class="text-xs text-zinc-500">Nomor kontrak, tanggal, dan nilai</p>
                 </div>
             </div>
-            <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div class="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <flux:field>
                     <flux:label>Nomor Kontrak <flux:badge size="sm" color="red" class="ml-1">Wajib</flux:badge></flux:label>
                     <flux:input wire:model="contract_number" placeholder="Contoh: 008"/>
@@ -331,7 +331,7 @@ new class extends Component
 
         {{-- Section 3: Timeline --}}
         <div class="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-zinc-100 flex items-center gap-3">
+            <div class="px-4 sm:px-6 py-4 border-b border-zinc-100 flex items-center gap-3">
                 <div class="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
                     <flux:icon name="calendar-days" class="w-4 h-4 text-green-600"/>
                 </div>
@@ -340,7 +340,7 @@ new class extends Component
                     <p class="text-xs text-zinc-500">Tanggal mulai, selesai, dan maintenance</p>
                 </div>
             </div>
-            <div class="p-6 grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <div class="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-3 gap-5">
                 <flux:field>
                     <flux:label>Tanggal Mulai <flux:badge size="sm" color="red" class="ml-1">Wajib</flux:badge></flux:label>
                     <flux:input wire:model="start_date" type="date"/>
@@ -363,7 +363,7 @@ new class extends Component
 
         {{-- Section 4: Perusahaan & Tim --}}
         <div class="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-visible">
-            <div class="px-6 py-4 border-b border-zinc-100 flex items-center gap-3">
+            <div class="px-4 sm:px-6 py-4 border-b border-zinc-100 flex items-center gap-3">
                 <div class="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
                     <flux:icon name="users" class="w-4 h-4 text-purple-600"/>
                 </div>
@@ -372,7 +372,7 @@ new class extends Component
                     <p class="text-xs text-zinc-500">Pilih perusahaan dan project leader</p>
                 </div>
             </div>
-            <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5 ">
+            <div class="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-5 ">
 
                 {{-- Company Select Search --}}
                 <div>
@@ -414,7 +414,7 @@ new class extends Component
 
         {{-- Section 5: Tim Pendukung (PPK) --}}
         <div class="bg-white rounded-2xl border border-zinc-100 shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-zinc-100 flex items-center gap-3">
+            <div class="px-4 sm:px-6 py-4 border-b border-zinc-100 flex items-center gap-3">
                 <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
                     <flux:icon name="briefcase" class="w-4 h-4 text-amber-600"/>
                 </div>
@@ -423,7 +423,7 @@ new class extends Component
                     <p class="text-xs text-zinc-500">Daftar nama tim pendukung — opsional, bisa ditambah nanti</p>
                 </div>
             </div>
-            <div class="p-6 space-y-4">
+            <div class="p-4 sm:p-6 space-y-4">
                 <div class="flex flex-col sm:flex-row gap-2">
                     <flux:input
                         wire:model="newSupportTeam"
