@@ -94,7 +94,7 @@
                             <tr class="hover:bg-zinc-50/60">
                                 <td class="px-3 py-2 text-right text-zinc-400" x-text="index + 1"></td>
                                 <template x-for="column in columns" :key="column.key">
-                                    <td class="px-3 py-2 text-zinc-800 whitespace-nowrap" x-text="row[column.key]"></td>
+                                    <td class="px-3 py-2 text-zinc-800 whitespace-nowrap max-w-48 truncate" x-text="row[column.key]"></td>
                                 </template>
                             </tr>
                         </template>

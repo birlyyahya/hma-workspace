@@ -368,7 +368,7 @@ new class extends Component {
         return [
             'subName'     => 'required|string|min:3|max:120',
             'subQuantity' => 'required|integer|min:1',
-            'subPrice'    => 'required',
+            'subPrice'    => 'nullable',
             'subType'     => 'required|in:hardware,software',
         ];
     }
@@ -1124,9 +1124,11 @@ new class extends Component {
                                                                         class="w-16 rounded-lg border border-zinc-300 bg-white text-sm py-1 px-2 focus:border-red-500 focus:ring-red-500" />
                                                                     <span class="text-xs text-zinc-500 whitespace-nowrap">/ {{ $sub['qty_total'] }} diterima</span>
                                                                 </div>
+                                                                @if($sub['total_nominal'] > 0)
                                                                 <p class="w-28 text-right text-sm font-semibold text-zinc-900 shrink-0">
                                                                     Rp {{ number_format($sub['total_nominal'], 0, ',', '.') }}
                                                                 </p>
+                                                                @endif
                                                                 <div class="flex items-center shrink-0 -mr-1">
                                                                     <flux:button wire:click="editSub({{ (int) $sub['id'] }})"
                                                                         variant="ghost" size="xs" icon="pencil-square" class="text-zinc-400" />
@@ -1172,7 +1174,7 @@ new class extends Component {
                                                                 @endif
                                                             </div>
                                                         </div>
-                                                        <flux:error name="subName" />
+                                                        <flux:error name="subName"  />
                                                         <flux:error name="subQuantity" />
                                                         <flux:error name="subPrice" />
                                                     </form>
