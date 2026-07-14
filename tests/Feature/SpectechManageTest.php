@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\User;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Livewire\Volt\Volt;
 
@@ -95,31 +94,57 @@ test('save does nothing when the queue is empty', function () {
     Http::assertNothingSent();
 });
 
-test('import uploads an excel file to the import endpoint', function () {
+test('importParsed sends the frontend-parsed rows to the bulk endpoint', function () {
     Http::fake([
-        '*spekteks/import' => Http::response(['status' => 200], 200),
+        '*spekteks/bulkCreate' => Http::response(['status' => 201], 201),
     ]);
 
     $this->actingAs(User::factory()->create());
 
-    Volt::test('project.components.project-spectech-manage', ['id' => 7])
-        ->set('importFile', UploadedFile::fake()->createWithContent('spektek.csv', "name,qty_total,total_nominal,type\nSwitch,3,9000000,hardware\n"))
-        ->call('import')
-        ->assertHasNoErrors()
-        ->assertDispatched('spectechSaved');
+    $rows = [
+        ['name' => 'Switch Cisco', 'type' => 'hardware', 'qty_total' => 3, 'total_nominal' => 9000000, 'note' => ''],
+        ['name' => 'Lisensi Office', 'type' => 'software', 'qty_total' => 2, 'total_nominal' => 2000000, 'note' => 'Volume'],
+    ];
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), 'spekteks/import'));
+    Volt::test('project.components.project-spectech-manage', ['id' => 7])
+        ->call('importParsed', $rows)
+        ->assertReturned(true)
+        ->assertDispatched('spectechSaved')
+        ->assertDispatched('excel-import-reset');
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'spekteks/bulkCreate')
+        && count($request->data()) === 2
+        && (int) $request->data()[0]['project_id'] === 7
+        && $request->data()[0]['type'] === 'hardware'
+        && (int) $request->data()[0]['qty_recived'] === 0
+        && $request->data()[1]['name'] === 'Lisensi Office');
 });
 
-test('import rejects non-excel files', function () {
+test('importParsed rejects invalid rows without hitting the API', function () {
+    Http::fake();
+
+    $this->actingAs(User::factory()->create());
+
+    $rows = [
+        ['name' => '', 'type' => 'firmware', 'qty_total' => 0, 'total_nominal' => -5, 'note' => ''],
+    ];
+
+    Volt::test('project.components.project-spectech-manage', ['id' => 7])
+        ->call('importParsed', $rows)
+        ->assertReturned(false)
+        ->assertNotDispatched('spectechSaved');
+
+    Http::assertNothingSent();
+});
+
+test('importParsed rejects an empty row set', function () {
     Http::fake();
 
     $this->actingAs(User::factory()->create());
 
     Volt::test('project.components.project-spectech-manage', ['id' => 7])
-        ->set('importFile', UploadedFile::fake()->create('notes.pdf', 100, 'application/pdf'))
-        ->call('import')
-        ->assertHasErrors(['importFile']);
+        ->call('importParsed', [])
+        ->assertReturned(false);
 
     Http::assertNothingSent();
 });

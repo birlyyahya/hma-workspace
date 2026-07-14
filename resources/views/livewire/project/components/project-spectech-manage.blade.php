@@ -3,14 +3,13 @@
 use App\Services\ProjectCache;
 use App\Services\ProjectWriter;
 use Flux\Flux;
+use Illuminate\Support\Facades\Validator;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
-use Livewire\WithFileUploads;
 use Masmerise\Toaster\Toaster;
 
 new class extends Component {
-    use WithFileUploads;
 
     public int $id;
 
@@ -29,7 +28,37 @@ new class extends Component {
     public ?int $draftQuantity = null;
     public ?string $draftNote = null;
 
-    public $importFile = null;
+    /**
+     * Definisi kolom untuk import Excel (dibaca komponen frontend & validasi server).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function importColumns(): array
+    {
+        return [
+            ['key' => 'name', 'header' => 'Nama', 'required' => true, 'type' => 'string'],
+            ['key' => 'type', 'header' => 'Tipe', 'required' => true, 'type' => 'enum', 'map' => [
+                'barang'    => 'hardware',
+                'aplikasi'  => 'software',
+                'hardware'  => 'hardware',
+                'software'  => 'software',
+            ]],
+            ['key' => 'qty_total', 'header' => 'Jumlah', 'required' => true, 'type' => 'int'],
+            ['key' => 'total_nominal', 'header' => 'Total Harga', 'required' => true, 'type' => 'number'],
+            ['key' => 'note', 'header' => 'Catatan', 'required' => false, 'type' => 'string'],
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function importExample(): array
+    {
+        return [
+            ['name' => 'Pipa PVC 4 inch', 'type' => 'Barang', 'qty_total' => 10, 'total_nominal' => 500000, 'note' => 'Merk bebas'],
+            ['name' => 'Lisensi Office', 'type' => 'Aplikasi', 'qty_total' => 2, 'total_nominal' => 2000000, 'note' => ''],
+        ];
+    }
 
     #[On('openManageSpectech')]
     public function open(string $tab = 'manual'): void
@@ -138,44 +167,63 @@ new class extends Component {
     }
 
     /**
-     * Unggah file excel; parsing & validasi baris dilakukan di backend.
+     * Terima hasil parsing Excel dari frontend (array object) lalu kirim ke
+     * endpoint bulk yang sama dengan input manual. Tetap divalidasi di server
+     * sebagai lapisan pertahanan kedua. Return bool agar frontend tahu sukses.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
      */
-    public function import(): void
+    public function importParsed(array $rows): bool
     {
-        $this->validate(
-            ['importFile' => 'required|file|mimes:xlsx,xls,csv|max:5120'],
-            [
-                'importFile.required' => 'Pilih file excel terlebih dahulu.',
-                'importFile.mimes'    => 'Format harus .xlsx, .xls, atau .csv.',
-                'importFile.max'      => 'Ukuran file maksimal 5MB.',
-            ],
-        );
-
-        // TODO: endpoint import belum tersedia. Backend menerima file mentah,
-        // melakukan parsing baris & membuat spektek secara massal.
-        $result = app(ProjectWriter::class)->importSpectech((int) $this->id, [
-            'contents' => $this->importFile->get(),
-            'name' => $this->importFile->getClientOriginalName(),
+        $validator = Validator::make(['rows' => $rows], [
+            'rows'                 => 'required|array|min:1',
+            'rows.*.name'          => 'required|string|max:120',
+            'rows.*.type'          => 'required|in:hardware,software',
+            'rows.*.qty_total'     => 'required|integer|min:1',
+            'rows.*.total_nominal' => 'required|numeric|min:0',
+            'rows.*.note'          => 'nullable|string|max:500',
+        ], [], [
+            'rows' => 'data',
         ]);
 
-        if (! $result['ok']) {
-            Toaster::error(getErrorMessages($result['body']['errors'] ?? []) ?: 'Gagal mengimpor file');
-            return;
+        if ($validator->fails()) {
+            Toaster::error('Data tidak valid: '.$validator->errors()->first());
+            return false;
         }
 
-        $this->reset('importFile');
+        $payload = array_map(fn (array $row): array => [
+            'name'          => $row['name'],
+            'type'          => $row['type'],
+            'qty_total'     => (int) $row['qty_total'],
+            'qty_recived'   => 0,
+            'total_nominal' => (int) $row['total_nominal'],
+            'note'          => $row['note'] ?? null,
+            'project_id'    => (int) $this->id,
+        ], $rows);
+
+        $result = app(ProjectWriter::class)->bulkSpectech((int) $this->id, $payload);
+
+        if (! $result['ok']) {
+            Toaster::error(getErrorMessages($result['body']['errors'] ?? []) ?: 'Gagal mengimpor spektek');
+            return false;
+        }
+
+        $count = count($payload);
         $this->finishMutation();
 
-        Toaster::success('Spektek berhasil diimpor');
+        Toaster::success($count.' spektek berhasil diimpor');
         Flux::modal('manageSpectech')->close();
+
+        return true;
     }
 
     protected function finishMutation(): void
     {
-        $this->reset('drafts', 'draftName', 'draftPrice', 'draftQuantity', 'draftNote', 'importFile');
+        $this->reset('drafts', 'draftName', 'draftPrice', 'draftQuantity', 'draftNote');
         $this->draftType = 'hardware';
         $this->manageTab = 'manual';
         $this->resetErrorBag();
+        $this->dispatch('excel-import-reset');
 
         app(ProjectCache::class)->flushSpectech($this->id);
         $this->dispatch('spectechSaved');
@@ -183,10 +231,11 @@ new class extends Component {
 
     public function resetManage(): void
     {
-        $this->reset('drafts', 'draftName', 'draftPrice', 'draftQuantity', 'draftNote', 'importFile');
+        $this->reset('drafts', 'draftName', 'draftPrice', 'draftQuantity', 'draftNote');
         $this->draftType = 'hardware';
         $this->manageTab = 'manual';
         $this->resetErrorBag();
+        $this->dispatch('excel-import-reset');
     }
 
     #[Computed]
@@ -393,48 +442,13 @@ new class extends Component {
 
             {{-- ============ IMPORT EXCEL ============ --}}
             <div x-show="$wire.manageTab === 'import'" class="space-y-5" x-cloak>
-                <form wire:submit="import" class="space-y-5">
-                    <div class="rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 space-y-3">
-                        <div class="flex gap-2">
-                            <flux:icon.information-circle class="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
-                            <flux:text class="text-xs text-zinc-600 leading-relaxed">
-                                Unggah file <span class="font-medium text-zinc-800">.xlsx</span>, <span class="font-medium text-zinc-800">.xls</span>, atau
-                                <span class="font-medium text-zinc-800">.csv</span>. Sistem akan membaca & memvalidasi setiap baris secara otomatis.
-                            </flux:text>
-                        </div>
-                    </div>
-
-                    <flux:field>
-                        <flux:label badge="Wajib">File excel</flux:label>
-                        <input type="file" wire:model="importFile" accept=".xlsx,.xls,.csv"
-                            class="block w-full text-sm text-zinc-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-red-50 file:text-red-700 hover:file:bg-red-100 file:cursor-pointer cursor-pointer" />
-                        <flux:error name="importFile" />
-
-                        <div wire:loading wire:target="importFile" class="mt-2">
-                            <flux:text class="text-xs text-zinc-500">Mengunggah file...</flux:text>
-                        </div>
-
-                        @if($importFile)
-                            <div class="mt-3 flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-100 p-3">
-                                <flux:icon.document-check class="w-5 h-5 text-emerald-600 shrink-0" />
-                                <flux:text class="text-sm text-emerald-800 truncate">
-                                    {{ $importFile->getClientOriginalName() }}
-                                </flux:text>
-                            </div>
-                        @endif
-                    </flux:field>
-
-                    <div class="flex items-center justify-end gap-2 border-t border-zinc-100 pt-4">
-                        <flux:modal.close>
-                            <flux:button variant="ghost">Tutup</flux:button>
-                        </flux:modal.close>
-                        <flux:button type="submit" variant="primary" icon="arrow-up-tray"
-                            wire:loading.attr="disabled" wire:target="import,importFile">
-                            <span wire:loading.remove wire:target="import">Import</span>
-                            <span wire:loading wire:target="import">Mengimpor...</span>
-                        </flux:button>
-                    </div>
-                </form>
+                <x-excel-import
+                    :columns="$this->importColumns()"
+                    :example="$this->importExample()"
+                    template-name="Template Spektek.xlsx"
+                    on-import="importParsed"
+                    submit-label="Import Spektek"
+                />
             </div>
         </div>
     </flux:modal>

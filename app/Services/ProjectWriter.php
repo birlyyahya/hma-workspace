@@ -370,31 +370,6 @@ class ProjectWriter
         }
     }
 
-    /**
-     * Impor spektek dari file excel (multipart). Sukses = HTTP 2xx.
-     *
-     * @param  array{contents: string, name: string}  $file
-     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
-     */
-    public function importSpectech(int $projectId, array $file): array
-    {
-        try {
-            $response = $this->externalWrite(timeout: 30)->asMultipart()
-                ->attach('file', $file['contents'], $file['name'])
-                ->post($this->apiBase.'/spekteks/import', ['project_id' => $projectId]);
-            $body = (array) $response->json();
-
-            return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushSpectech($projectId), [
-                'name' => 'project',
-                'event' => 'updated',
-                'description' => "Mengimpor spektek project #{$projectId}",
-                'properties' => ['project_id' => $projectId, 'file' => $file['name'] ?? null],
-            ]);
-        } catch (\Throwable $e) {
-            return $this->fail('importSpectech', $e, ['project_id' => $projectId]);
-        }
-    }
-
     // ------------------------------------------------------------- Sub Spektek
 
     /**
