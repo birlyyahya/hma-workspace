@@ -238,7 +238,7 @@ class ProjectCache
                     return $e instanceof ConnectionException
                         || (method_exists($e, 'response') && optional($e->response)->serverError());
                 }, throw: false)
-                ->get($this->apiBase.'/activity-categories/search', [
+                ->get($this->apiBase.'/spekteks/search', [
                     'project_id' => $projectId,
                     'limit' => 99999,
                 ])->json('data') ?? [];

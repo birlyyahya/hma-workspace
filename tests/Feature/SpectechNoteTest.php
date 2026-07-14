@@ -7,7 +7,7 @@ use Livewire\Volt\Volt;
 function fakeSpectechApi(array $items = []): void
 {
     Http::fake([
-        '*activity-categories/search*' => Http::response([
+        '*spekteks/search*' => Http::response([
             'status' => 200,
             'data' => $items,
             'pagination' => [],
@@ -23,10 +23,10 @@ function spectechItem(): array
         'id' => 5,
         'name' => 'Switch Cisco',
         'qty_total' => 3,
-        'qty_recived' => 1,
+        'qty_received' => 1,
         'total_nominal' => 9000000,
         'qty_nominal' => 3000000,
-        'percentage' => 33,
+        'progress_percentage' => 33,
         'note' => 'Catatan lama',
         'images' => [],
         'type' => 'hardware',

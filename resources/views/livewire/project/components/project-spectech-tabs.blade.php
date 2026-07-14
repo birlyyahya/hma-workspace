@@ -69,10 +69,10 @@ new class extends Component {
             'id'            => $data['id'],
             'name'          => $data['name'],
             'qty_total'     => $data['qty_total'],
-            'qty_recived'   => $data['qty_recived'],
+            'qty_recived'   => $data['qty_received'],
             'total_nominal' => $data['total_nominal'],
             'qty_nominal'   => $data['qty_nominal'],
-            'percentage'    => $data['percentage'],
+            'percentage'    => $data['progress_percentage'],
             'note'          => $data['note'],
             'detail'        => $data['detail'] ?? '',
             'images'        => $data['images'] ?? [],
@@ -995,7 +995,7 @@ new class extends Component {
 
 
 {{-- ============ ADD SPECTECH MODAL ============ --}}
-<flux:modal name="addSpectech" wire:close="resetForm" class="md:w-120">
+<flux:modal name="addSpectech" wire:close="resetForm" class="md:w-120 lg:min-w-5xl">
     <form wire:submit="create" class="space-y-6">
         <div class="space-y-1">
             <flux:heading size="lg">Tambah Spektek</flux:heading>
@@ -1004,65 +1004,71 @@ new class extends Component {
             </flux:text>
         </div>
 
-        <div class="space-y-4">
-            {{-- Tipe spektek: Hardware / Software --}}
-            <flux:field>
-                <flux:label>Tipe spektek</flux:label>
-                <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-1 grid grid-cols-2 gap-1">
-                    @foreach ([
-                        ['key' => 'hardware', 'label' => 'Barang', 'icon' => 'cube'],
-                        ['key' => 'software', 'label' => 'Aplikasi', 'icon' => 'computer-desktop'],
-                    ] as $typeTab)
-                        <button type="button"
-                            wire:click="$set('form.type', '{{ $typeTab['key'] }}')"
-                            @class([
-                                'flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer',
-                                'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200' => $form->type === $typeTab['key'],
-                                'text-zinc-600 hover:bg-white' => $form->type !== $typeTab['key'],
-                            ])>
-                            <flux:icon name="{{ $typeTab['icon'] }}" class="w-4 h-4" />
-                            <span>{{ $typeTab['label'] }}</span>
-                        </button>
-                    @endforeach
-                </div>
-                <flux:error name="form.type" />
-            </flux:field>
-
-            <flux:field>
-                <flux:label badge="Wajib">Nama spektek</flux:label>
-                <flux:input wire:model="form.name" placeholder="cth. Pipa PVC 4 inch" autofocus />
-                <flux:error name="form.name" />
-            </flux:field>
-
-            <div class="grid grid-cols-3 gap-3">
-                <flux:field class="col-span-2">
-                    <flux:label badge="Wajib">Total Harga</flux:label>
-                    <x-rupiah-input model="form.price" placeholder="0" />
-                    <flux:error name="form.price" />
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {{-- KANAN: inputan utama (mobile: tampil duluan) --}}
+            <div class="space-y-4">
+                {{-- Tipe spektek: Hardware / Software --}}
+                <flux:field>
+                    <flux:label>Tipe spektek</flux:label>
+                    <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-1 grid grid-cols-2 gap-1">
+                        @foreach ([
+                            ['key' => 'hardware', 'label' => 'Barang', 'icon' => 'cube'],
+                            ['key' => 'software', 'label' => 'Aplikasi', 'icon' => 'computer-desktop'],
+                        ] as $typeTab)
+                            <button type="button"
+                                wire:click="$set('form.type', '{{ $typeTab['key'] }}')"
+                                @class([
+                                    'flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer',
+                                    'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200' => $form->type === $typeTab['key'],
+                                    'text-zinc-600 hover:bg-white' => $form->type !== $typeTab['key'],
+                                ])>
+                                <flux:icon name="{{ $typeTab['icon'] }}" class="w-4 h-4" />
+                                <span>{{ $typeTab['label'] }}</span>
+                            </button>
+                        @endforeach
+                    </div>
+                    <flux:error name="form.type" />
                 </flux:field>
 
                 <flux:field>
-                    <flux:label badge="Wajib">Jumlah</flux:label>
-                    <flux:input wire:model="form.quantity" type="number" min="1" placeholder="0" />
-                    <flux:error name="form.quantity" />
+                    <flux:label badge="Wajib">Nama spektek</flux:label>
+                    <flux:input wire:model="form.name" placeholder="cth. Pipa PVC 4 inch" autofocus />
+                    <flux:error name="form.name" />
+                </flux:field>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <flux:field class="col-span-2">
+                        <flux:label badge="Wajib">Total Harga</flux:label>
+                        <x-rupiah-input model="form.price" placeholder="0" />
+                        <flux:error name="form.price" />
+                    </flux:field>
+
+                    <flux:field>
+                        <flux:label badge="Wajib">Jumlah</flux:label>
+                        <flux:input wire:model="form.quantity" type="number" min="1" placeholder="0" />
+                        <flux:error name="form.quantity" />
+                    </flux:field>
+                </div>
+
+                <flux:field>
+                    <flux:label>Catatan</flux:label>
+                    <flux:textarea wire:model="form.notes" rows="3" placeholder="Catatan tambahan (opsional)" />
+                    <flux:error name="form.notes" />
                 </flux:field>
             </div>
 
-            <flux:field>
-                <flux:label>Detail Spesifikasi</flux:label>
-                <div wire:ignore x-data="spectechRichEditor(@entangle('form.detail'))"
-                    class="spectech-editor overflow-hidden rounded-lg border border-zinc-200 bg-white focus-within:border-zinc-400">
-                    <div x-ref="editor" data-placeholder="Rincian spesifikasi lengkap — cth. RAM 16GB DDR5, SSD 512GB NVMe, Prosesor Intel i7..."></div>
-                </div>
-                <flux:description>Opsional. Bisa berupa daftar poin; tampil saat baris item diklik di tabel.</flux:description>
-                <flux:error name="form.detail" />
-            </flux:field>
-
-            <flux:field>
-                <flux:label>Catatan</flux:label>
-                <flux:textarea wire:model="form.notes" rows="3" placeholder="Catatan tambahan (opsional)" />
-                <flux:error name="form.notes" />
-            </flux:field>
+            {{-- KIRI: detail spesifikasi --}}
+            <div class="">
+                <flux:field>
+                    <flux:label>Detail Spesifikasi</flux:label>
+                    <div wire:ignore x-data="spectechRichEditor(@entangle('form.detail'))"
+                        class="spectech-editor spectech-editor--tall overflow-hidden rounded-lg border border-zinc-200 bg-white focus-within:border-zinc-400">
+                        <div x-ref="editor" data-placeholder="Rincian spesifikasi lengkap — cth. RAM 16GB DDR5, SSD 512GB NVMe, Prosesor Intel i7..."></div>
+                    </div>
+                    <flux:description>Opsional. Bisa berupa daftar poin; tampil saat baris item diklik di tabel.</flux:description>
+                    <flux:error name="form.detail" />
+                </flux:field>
+            </div>
         </div>
 
         <div class="flex gap-2 pt-2">
@@ -1090,83 +1096,89 @@ new class extends Component {
             </flux:text>
         </div>
 
-         <flux:field>
-                <flux:label badge="Wajib" >Tipe spektek</flux:label>
-                <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-1 grid grid-cols-2 gap-1">
-                    @foreach ([
-                        ['key' => 'hardware', 'label' => 'Barang', 'icon' => 'cube'],
-                        ['key' => 'software', 'label' => 'Aplikasi', 'icon' => 'computer-desktop'],
-                    ] as $typeTab)
-                        <button type="button"
-                            wire:click="$set('form.type', '{{ $typeTab['key'] }}')"
-                            @class([
-                                'flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer',
-                                'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200' => $form->type === $typeTab['key'],
-                                'text-zinc-600 hover:bg-white' => $form->type !== $typeTab['key'],
-                            ])>
-                            <flux:icon name="{{ $typeTab['icon'] }}" class="w-4 h-4" />
-                            <span>{{ $typeTab['label'] }}</span>
-                        </button>
-                    @endforeach
-                </div>
-                <flux:error name="form.type" />
-            </flux:field>
-
-        <div class="space-y-4">
-            <flux:field>
-                <flux:label badge="Wajib">Nama Spektek</flux:label>
-                <flux:input wire:model="form.name" placeholder="cth. Pipa PVC 4 inch" />
-                <flux:error name="form.name" />
-            </flux:field>
-
-            <div class="grid grid-cols-3 gap-3">
-                <flux:field class="col-span-2">
-                    <flux:label badge="Wajib">Total Harga</flux:label>
-                    <x-rupiah-input model="form.price" placeholder="0" />
-                    <flux:error name="form.price" />
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {{-- KANAN: inputan utama (mobile: tampil duluan) --}}
+            <div class="space-y-4">
+                <flux:field>
+                    <flux:label badge="Wajib">Tipe spektek</flux:label>
+                    <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-1 grid grid-cols-2 gap-1">
+                        @foreach ([
+                            ['key' => 'hardware', 'label' => 'Barang', 'icon' => 'cube'],
+                            ['key' => 'software', 'label' => 'Aplikasi', 'icon' => 'computer-desktop'],
+                        ] as $typeTab)
+                            <button type="button"
+                                wire:click="$set('form.type', '{{ $typeTab['key'] }}')"
+                                @class([
+                                    'flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer',
+                                    'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200' => $form->type === $typeTab['key'],
+                                    'text-zinc-600 hover:bg-white' => $form->type !== $typeTab['key'],
+                                ])>
+                                <flux:icon name="{{ $typeTab['icon'] }}" class="w-4 h-4" />
+                                <span>{{ $typeTab['label'] }}</span>
+                            </button>
+                        @endforeach
+                    </div>
+                    <flux:error name="form.type" />
                 </flux:field>
 
                 <flux:field>
-                    <flux:label badge="Wajib">Jumlah</flux:label>
-                    <flux:input wire:model="form.quantity" type="number" min="1" placeholder="0" />
-                    <flux:error name="form.quantity" />
+                    <flux:label badge="Wajib">Nama Spektek</flux:label>
+                    <flux:input wire:model="form.name" placeholder="cth. Pipa PVC 4 inch" />
+                    <flux:error name="form.name" />
+                </flux:field>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <flux:field class="col-span-2">
+                        <flux:label badge="Wajib">Total Harga</flux:label>
+                        <x-rupiah-input model="form.price" placeholder="0" />
+                        <flux:error name="form.price" />
+                    </flux:field>
+
+                    <flux:field>
+                        <flux:label badge="Wajib">Jumlah</flux:label>
+                        <flux:input wire:model="form.quantity" type="number" min="1" placeholder="0" />
+                        <flux:error name="form.quantity" />
+                    </flux:field>
+                </div>
+
+                {{-- Penerimaan Barang --}}
+                {{-- <div class="rounded-lg border border-zinc-200 bg-zinc-50/50 p-4 space-y-3">
+                    <flux:checkbox x-model="isComing"
+                        @change="if (!isComing) $wire.set('form.received_quantity', 0)"
+                        label="Sudah ada barang diterima?" />
+
+                    <div x-show="isComing" x-collapse>
+                        <flux:field>
+                            <flux:label>Jumlah Diterima</flux:label>
+                            <flux:input wire:model="form.received_quantity" type="number" min="0"
+                                :max="$form->quantity" placeholder="0" />
+                            <flux:description>
+                                Maksimal {{ $form->quantity ?? 0 }} (sesuai total qty).
+                            </flux:description>
+                            <flux:error name="form.received_quantity" />
+                        </flux:field>
+                    </div>
+                </div> --}}
+
+                <flux:field>
+                    <flux:label>Catatan</flux:label>
+                    <flux:textarea wire:model="form.notes" rows="3" placeholder="Catatan tambahan (opsional)" />
+                    <flux:error name="form.notes" />
                 </flux:field>
             </div>
 
-            {{-- Penerimaan Barang --}}
-            {{-- <div class="rounded-lg border border-zinc-200 bg-zinc-50/50 p-4 space-y-3">
-                <flux:checkbox x-model="isComing"
-                    @change="if (!isComing) $wire.set('form.received_quantity', 0)"
-                    label="Sudah ada barang diterima?" />
-
-                <div x-show="isComing" x-collapse>
-                    <flux:field>
-                        <flux:label>Jumlah Diterima</flux:label>
-                        <flux:input wire:model="form.received_quantity" type="number" min="0"
-                            :max="$form->quantity" placeholder="0" />
-                        <flux:description>
-                            Maksimal {{ $form->quantity ?? 0 }} (sesuai total qty).
-                        </flux:description>
-                        <flux:error name="form.received_quantity" />
-                    </flux:field>
-                </div>
-            </div> --}}
-
-            <flux:field>
-                <flux:label>Detail Spesifikasi</flux:label>
-                <div wire:ignore x-data="spectechRichEditor(@entangle('form.detail'))"
-                    class="spectech-editor overflow-hidden rounded-lg border border-zinc-200 bg-white focus-within:border-zinc-400">
-                    <div x-ref="editor" data-placeholder="Rincian spesifikasi lengkap — cth. RAM 16GB DDR5, SSD 512GB NVMe, Prosesor Intel i7..."></div>
-                </div>
-                <flux:description>Opsional. Bisa berupa daftar poin; tampil saat baris item diklik di tabel.</flux:description>
-                <flux:error name="form.detail" />
-            </flux:field>
-
-            <flux:field>
-                <flux:label>Catatan</flux:label>
-                <flux:textarea wire:model="form.notes" rows="3" placeholder="Catatan tambahan (opsional)" />
-                <flux:error name="form.notes" />
-            </flux:field>
+            {{-- KIRI: detail spesifikasi --}}
+            <div class="">
+                <flux:field>
+                    <flux:label>Detail Spesifikasi</flux:label>
+                    <div wire:ignore x-data="spectechRichEditor(@entangle('form.detail'))"
+                        class="spectech-editor spectech-editor--tall overflow-hidden rounded-lg border border-zinc-200 bg-white focus-within:border-zinc-400">
+                        <div x-ref="editor" data-placeholder="Rincian spesifikasi lengkap — cth. RAM 16GB DDR5, SSD 512GB NVMe, Prosesor Intel i7..."></div>
+                    </div>
+                    <flux:description>Opsional. Bisa berupa daftar poin; tampil saat baris item diklik di tabel.</flux:description>
+                    <flux:error name="form.detail" />
+                </flux:field>
+            </div>
         </div>
 
         <div class="flex gap-2 pt-2">
@@ -1318,6 +1330,11 @@ new class extends Component {
         min-height: 110px;
         max-height: 260px;
         overflow-y: auto;
+    }
+
+    .spectech-editor--tall .ck.ck-editor__editable_inline {
+        min-height: 280px;
+        max-height: 420px;
     }
 
     .spectech-editor .ck.ck-editor__editable_inline > :first-child {

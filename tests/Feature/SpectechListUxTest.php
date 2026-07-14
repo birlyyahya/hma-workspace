@@ -10,7 +10,7 @@ use Livewire\Volt\Volt;
 function fakeSpectechListApi(array $items): void
 {
     Http::fake([
-        '*activity-categories/search*' => Http::response([
+        '*spekteks/search*' => Http::response([
             'status' => 200,
             'data' => $items,
             'pagination' => [],
@@ -31,10 +31,10 @@ function makeSpectechItems(int $count): array
         'id' => $i,
         'name' => sprintf('Item %03d', $i),
         'qty_total' => $i,
-        'qty_recived' => 0,
+        'qty_received' => 0,
         'total_nominal' => $i * 1000,
         'qty_nominal' => 1000,
-        'percentage' => 0,
+        'progress_percentage' => 0,
         'note' => '',
         'images' => [],
         'type' => 'hardware',
@@ -43,9 +43,9 @@ function makeSpectechItems(int $count): array
 
 test('items can be sorted by total nominal in both directions', function () {
     fakeSpectechListApi([
-        ['id' => 1, 'name' => 'Kabel UTP', 'qty_total' => 1, 'qty_recived' => 0, 'total_nominal' => 3000, 'qty_nominal' => 3000, 'percentage' => 0, 'note' => '', 'images' => [], 'type' => 'hardware'],
-        ['id' => 2, 'name' => 'Router Mikrotik', 'qty_total' => 1, 'qty_recived' => 0, 'total_nominal' => 1000, 'qty_nominal' => 1000, 'percentage' => 0, 'note' => '', 'images' => [], 'type' => 'hardware'],
-        ['id' => 3, 'name' => 'Switch Cisco', 'qty_total' => 1, 'qty_recived' => 0, 'total_nominal' => 2000, 'qty_nominal' => 2000, 'percentage' => 0, 'note' => '', 'images' => [], 'type' => 'hardware'],
+        ['id' => 1, 'name' => 'Kabel UTP', 'qty_total' => 1, 'qty_received' => 0, 'total_nominal' => 3000, 'qty_nominal' => 3000, 'progress_percentage' => 0, 'note' => '', 'images' => [], 'type' => 'hardware'],
+        ['id' => 2, 'name' => 'Router Mikrotik', 'qty_total' => 1, 'qty_received' => 0, 'total_nominal' => 1000, 'qty_nominal' => 1000, 'progress_percentage' => 0, 'note' => '', 'images' => [], 'type' => 'hardware'],
+        ['id' => 3, 'name' => 'Switch Cisco', 'qty_total' => 1, 'qty_received' => 0, 'total_nominal' => 2000, 'qty_nominal' => 2000, 'progress_percentage' => 0, 'note' => '', 'images' => [], 'type' => 'hardware'],
     ]);
 
     $this->actingAs(User::factory()->create());

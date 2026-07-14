@@ -7,7 +7,7 @@ use Livewire\Volt\Volt;
 function fakeSpectechSearch(array $items = []): void
 {
     Http::fake([
-        '*activity-categories/search*' => Http::response([
+        '*spekteks/search*' => Http::response([
             'status' => 200,
             'data' => $items,
             'pagination' => [],
@@ -18,10 +18,10 @@ function fakeSpectechSearch(array $items = []): void
                 'id' => 99,
                 'name' => 'Lisensi Office',
                 'qty_total' => 2,
-                'qty_recived' => 0,
+                'qty_received' => 0,
                 'total_nominal' => 2000000,
                 'qty_nominal' => 1000000,
-                'percentage' => 0,
+                'progress_percentage' => 0,
                 'note' => '',
                 'images' => [],
                 'type' => 'software',
@@ -36,10 +36,10 @@ test('spectech tab loads its own data from the API on mount', function () {
             'id' => 5,
             'name' => 'Switch Cisco',
             'qty_total' => 3,
-            'qty_recived' => 1,
+            'qty_received' => 1,
             'total_nominal' => 9000000,
             'qty_nominal' => 3000000,
-            'percentage' => 33,
+            'progress_percentage' => 33,
             'note' => '',
             'images' => [],
             'type' => 'hardware',
@@ -56,7 +56,7 @@ test('spectech tab loads its own data from the API on mount', function () {
         ->assertCount('spectech', 1)
         ->assertSee('Switch Cisco');
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), 'activity-categories/search')
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'spekteks/search')
         && (int) $request['project_id'] === 42);
 });
 
