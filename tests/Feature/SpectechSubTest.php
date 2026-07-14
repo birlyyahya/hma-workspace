@@ -6,7 +6,8 @@ use Livewire\Volt\Volt;
 
 /**
  * Sub spektek tersemat di response spekteks/search (with_sub=true), jadi
- * tidak ada fake untuk endpoint baca sub — hanya endpoint tulisnya.
+ * tidak ada fake untuk endpoint baca sub — hanya endpoint tulisnya. Expand
+ * baris ditangani Alpine (client-side), tak ada lagi method server toggleExpand.
  *
  * @param  array<int, array<string, mixed>>  $subs
  */
@@ -51,21 +52,25 @@ function subSpectechItem(): array
     ];
 }
 
-test('expanding a row shows subs embedded in the spektek payload without extra API hits', function () {
+/**
+ * @return \Livewire\Features\SupportTesting\Testable
+ */
+function spectechTabs()
+{
+    return Volt::test('project.components.project-spectech-tabs', [
+        'totalproject' => 100000000,
+        'id' => 1,
+        'progress' => 0,
+    ]);
+}
+
+test('embedded subs render (panel + badge) without an extra sub API call', function () {
     fakeSubSpectechApi([subSpectechItem()]);
 
     $this->actingAs(User::factory()->create());
 
-    Volt::test('project.components.project-spectech-tabs', [
-        'totalproject' => 100000000,
-        'id' => 1,
-        'progress' => 0,
-    ])
+    spectechTabs()
         ->assertSee('1 sub')
-        ->call('toggleExpand', 5)
-        ->assertSet('expandedId', 5)
-        ->assertSet('showSubForm', false)
-        ->assertCount('subItems', 1)
         ->assertSee('Device Finder');
 
     Http::assertSent(fn ($request) => str_contains($request->url(), 'spekteks/search')
@@ -73,40 +78,34 @@ test('expanding a row shows subs embedded in the spektek payload without extra A
     Http::assertNotSent(fn ($request) => str_contains($request->url(), 'sub-spekteks/search'));
 });
 
-test('expanding the same row again collapses the panel', function () {
+test('openSubForm and closeSubForm toggle the active form for a spektek', function () {
     fakeSubSpectechApi([subSpectechItem()]);
 
     $this->actingAs(User::factory()->create());
 
-    Volt::test('project.components.project-spectech-tabs', [
-        'totalproject' => 100000000,
-        'id' => 1,
-        'progress' => 0,
-    ])
-        ->call('toggleExpand', 5)
-        ->call('toggleExpand', 5)
-        ->assertSet('expandedId', null)
-        ->assertCount('subItems', 0);
+    spectechTabs()
+        ->call('openSubForm', 5)
+        ->assertSet('activeSubFormId', 5)
+        ->call('closeSubForm')
+        ->assertSet('activeSubFormId', null)
+        ->assertSet('subName', '');
 });
 
-test('saveSub creates a sub spektek attached to the expanded item', function () {
+test('saveSub creates a sub spektek attached to the given spektek id', function () {
     fakeSubSpectechApi();
 
     $this->actingAs(User::factory()->create());
 
-    Volt::test('project.components.project-spectech-tabs', [
-        'totalproject' => 100000000,
-        'id' => 1,
-        'progress' => 0,
-    ])
-        ->call('toggleExpand', 5)
+    spectechTabs()
+        ->call('openSubForm', 5)
         ->set('subName', 'Kabel Fiber')
         ->set('subQuantity', 10)
         ->set('subPrice', '2000000')
         ->set('subType', 'hardware')
-        ->call('saveSub')
+        ->call('saveSub', 5)
         ->assertHasNoErrors()
-        ->assertSet('subName', '');
+        ->assertSet('subName', '')
+        ->assertSet('activeSubFormId', 5);
 
     Http::assertSent(fn ($request) => $request->method() === 'POST'
         && str_ends_with($request->url(), '/sub-spekteks')
@@ -115,41 +114,33 @@ test('saveSub creates a sub spektek attached to the expanded item', function () 
         && (int) $request['spektek_id'] === 5);
 });
 
-test('sub form requires name, quantity and price', function () {
+test('sub form requires name and quantity', function () {
     fakeSubSpectechApi();
 
     $this->actingAs(User::factory()->create());
 
-    Volt::test('project.components.project-spectech-tabs', [
-        'totalproject' => 100000000,
-        'id' => 1,
-        'progress' => 0,
-    ])
-        ->call('toggleExpand', 5)
-        ->call('saveSub')
-        ->assertHasErrors(['subName', 'subQuantity', 'subPrice']);
+    spectechTabs()
+        ->call('openSubForm', 5)
+        ->call('saveSub', 5)
+        ->assertHasErrors(['subName', 'subQuantity']);
 
     Http::assertNotSent(fn ($request) => $request->method() === 'POST'
         && str_ends_with($request->url(), '/sub-spekteks'));
 });
 
-test('editSub prefills the inline form and saveSub patches the sub spektek', function () {
+test('editSub prefills the form and saveSub patches the sub spektek', function () {
     fakeSubSpectechApi([subSpectechItem()]);
 
     $this->actingAs(User::factory()->create());
 
-    Volt::test('project.components.project-spectech-tabs', [
-        'totalproject' => 100000000,
-        'id' => 1,
-        'progress' => 0,
-    ])
-        ->call('toggleExpand', 5)
-        ->call('editSub', 2)
-        ->assertSet('showSubForm', true)
+    spectechTabs()
+        ->call('editSub', 5, 2)
+        ->assertSet('activeSubFormId', 5)
+        ->assertSet('subEditId', 2)
         ->assertSet('subName', 'Device Finder')
         ->assertSet('subQuantity', 5)
         ->set('subName', 'Device Finder V2')
-        ->call('saveSub')
+        ->call('saveSub', 5)
         ->assertHasNoErrors()
         ->assertSet('subEditId', null);
 
@@ -163,19 +154,15 @@ test('updateSubQty patches the qty received endpoint and clamps to qty total', f
 
     $this->actingAs(User::factory()->create());
 
-    $component = Volt::test('project.components.project-spectech-tabs', [
-        'totalproject' => 100000000,
-        'id' => 1,
-        'progress' => 0,
-    ])->call('toggleExpand', 5);
+    $component = spectechTabs();
 
-    $component->call('updateSubQty', 2, 3);
+    $component->call('updateSubQty', 5, 2, 3);
 
     Http::assertSent(fn ($request) => $request->method() === 'PATCH'
         && str_contains($request->url(), '/sub-spekteks/2/updateQtyReceived')
         && (int) $request['qty_received'] === 3);
 
-    $component->call('updateSubQty', 2, 99);
+    $component->call('updateSubQty', 5, 2, 99);
 
     Http::assertSent(fn ($request) => str_contains($request->url(), '/sub-spekteks/2/updateQtyReceived')
         && (int) $request['qty_received'] === 5);
@@ -186,52 +173,33 @@ test('deleteSub sends a DELETE for the selected sub spektek', function () {
 
     $this->actingAs(User::factory()->create());
 
-    Volt::test('project.components.project-spectech-tabs', [
-        'totalproject' => 100000000,
-        'id' => 1,
-        'progress' => 0,
-    ])
-        ->call('toggleExpand', 5)
-        ->call('confirmDeleteSub', 2)
+    spectechTabs()
+        ->call('confirmDeleteSub', 5, 2)
         ->assertSet('deletingSubId', 2)
+        ->assertSet('deletingSubSpektekId', 5)
         ->call('deleteSub')
-        ->assertSet('deletingSubId', null);
+        ->assertSet('deletingSubId', null)
+        ->assertSet('deletingSubSpektekId', null);
 
     Http::assertSent(fn ($request) => $request->method() === 'DELETE'
         && str_ends_with($request->url(), '/sub-spekteks/2'));
 });
 
-test('sub form is collapsible and closing it cancels an in-progress edit', function () {
+test('switching type or bulk mode closes the sub form and dispatches collapse', function () {
     fakeSubSpectechApi([subSpectechItem()]);
 
     $this->actingAs(User::factory()->create());
 
-    Volt::test('project.components.project-spectech-tabs', [
-        'totalproject' => 100000000,
-        'id' => 1,
-        'progress' => 0,
-    ])
-        ->call('toggleExpand', 5)
-        ->call('toggleSubForm')
-        ->assertSet('showSubForm', true)
-        ->call('editSub', 2)
-        ->call('toggleSubForm')
-        ->assertSet('showSubForm', false)
-        ->assertSet('subEditId', null)
-        ->assertSet('subName', '');
-});
+    spectechTabs()
+        ->call('openSubForm', 5)
+        ->assertSet('activeSubFormId', 5)
+        ->call('setType', 'software')
+        ->assertSet('activeSubFormId', null)
+        ->assertDispatched('spektek-collapse');
 
-test('bulk mode disables row expansion', function () {
-    fakeSubSpectechApi();
-
-    $this->actingAs(User::factory()->create());
-
-    Volt::test('project.components.project-spectech-tabs', [
-        'totalproject' => 100000000,
-        'id' => 1,
-        'progress' => 0,
-    ])
+    spectechTabs()
+        ->call('openSubForm', 5)
         ->call('toggleBulkMode')
-        ->call('toggleExpand', 5)
-        ->assertSet('expandedId', null);
+        ->assertSet('activeSubFormId', null)
+        ->assertDispatched('spektek-collapse');
 });
