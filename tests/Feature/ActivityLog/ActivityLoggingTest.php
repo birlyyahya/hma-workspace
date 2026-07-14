@@ -153,8 +153,8 @@ test('a project write records the payload in properties', function () {
 
 test('spectech creation and update are logged with the payload', function () {
     Http::fake([
-        '*/activity-categories/9' => Http::response(['status' => 200], 200),
-        '*/activity-categories' => Http::response(['status' => 201], 201),
+        '*/spekteks/9' => Http::response(['status' => 200], 200),
+        '*/spekteks' => Http::response(['status' => 201], 201),
     ]);
 
     $writer = new ProjectWriter('http://api.test', new ProjectCache('http://api.test'));

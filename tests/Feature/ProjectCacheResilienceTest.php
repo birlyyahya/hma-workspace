@@ -14,7 +14,7 @@ test('spectechFor returns empty without throwing when the API connection fails',
 
 test('spectechFor caches a successful response', function () {
     Http::fake([
-        '*activity-categories/search*' => Http::response(['status' => 200, 'data' => [['id' => 1]]], 200),
+        '*spekteks/search*' => Http::response(['status' => 200, 'data' => [['id' => 1]]], 200),
     ]);
 
     $cache = new ProjectCache('http://api.test');

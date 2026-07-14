@@ -48,7 +48,7 @@ class ProjectWriter
             return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), fn () => $this->cache->flushProjects(), [
                 'name' => 'project',
                 'event' => 'created',
-                'description' => 'Membuat project baru project #' . ($body['id'] ?? 'Unknown'),
+                'description' => 'Membuat project baru project #'.($body['id'] ?? 'Unknown'),
                 'properties' => ['name' => $payload['name'] ?? null, 'payload' => $payload],
             ]);
         } catch (\Throwable $e) {
@@ -118,7 +118,7 @@ class ProjectWriter
             return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), fn () => $this->cache->flushProjects(), [
                 'name' => 'project',
                 'event' => 'created',
-                'description' => 'Menambah timeline project di ' . ($payload['project_id'] ?? 'Unknown'),
+                'description' => 'Menambah timeline project di '.($payload['project_id'] ?? 'Unknown'),
                 'properties' => ['project_id' => $payload['project_id'] ?? null, 'payload' => $payload],
             ]);
         } catch (\Throwable $e) {
@@ -141,7 +141,7 @@ class ProjectWriter
             return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushProjects(), [
                 'name' => 'project',
                 'event' => 'updated',
-                'description' => "Memperbarui timeline #{$id} di project #" . ($body['project_id'] ?? 'Unknown'),
+                'description' => "Memperbarui timeline #{$id} di project #".($body['project_id'] ?? 'Unknown'),
                 'properties' => ['id' => $id, 'payload' => $payload],
             ]);
         } catch (\Throwable $e) {
@@ -163,7 +163,7 @@ class ProjectWriter
             return $this->result((int) ($body['status'] ?? 0) === 200, $body, $response->status(), fn () => $this->cache->flushProjects(), [
                 'name' => 'project',
                 'event' => 'deleted',
-                'description' => "Menghapus timeline #{$id} di project #" . ($body['project_id'] ?? 'Unknown'),
+                'description' => "Menghapus timeline #{$id} di project #".($body['project_id'] ?? 'Unknown'),
                 'properties' => ['id' => $id],
             ]);
         } catch (\Throwable $e) {
@@ -218,7 +218,7 @@ class ProjectWriter
             }, [
                 'name' => 'project',
                 'event' => 'deleted',
-                'description' => 'Menghapus anggota tim project pada project #' . ($body['project_id'] ?? 'Unknown'),
+                'description' => 'Menghapus anggota tim project pada project #'.($body['project_id'] ?? 'Unknown'),
                 'properties' => ['team_id' => $teamId, 'user_id' => $userId],
             ]);
         } catch (\Throwable $e) {
@@ -284,7 +284,7 @@ class ProjectWriter
     public function deleteSpectechCategory(int $id, int $projectId): array
     {
         try {
-            $response = $this->externalWrite(timeout: 10)->delete($this->apiBase.'/activity-categories/'.$id);
+            $response = $this->externalWrite(timeout: 10)->delete($this->apiBase.'/spekteks/'.$id);
             $body = (array) $response->json();
 
             return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushSpectech($projectId), [
@@ -307,7 +307,7 @@ class ProjectWriter
     public function createSpectechCategory(int $projectId, array $payload): array
     {
         try {
-            $response = $this->externalWrite(timeout: 10)->post($this->apiBase.'/activity-categories', $payload);
+            $response = $this->externalWrite(timeout: 10)->post($this->apiBase.'/spekteks', $payload);
             $body = (array) $response->json();
 
             return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), fn () => $this->cache->flushSpectech($projectId), [
@@ -322,7 +322,7 @@ class ProjectWriter
     }
 
     /**
-     * Perbarui spektek (POST ke /activity-categories/{id}, meniru pemanggil asli).
+     * Perbarui spektek (POST ke /spekteks/{id}, meniru pemanggil asli).
      * Idempotent. Sukses = body.status === 200.
      *
      * @param  array<string, mixed>  $payload
@@ -331,7 +331,7 @@ class ProjectWriter
     public function updateSpectechCategory(int $id, int $projectId, array $payload): array
     {
         try {
-            $response = $this->externalWrite(timeout: 10)->post($this->apiBase.'/activity-categories/'.$id, $payload);
+            $response = $this->externalWrite(timeout: 10)->patch($this->apiBase.'/spekteks/'.$id, $payload);
             $body = (array) $response->json();
 
             return $this->result((int) ($body['status'] ?? 0) === 200, $body, $response->status(), fn () => $this->cache->flushSpectech($projectId), [
@@ -354,7 +354,7 @@ class ProjectWriter
     public function bulkSpectech(int $projectId, array $payload): array
     {
         try {
-            $response = $this->externalWrite(timeout: 30)->post($this->apiBase.'/activity-categories/bulk', $payload);
+            $response = $this->externalWrite(timeout: 30)->post($this->apiBase.'/spekteks/bulk', $payload);
             $body = (array) $response->json();
 
             return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushSpectech($projectId), [
@@ -379,7 +379,7 @@ class ProjectWriter
         try {
             $response = $this->externalWrite(timeout: 30)->asMultipart()
                 ->attach('file', $file['contents'], $file['name'])
-                ->post($this->apiBase.'/activity-categories/import', ['project_id' => $projectId]);
+                ->post($this->apiBase.'/spekteks/import', ['project_id' => $projectId]);
             $body = (array) $response->json();
 
             return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushSpectech($projectId), [
@@ -390,6 +390,100 @@ class ProjectWriter
             ]);
         } catch (\Throwable $e) {
             return $this->fail('importSpectech', $e, ['project_id' => $projectId]);
+        }
+    }
+
+    // ------------------------------------------------------------- Sub Spektek
+
+    /**
+     * Tambah sub spektek pada satu spektek. NON-idempotent. Sukses = body.status === 201.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function createSubSpectech(int $spektekId, array $payload): array
+    {
+        try {
+            $response = $this->externalWrite(timeout: 10)->post($this->apiBase.'/sub-spekteks', $payload);
+            $body = (array) $response->json();
+
+            return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), fn () => $this->cache->flushSubSpectech($spektekId), [
+                'name' => 'project',
+                'event' => 'created',
+                'description' => "Menambah sub spektek pada spektek #{$spektekId}",
+                'properties' => ['spektek_id' => $spektekId, 'payload' => $payload],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->fail('createSubSpectech', $e, ['spektek_id' => $spektekId]);
+        }
+    }
+
+    /**
+     * Perbarui sub spektek. Idempotent. Sukses = body.status === 200.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function updateSubSpectech(int $id, int $spektekId, array $payload): array
+    {
+        try {
+            $response = $this->externalWrite(timeout: 10)->patch($this->apiBase.'/sub-spekteks/'.$id, $payload);
+            $body = (array) $response->json();
+
+            return $this->result((int) ($body['status'] ?? 0) === 200, $body, $response->status(), fn () => $this->cache->flushSubSpectech($spektekId), [
+                'name' => 'project',
+                'event' => 'updated',
+                'description' => "Memperbarui sub spektek #{$id} (spektek #{$spektekId})",
+                'properties' => ['id' => $id, 'spektek_id' => $spektekId, 'payload' => $payload],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->fail('updateSubSpectech', $e, ['id' => $id, 'spektek_id' => $spektekId]);
+        }
+    }
+
+    /**
+     * Perbarui jumlah diterima sub spektek. Idempotent. Sukses = HTTP 2xx.
+     *
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function updateSubSpectechQty(int $id, int $spektekId, int $qtyReceived): array
+    {
+        try {
+            $response = $this->externalWrite(timeout: 10)->patch($this->apiBase.'/sub-spekteks/'.$id.'/updateQtyReceived', [
+                'qty_received' => $qtyReceived,
+            ]);
+            $body = (array) $response->json();
+
+            return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushSubSpectech($spektekId), [
+                'name' => 'project',
+                'event' => 'updated',
+                'description' => "Memperbarui qty diterima sub spektek #{$id} (spektek #{$spektekId})",
+                'properties' => ['id' => $id, 'spektek_id' => $spektekId, 'qty_received' => $qtyReceived],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->fail('updateSubSpectechQty', $e, ['id' => $id, 'spektek_id' => $spektekId]);
+        }
+    }
+
+    /**
+     * Hapus sub spektek (soft delete di backend). Sukses = HTTP 2xx.
+     *
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function deleteSubSpectech(int $id, int $spektekId): array
+    {
+        try {
+            $response = $this->externalWrite(timeout: 10)->delete($this->apiBase.'/sub-spekteks/'.$id);
+            $body = (array) $response->json();
+
+            return $this->result($response->successful(), $body, $response->status(), fn () => $this->cache->flushSubSpectech($spektekId), [
+                'name' => 'project',
+                'event' => 'deleted',
+                'description' => "Menghapus sub spektek #{$id} (spektek #{$spektekId})",
+                'properties' => ['id' => $id, 'spektek_id' => $spektekId],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->fail('deleteSubSpectech', $e, ['id' => $id, 'spektek_id' => $spektekId]);
         }
     }
 
@@ -411,7 +505,7 @@ class ProjectWriter
             return $this->result((int) ($body['status'] ?? 0) === 201, $body, $response->status(), null, [
                 'name' => 'project',
                 'event' => 'created',
-                'description' => 'Mengunggah dokumen admin project di project #' . ($payload['project_id'] ?? 'Unknown'),
+                'description' => 'Mengunggah dokumen admin project di project #'.($payload['project_id'] ?? 'Unknown'),
                 'properties' => ['project_id' => $payload['project_id'] ?? null, 'payload' => $payload],
             ]);
         } catch (\Throwable $e) {
@@ -434,7 +528,7 @@ class ProjectWriter
             return $this->result($ok, $body, $response->status(), null, [
                 'name' => 'project',
                 'event' => 'deleted',
-                'description' => "Menghapus dokumen admin project #{$id} di project #" . ($body['project_id'] ?? 'Unknown'),
+                'description' => "Menghapus dokumen admin project #{$id} di project #".($body['project_id'] ?? 'Unknown'),
                 'properties' => ['id' => $id],
             ]);
         } catch (\Throwable $e) {

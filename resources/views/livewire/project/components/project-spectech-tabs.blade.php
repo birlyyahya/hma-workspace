@@ -39,6 +39,23 @@ new class extends Component {
     public string $sortDir = 'asc';
     public int $visibleLimit = 25;
 
+    public ?int $expandedId = null;
+
+    /**
+     * @var array<int, array<string, mixed>>
+     */
+    public array $subItems = [];
+
+    public ?int $subEditId = null;
+    public string $subName = '';
+    public ?int $subQuantity = null;
+    public ?string $subPrice = null;
+    public string $subType = 'hardware';
+    public ?int $deletingSubId = null;
+
+    public ?string $detailName = null;
+    public ?string $detailHtml = null;
+
     public function placeholder()
     {
         return view('components.placeholder.ph_project_spectech_tabs');
@@ -217,6 +234,7 @@ new class extends Component {
         $this->activeType = $type;
         $this->selectedIds = [];
         $this->reset('visibleLimit');
+        $this->collapseSub();
     }
 
     public function sortByColumn(string $column): void
@@ -256,10 +274,202 @@ new class extends Component {
         $this->reset('visibleLimit');
     }
 
+    public function toggleExpand(int $id): void
+    {
+        if ($this->bulkMode) {
+            return;
+        }
+
+        if ($this->expandedId === $id) {
+            $this->collapseSub();
+
+            return;
+        }
+
+        $this->expandedId = $id;
+        $this->resetSubForm();
+        $this->loadSubItems();
+    }
+
+    public function collapseSub(): void
+    {
+        $this->expandedId = null;
+        $this->subItems = [];
+        $this->resetSubForm();
+    }
+
+    protected function loadSubItems(): void
+    {
+        if ($this->expandedId === null) {
+            $this->subItems = [];
+
+            return;
+        }
+
+        $data = app(ProjectCache::class)->subSpectechFor((int) $this->expandedId);
+
+        $this->subItems = array_map(fn (array $item): array => [
+            'id'                  => $item['id'],
+            'name'                => $item['name'] ?? '',
+            'qty_total'           => (int) ($item['qty_total'] ?? 0),
+            'qty_received'        => (int) ($item['qty_received'] ?? 0),
+            'total_nominal'       => (float) ($item['total_nominal'] ?? 0),
+            'progress_percentage' => (float) ($item['progress_percentage'] ?? 0),
+            'type'                => $item['type'] ?? 'hardware',
+        ], $data);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function subRules(): array
+    {
+        return [
+            'subName'     => 'required|string|min:3|max:120',
+            'subQuantity' => 'required|integer|min:1',
+            'subPrice'    => 'required',
+            'subType'     => 'required|in:hardware,software',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function subMessages(): array
+    {
+        return [
+            'subName.required'     => 'Nama sub spektek wajib diisi.',
+            'subName.min'          => 'Nama sub spektek minimal 3 karakter.',
+            'subQuantity.required' => 'Jumlah wajib diisi.',
+            'subQuantity.min'      => 'Jumlah minimal 1.',
+            'subPrice.required'    => 'Total harga wajib diisi.',
+        ];
+    }
+
+    public function resetSubForm(): void
+    {
+        $this->reset('subEditId', 'subName', 'subQuantity', 'subPrice');
+        $this->subType = 'hardware';
+        $this->resetErrorBag(['subName', 'subQuantity', 'subPrice', 'subType']);
+    }
+
+    public function saveSub(): void
+    {
+        if ($this->expandedId === null) {
+            return;
+        }
+
+        $this->validate($this->subRules(), $this->subMessages());
+
+        $payload = [
+            'name'          => $this->subName,
+            'qty_total'     => (int) $this->subQuantity,
+            'total_nominal' => (int) preg_replace('/[^0-9]/', '', (string) $this->subPrice),
+            'type'          => $this->subType,
+            'spektek_id'    => (int) $this->expandedId,
+        ];
+
+        $result = $this->subEditId !== null
+            ? app(ProjectWriter::class)->updateSubSpectech((int) $this->subEditId, (int) $this->expandedId, $payload)
+            : app(ProjectWriter::class)->createSubSpectech((int) $this->expandedId, $payload);
+
+        if (! $result['ok']) {
+            Toaster::error(getErrorMessages($result['body']['errors'] ?? []) ?: 'Gagal menyimpan sub spektek');
+            $this->logApiFailure('saveSub', $result['body']);
+
+            return;
+        }
+
+        Toaster::success($this->subEditId !== null ? 'Sub spektek berhasil diperbarui' : 'Sub spektek berhasil ditambahkan');
+        $this->resetSubForm();
+        $this->loadSubItems();
+    }
+
+    public function editSub(int $id): void
+    {
+        $item = collect($this->subItems)->firstWhere('id', $id);
+
+        if (! $item) {
+            Toaster::error('Sub spektek tidak ditemukan');
+
+            return;
+        }
+
+        $this->subEditId = $id;
+        $this->subName = $item['name'];
+        $this->subQuantity = (int) $item['qty_total'];
+        $this->subPrice = (string) (int) $item['total_nominal'];
+        $this->subType = $item['type'];
+    }
+
+    public function confirmDeleteSub(int $id): void
+    {
+        $this->deletingSubId = $id;
+        Flux::modal('deleteSubSpectech')->show();
+    }
+
+    public function deleteSub(): void
+    {
+        if ($this->deletingSubId === null || $this->expandedId === null) {
+            return;
+        }
+
+        $result = app(ProjectWriter::class)->deleteSubSpectech((int) $this->deletingSubId, (int) $this->expandedId);
+
+        if ($result['ok']) {
+            Toaster::success('Sub spektek berhasil dihapus');
+            $this->loadSubItems();
+        } else {
+            Toaster::error('Gagal menghapus sub spektek');
+        }
+
+        $this->reset('deletingSubId');
+        Flux::modal('deleteSubSpectech')->close();
+    }
+
+    public function updateSubQty(int $id, $qty): void
+    {
+        if ($this->expandedId === null) {
+            return;
+        }
+
+        $item = collect($this->subItems)->firstWhere('id', $id);
+
+        if (! $item) {
+            return;
+        }
+
+        $qty = max(0, min((int) $qty, (int) $item['qty_total']));
+
+        $result = app(ProjectWriter::class)->updateSubSpectechQty($id, (int) $this->expandedId, $qty);
+
+        if (! $result['ok']) {
+            Toaster::error('Gagal memperbarui jumlah diterima');
+        }
+
+        $this->loadSubItems();
+    }
+
+    public function showDetail(int $id): void
+    {
+        $item = collect($this->spectech)->firstWhere('id', $id);
+
+        if (! $item || empty($item['detail'])) {
+            Toaster::error('Detail spesifikasi tidak tersedia');
+
+            return;
+        }
+
+        $this->detailName = $item['name'];
+        $this->detailHtml = $item['detail'];
+        Flux::modal('viewSpectechDetail')->show();
+    }
+
     public function toggleBulkMode(): void
     {
         $this->bulkMode = ! $this->bulkMode;
         $this->selectedIds = [];
+        $this->collapseSub();
     }
 
     public function toggleSelect(int $id): void
@@ -720,8 +930,7 @@ new class extends Component {
                 @endif
             @else
                 {{-- ============ TABLE VIEW (desktop) ============ --}}
-                <div class="hidden md:block bg-white border border-zinc-200 rounded-xl overflow-hidden"
-                    x-data="{ expandedId: null, toggleDetail(id) { this.expandedId = this.expandedId === id ? null : id } }">
+                <div class="hidden md:block bg-white border border-zinc-200 rounded-xl overflow-hidden">
                     <table class="w-full text-sm">
                         <thead class="bg-zinc-50 border-b border-zinc-200">
                             <tr class="text-left text-[11px] uppercase tracking-wide text-zinc-500">
@@ -767,19 +976,16 @@ new class extends Component {
                                     $qtyTotal = (int) ($data['qty_total'] ?? 0);
                                     $isSelected = in_array((int) $data['id'], array_map('intval', $selectedIds), true);
                                     $hasDetail = ! empty($data['detail']);
+                                    $isExpanded = ! $bulkMode && $expandedId === (int) $data['id'];
                                 @endphp
                                 <tr wire:key="spectech-row-{{ $data['id'] }}"
                                     @class([
-                                        'transition',
+                                        'transition cursor-pointer',
                                         'bg-red-50/60' => $bulkMode && $isSelected,
-                                        'hover:bg-zinc-50/60' => !($bulkMode && $isSelected),
-                                        'cursor-pointer' => $bulkMode || $hasDetail,
+                                        'bg-zinc-50/80' => $isExpanded,
+                                        'hover:bg-zinc-50/60' => !($bulkMode && $isSelected) && !$isExpanded,
                                     ])
-                                    @if($bulkMode)
-                                        wire:click="toggleSelect({{ (int) $data['id'] }})"
-                                    @elseif($hasDetail)
-                                        x-on:click="toggleDetail({{ (int) $data['id'] }})"
-                                    @endif>
+                                    wire:click="{{ $bulkMode ? 'toggleSelect' : 'toggleExpand' }}({{ (int) $data['id'] }})">
                                     @if($bulkMode)
                                         <td class="px-4 py-3 align-top">
                                             <input type="checkbox"
@@ -791,10 +997,12 @@ new class extends Component {
                                     @endif
                                     <td class="px-4 py-3 align-top">
                                         <div class="flex items-start gap-2">
-                                            @if($hasDetail && !$bulkMode)
-                                                <flux:icon.chevron-right class="w-4 h-4 mt-0.5 text-zinc-400 shrink-0 transition-transform"
-                                                    x-bind:class="expandedId === {{ (int) $data['id'] }} && 'rotate-90'" />
-                                            @endif
+                                            @unless($bulkMode)
+                                                <flux:icon.chevron-right @class([
+                                                    'w-4 h-4 mt-0.5 text-zinc-400 shrink-0 transition-transform',
+                                                    'rotate-90' => $isExpanded,
+                                                ]) />
+                                            @endunless
                                             <div class="min-w-0">
                                                 <p class="font-medium text-zinc-900">{{ $data['name'] }}</p>
                                                 @if(!empty($data['note']))
@@ -820,7 +1028,7 @@ new class extends Component {
                                                 <flux:button variant="ghost" size="sm" icon="ellipsis-vertical" class="text-zinc-400" />
                                                 <flux:navmenu>
                                                     @if($hasDetail)
-                                                        <flux:navmenu.item icon="eye" x-on:click="toggleDetail({{ (int) $data['id'] }})">Lihat Detail</flux:navmenu.item>
+                                                        <flux:navmenu.item icon="eye" wire:click="showDetail({{ (int) $data['id'] }})">Lihat Detail</flux:navmenu.item>
                                                     @endif
                                                     <flux:navmenu.item icon="pencil-square" wire:click="editSpectech({{ $data['id'] }})">Edit</flux:navmenu.item>
                                                     <flux:navmenu.item icon="trash" variant="danger"
@@ -831,20 +1039,105 @@ new class extends Component {
                                     @endunless
                                 </tr>
 
-                                {{-- Expandable detail row --}}
-                                @if($hasDetail && !$bulkMode)
-                                    <tr wire:key="spectech-detail-{{ $data['id'] }}" x-cloak
-                                        x-show="expandedId === {{ (int) $data['id'] }}"
-                                        class="border-t-0!">
-                                        <td colspan="5" class="px-4 pb-4 pt-0">
-                                            <div class="ml-6 rounded-lg bg-zinc-50 border border-zinc-200 p-4">
-                                                <p class="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-zinc-500 mb-2">
-                                                    <flux:icon.list-bullet class="w-3.5 h-3.5" />
-                                                    Detail Spesifikasi
-                                                </p>
-                                                <div class="spectech-prose text-sm text-zinc-700 leading-relaxed">
-                                                    {!! $data['detail'] !!}
+                                {{-- Expandable sub spektek panel --}}
+                                @if($isExpanded)
+                                    <tr wire:key="spectech-sub-{{ $data['id'] }}" class="border-t-0!">
+                                        <td colspan="5" class="px-4 pb-5 pt-0">
+                                            <div class="ml-6 rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 space-y-4">
+                                                <div class="flex items-center justify-between gap-3">
+                                                    <p class="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-zinc-500">
+                                                        <flux:icon.squares-2x2 class="w-3.5 h-3.5" />
+                                                        Sub Spektek ({{ count($subItems) }})
+                                                    </p>
+                                                    @if($hasDetail)
+                                                        <button type="button" wire:click="showDetail({{ (int) $data['id'] }})"
+                                                            class="inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:text-red-700 cursor-pointer">
+                                                            <flux:icon.document-text class="w-3.5 h-3.5" />
+                                                            Lihat Detail Spesifikasi
+                                                        </button>
+                                                    @endif
                                                 </div>
+
+                                                @if(count($subItems) > 0)
+                                                    <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+                                                        <table class="w-full text-sm">
+                                                            <thead class="bg-zinc-50 border-b border-zinc-200">
+                                                                <tr class="text-left text-[11px] uppercase tracking-wide text-zinc-500">
+                                                                    <th class="px-3 py-2 font-medium">Nama</th>
+                                                                    <th class="px-3 py-2 font-medium w-36">Diterima / Qty</th>
+                                                                    <th class="px-3 py-2 font-medium w-36 text-right">Total Nominal</th>
+                                                                    <th class="px-2 py-2 w-20"></th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody class="divide-y divide-zinc-100">
+                                                                @foreach($subItems as $sub)
+                                                                    <tr wire:key="sub-row-{{ $sub['id'] }}">
+                                                                        <td class="px-3 py-2">
+                                                                            <p class="font-medium text-zinc-900">{{ $sub['name'] }}</p>
+                                                                            <p class="text-xs text-zinc-500">{{ $sub['type'] === 'software' ? 'Aplikasi' : 'Barang' }}</p>
+                                                                        </td>
+                                                                        <td class="px-3 py-2">
+                                                                            <div class="flex items-center gap-1.5">
+                                                                                <input type="number" min="0" max="{{ $sub['qty_total'] }}"
+                                                                                    value="{{ $sub['qty_received'] }}"
+                                                                                    wire:change="updateSubQty({{ (int) $sub['id'] }}, $event.target.value)"
+                                                                                    class="w-16 rounded-lg border border-zinc-300 bg-white text-sm py-1 px-2 focus:border-red-500 focus:ring-red-500" />
+                                                                                <span class="text-xs text-zinc-500">/ {{ $sub['qty_total'] }}</span>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td class="px-3 py-2 text-right font-medium text-zinc-900">
+                                                                            Rp {{ number_format($sub['total_nominal'], 0, ',', '.') }}
+                                                                        </td>
+                                                                        <td class="px-2 py-2 text-right whitespace-nowrap">
+                                                                            <flux:button wire:click="editSub({{ (int) $sub['id'] }})"
+                                                                                variant="ghost" size="xs" icon="pencil-square" class="text-zinc-400" />
+                                                                            <flux:button wire:click="confirmDeleteSub({{ (int) $sub['id'] }})"
+                                                                                variant="ghost" size="xs" icon="trash" class="text-zinc-400 hover:text-red-600!" />
+                                                                        </td>
+                                                                    </tr>
+                                                                @endforeach
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                @else
+                                                    <p class="text-sm text-zinc-500">
+                                                        Belum ada sub spektek untuk item ini — tambahkan lewat form di bawah (opsional).
+                                                    </p>
+                                                @endif
+
+                                                {{-- Inline add/edit form --}}
+                                                <form wire:submit="saveSub" class="space-y-2">
+                                                    <div class="grid grid-cols-12 gap-2">
+                                                        <div class="col-span-4">
+                                                            <flux:input wire:model="subName" size="sm" placeholder="Nama sub spektek..." />
+                                                        </div>
+                                                        <div class="col-span-2">
+                                                            <flux:select wire:model="subType" size="sm">
+                                                                <flux:select.option value="hardware">Barang</flux:select.option>
+                                                                <flux:select.option value="software">Aplikasi</flux:select.option>
+                                                            </flux:select>
+                                                        </div>
+                                                        <div class="col-span-2">
+                                                            <flux:input wire:model="subQuantity" type="number" min="1" size="sm" placeholder="Qty" />
+                                                        </div>
+                                                        <div class="col-span-2">
+                                                            <flux:input wire:model="subPrice" type="number" min="0" size="sm" placeholder="Total harga" />
+                                                        </div>
+                                                        <div class="col-span-2 flex items-start gap-1">
+                                                            <flux:button type="submit" variant="primary" size="sm" class="flex-1"
+                                                                icon="{{ $subEditId ? 'check' : 'plus' }}"
+                                                                wire:loading.attr="disabled" wire:target="saveSub">
+                                                                {{ $subEditId ? 'Simpan' : 'Tambah' }}
+                                                            </flux:button>
+                                                            @if($subEditId)
+                                                                <flux:button wire:click="resetSubForm" variant="ghost" size="sm" icon="x-mark" tooltip="Batal edit" />
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                    <flux:error name="subName" />
+                                                    <flux:error name="subQuantity" />
+                                                    <flux:error name="subPrice" />
+                                                </form>
                                             </div>
                                         </td>
                                     </tr>
@@ -868,8 +1161,7 @@ new class extends Component {
                 </div>
 
                 {{-- ============ COMPACT LIST (mobile) ============ --}}
-                <div class="md:hidden bg-white border border-zinc-200 rounded-xl divide-y divide-zinc-100 overflow-hidden"
-                    x-data="{ expandedId: null, toggleDetail(id) { this.expandedId = this.expandedId === id ? null : id } }">
+                <div class="md:hidden bg-white border border-zinc-200 rounded-xl divide-y divide-zinc-100 overflow-hidden">
                     @foreach ($this->visibleSpectech as $data)
                         @php
                             $qtyRecv = (int) ($data['qty_recived'] ?? 0);
@@ -882,18 +1174,15 @@ new class extends Component {
                                 : ($qtyRecv > 0 ? 'bg-amber-50 text-amber-700 ring-amber-600/20' : 'bg-zinc-50 text-zinc-600 ring-zinc-500/20');
                             $isSelected = in_array((int) $data['id'], array_map('intval', $selectedIds), true);
                             $hasDetail = ! empty($data['detail']);
+                            $isExpanded = ! $bulkMode && $expandedId === (int) $data['id'];
                         @endphp
                         <div wire:key="spectech-mobile-{{ $data['id'] }}"
                             @class([
-                                'flex items-start gap-3 p-4 transition',
+                                'flex items-start gap-3 p-4 transition cursor-pointer',
                                 'bg-red-50/60' => $bulkMode && $isSelected,
-                                'cursor-pointer' => $bulkMode || $hasDetail,
+                                'bg-zinc-50/80' => $isExpanded,
                             ])
-                            @if($bulkMode)
-                                wire:click="toggleSelect({{ (int) $data['id'] }})"
-                            @elseif($hasDetail)
-                                x-on:click="toggleDetail({{ (int) $data['id'] }})"
-                            @endif>
+                            wire:click="{{ $bulkMode ? 'toggleSelect' : 'toggleExpand' }}({{ (int) $data['id'] }})">
                             @if($bulkMode)
                                 <input type="checkbox"
                                     class="mt-1 w-4 h-4 shrink-0 rounded border-zinc-300 text-red-600 focus:ring-red-500 cursor-pointer"
@@ -903,10 +1192,12 @@ new class extends Component {
                             @endif
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2 flex-wrap">
-                                    @if($hasDetail && !$bulkMode)
-                                        <flux:icon.chevron-right class="w-4 h-4 text-zinc-400 shrink-0 transition-transform"
-                                            x-bind:class="expandedId === {{ (int) $data['id'] }} && 'rotate-90'" />
-                                    @endif
+                                    @unless($bulkMode)
+                                        <flux:icon.chevron-right @class([
+                                            'w-4 h-4 text-zinc-400 shrink-0 transition-transform',
+                                            'rotate-90' => $isExpanded,
+                                        ]) />
+                                    @endunless
                                     <p class="font-medium text-zinc-900 truncate">{{ $data['name'] }}</p>
                                     <span class="inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full ring-1 ring-inset {{ $statusColor }}">
                                         {{ $statusLabel }}
@@ -923,17 +1214,66 @@ new class extends Component {
                                         {{ $data['note'] }}
                                     </p>
                                 @endif
-                                @if($hasDetail && !$bulkMode)
-                                    <div x-show="expandedId === {{ (int) $data['id'] }}" x-collapse x-cloak>
-                                        <div class="mt-2 rounded-lg bg-zinc-50 border border-zinc-200 p-3">
-                                            <p class="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-zinc-500 mb-2">
-                                                <flux:icon.list-bullet class="w-3.5 h-3.5" />
-                                                Detail Spesifikasi
+                                @if($isExpanded)
+                                    <div class="mt-3 rounded-lg bg-zinc-50 border border-zinc-200 p-3 space-y-3 cursor-default" x-on:click.stop>
+                                        <div class="flex items-center justify-between gap-2">
+                                            <p class="text-[11px] uppercase tracking-wide text-zinc-500">
+                                                Sub Spektek ({{ count($subItems) }})
                                             </p>
-                                            <div class="spectech-prose text-sm text-zinc-700 leading-relaxed">
-                                                {!! $data['detail'] !!}
-                                            </div>
+                                            @if($hasDetail)
+                                                <button type="button" wire:click="showDetail({{ (int) $data['id'] }})"
+                                                    class="text-xs font-medium text-red-600 cursor-pointer">
+                                                    Lihat Detail
+                                                </button>
+                                            @endif
                                         </div>
+
+                                        @forelse($subItems as $sub)
+                                            <div wire:key="sub-mobile-{{ $sub['id'] }}"
+                                                class="flex items-center justify-between gap-2 rounded-lg bg-white border border-zinc-100 px-3 py-2">
+                                                <div class="min-w-0">
+                                                    <p class="text-sm font-medium text-zinc-900 truncate">{{ $sub['name'] }}</p>
+                                                    <p class="text-xs text-zinc-500">
+                                                        {{ $sub['qty_received'] }}/{{ $sub['qty_total'] }} diterima
+                                                        · Rp {{ number_format($sub['total_nominal'], 0, ',', '.') }}
+                                                    </p>
+                                                </div>
+                                                <div class="flex items-center shrink-0">
+                                                    <flux:button wire:click="editSub({{ (int) $sub['id'] }})"
+                                                        variant="ghost" size="xs" icon="pencil-square" class="text-zinc-400" />
+                                                    <flux:button wire:click="confirmDeleteSub({{ (int) $sub['id'] }})"
+                                                        variant="ghost" size="xs" icon="trash" class="text-zinc-400 hover:text-red-600!" />
+                                                </div>
+                                            </div>
+                                        @empty
+                                            <p class="text-xs text-zinc-500">Belum ada sub spektek untuk item ini.</p>
+                                        @endforelse
+
+                                        {{-- Inline add/edit form --}}
+                                        <form wire:submit="saveSub" class="space-y-2">
+                                            <flux:input wire:model="subName" size="sm" placeholder="Nama sub spektek..." />
+                                            <div class="grid grid-cols-3 gap-2">
+                                                <flux:select wire:model="subType" size="sm">
+                                                    <flux:select.option value="hardware">Barang</flux:select.option>
+                                                    <flux:select.option value="software">Aplikasi</flux:select.option>
+                                                </flux:select>
+                                                <flux:input wire:model="subQuantity" type="number" min="1" size="sm" placeholder="Qty" />
+                                                <flux:input wire:model="subPrice" type="number" min="0" size="sm" placeholder="Harga" />
+                                            </div>
+                                            <flux:error name="subName" />
+                                            <flux:error name="subQuantity" />
+                                            <flux:error name="subPrice" />
+                                            <div class="flex gap-2">
+                                                <flux:button type="submit" variant="primary" size="sm" class="flex-1"
+                                                    icon="{{ $subEditId ? 'check' : 'plus' }}"
+                                                    wire:loading.attr="disabled" wire:target="saveSub">
+                                                    {{ $subEditId ? 'Simpan Perubahan' : 'Tambah Sub' }}
+                                                </flux:button>
+                                                @if($subEditId)
+                                                    <flux:button wire:click="resetSubForm" variant="ghost" size="sm" icon="x-mark" />
+                                                @endif
+                                            </div>
+                                        </form>
                                     </div>
                                 @endif
                             </div>
@@ -1065,7 +1405,7 @@ new class extends Component {
                         class="spectech-editor spectech-editor--tall overflow-hidden rounded-lg border border-zinc-200 bg-white focus-within:border-zinc-400">
                         <div x-ref="editor" data-placeholder="Rincian spesifikasi lengkap — cth. RAM 16GB DDR5, SSD 512GB NVMe, Prosesor Intel i7..."></div>
                     </div>
-                    <flux:description>Opsional. Bisa berupa daftar poin; tampil saat baris item diklik di tabel.</flux:description>
+                    <flux:description>Opsional. Bisa berupa daftar poin; dibuka lewat "Lihat Detail" pada item di tabel.</flux:description>
                     <flux:error name="form.detail" />
                 </flux:field>
             </div>
@@ -1175,7 +1515,7 @@ new class extends Component {
                         class="spectech-editor spectech-editor--tall overflow-hidden rounded-lg border border-zinc-200 bg-white focus-within:border-zinc-400">
                         <div x-ref="editor" data-placeholder="Rincian spesifikasi lengkap — cth. RAM 16GB DDR5, SSD 512GB NVMe, Prosesor Intel i7..."></div>
                     </div>
-                    <flux:description>Opsional. Bisa berupa daftar poin; tampil saat baris item diklik di tabel.</flux:description>
+                    <flux:description>Opsional. Bisa berupa daftar poin; dibuka lewat "Lihat Detail" pada item di tabel.</flux:description>
                     <flux:error name="form.detail" />
                 </flux:field>
             </div>
@@ -1303,6 +1643,29 @@ new class extends Component {
         </div>
     </div>
 </flux:modal>
+
+{{-- ============ VIEW DETAIL MODAL ============ --}}
+<flux:modal name="viewSpectechDetail" class="md:w-2xl">
+    <div class="space-y-4">
+        <div class="space-y-1">
+            <flux:heading size="lg">{{ $detailName }}</flux:heading>
+            <flux:text class="text-sm text-zinc-500">Detail spesifikasi lengkap item.</flux:text>
+        </div>
+        <div class="spectech-prose text-sm text-zinc-700 leading-relaxed max-h-[60vh] overflow-y-auto rounded-lg bg-zinc-50 border border-zinc-200 p-4">
+            {!! $detailHtml !!}
+        </div>
+        <div class="flex justify-end">
+            <flux:modal.close>
+                <flux:button variant="ghost">Tutup</flux:button>
+            </flux:modal.close>
+        </div>
+    </div>
+</flux:modal>
+
+{{-- ============ DELETE SUB CONFIRMATION MODAL ============ --}}
+<x-confirm-modal name="deleteSubSpectech" confirm="deleteSub" title="Hapus Sub Spektek?">
+    Sub spektek akan dihapus permanen dari item ini. Tindakan ini tidak dapat dibatalkan.
+</x-confirm-modal>
 
 {{-- ============ DELETE CONFIRMATION MODAL ============ --}}
 <x-confirm-modal name="deleteSpectech" confirm="deleteSpectech" title="Hapus Spectech?">

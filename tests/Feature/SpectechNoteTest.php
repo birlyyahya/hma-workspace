@@ -12,8 +12,8 @@ function fakeSpectechApi(array $items = []): void
             'data' => $items,
             'pagination' => [],
         ], 200),
-        '*activity-categories/*' => Http::response(['status' => 200, 'data' => []], 200),
-        '*activity-categories' => Http::response(['status' => 201, 'data' => []], 201),
+        '*spekteks/*' => Http::response(['status' => 200, 'data' => []], 200),
+        '*spekteks' => Http::response(['status' => 201, 'data' => []], 201),
     ]);
 }
 
@@ -46,7 +46,7 @@ test('create forwards the note to the spectech API', function () {
         ->call('create')
         ->assertHasNoErrors();
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), 'activity-categories')
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'spekteks')
         && ! str_contains($request->url(), 'search')
         && $request['note'] === 'Kabel cadangan gudang');
 });
@@ -74,6 +74,6 @@ test('update forwards the edited note to the spectech API', function () {
         ->call('update')
         ->assertHasNoErrors();
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), 'activity-categories/5')
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'spekteks/5')
         && $request['note'] === 'Catatan baru');
 });

@@ -55,7 +55,7 @@ test('a queued draft can be removed', function () {
 
 test('save sends all drafts to the bulk endpoint and clears the queue', function () {
     Http::fake([
-        '*activity-categories/bulk' => Http::response(['status' => 201], 201),
+        '*spekteks/bulk' => Http::response(['status' => 201], 201),
     ]);
 
     $this->actingAs(User::factory()->create());
@@ -75,7 +75,7 @@ test('save sends all drafts to the bulk endpoint and clears the queue', function
         ->assertCount('drafts', 0)
         ->assertDispatched('spectechSaved');
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), 'activity-categories/bulk')
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'spekteks/bulk')
         && (int) $request['project_id'] === 42
         && count($request['items']) === 2
         && $request['items'][0]['type'] === 'hardware'
@@ -96,7 +96,7 @@ test('save does nothing when the queue is empty', function () {
 
 test('import uploads an excel file to the import endpoint', function () {
     Http::fake([
-        '*activity-categories/import' => Http::response(['status' => 200], 200),
+        '*spekteks/import' => Http::response(['status' => 200], 200),
     ]);
 
     $this->actingAs(User::factory()->create());
@@ -107,7 +107,7 @@ test('import uploads an excel file to the import endpoint', function () {
         ->assertHasNoErrors()
         ->assertDispatched('spectechSaved');
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), 'activity-categories/import'));
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'spekteks/import'));
 });
 
 test('import rejects non-excel files', function () {

@@ -94,7 +94,7 @@ test('createCompany posts multipart and succeeds on HTTP 2xx', function () {
 });
 
 test('deleteSpectechCategory succeeds on HTTP 2xx', function () {
-    Http::fake(['*/activity-categories/11' => Http::response([], 200)]);
+    Http::fake(['*/spekteks/11' => Http::response([], 200)]);
 
     expect(makeProjectWriter()->deleteSpectechCategory(11, 100)['ok'])->toBeTrue();
 });

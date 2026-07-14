@@ -15,7 +15,7 @@ function fakeSpectechListApi(array $items): void
             'data' => $items,
             'pagination' => [],
         ], 200),
-        '*activity-categories*' => Http::response([
+        '*spekteks*' => Http::response([
             'status' => 201,
             'data' => [],
         ], 201),
@@ -158,7 +158,7 @@ test('create forwards the detail field to the spectech API', function () {
         ->call('create')
         ->assertHasNoErrors();
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), 'activity-categories')
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'spekteks')
         && ! str_contains($request->url(), 'search')
         && $request['detail'] === '<ul><li>RAM 16GB DDR5</li><li>SSD 512GB NVMe</li></ul>');
 });
@@ -180,7 +180,7 @@ test('editing an item populates the detail field on the form', function () {
         ->assertSet('form.detail', '<p>Prosesor Intel i7</p>');
 });
 
-test('item detail is rendered in the expandable row', function () {
+test('showDetail opens the detail modal with the item content', function () {
     $item = makeSpectechItems(1)[0];
     $item['detail'] = '<ul><li>RAM 16GB DDR5</li></ul>';
 
@@ -193,8 +193,24 @@ test('item detail is rendered in the expandable row', function () {
         'id' => 1,
         'progress' => 0,
     ])
-        ->assertSee('<li>RAM 16GB DDR5</li>', false)
-        ->assertSee('Detail Spesifikasi');
+        ->call('showDetail', 1)
+        ->assertSet('detailName', 'Item 001')
+        ->assertSet('detailHtml', '<ul><li>RAM 16GB DDR5</li></ul>')
+        ->assertSee('<li>RAM 16GB DDR5</li>', false);
+});
+
+test('showDetail rejects an item without detail', function () {
+    fakeSpectechListApi(makeSpectechItems(1));
+
+    $this->actingAs(User::factory()->create());
+
+    Volt::test('project.components.project-spectech-tabs', [
+        'totalproject' => 100000000,
+        'id' => 1,
+        'progress' => 0,
+    ])
+        ->call('showDetail', 1)
+        ->assertSet('detailName', null);
 });
 
 test('manage modal opens on the requested tab', function () {

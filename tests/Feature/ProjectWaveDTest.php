@@ -25,14 +25,14 @@ test('files-tabs finalizeChunkUpload posts the doc through ProjectWriter', funct
 
 test('spectech-tabs deleteSpectech sends the DELETE through ProjectWriter', function () {
     Http::fake([
-        '*activity-categories/search*' => Http::response(['status' => 200, 'data' => [
+        '*spekteks/search*' => Http::response(['status' => 200, 'data' => [
             [
                 'id' => 3, 'name' => 'Spektek A', 'type' => 'hardware',
-                'qty_total' => 1, 'qty_recived' => 0, 'total_nominal' => 1000,
-                'qty_nominal' => 1000, 'percentage' => 0, 'note' => '',
+                'qty_total' => 1, 'qty_received' => 0, 'total_nominal' => 1000,
+                'qty_nominal' => 1000, 'progress_percentage' => 0, 'note' => '',
             ],
         ]], 200),
-        '*activity-categories/3' => Http::response([], 200),
+        '*spekteks/3' => Http::response([], 200),
     ]);
     $this->actingAs(User::factory()->create());
 
@@ -41,12 +41,12 @@ test('spectech-tabs deleteSpectech sends the DELETE through ProjectWriter', func
         ->set('deletingName', 'Spektek A')
         ->call('deleteSpectech');
 
-    Http::assertSent(fn ($request) => $request->method() === 'DELETE' && str_ends_with($request->url(), '/activity-categories/3'));
+    Http::assertSent(fn ($request) => $request->method() === 'DELETE' && str_ends_with($request->url(), '/spekteks/3'));
 });
 
 test('spectech-manage save posts the bulk payload through ProjectWriter', function () {
     Http::fake([
-        '*activity-categories/bulk' => Http::response(['status' => 200], 200),
+        '*spekteks/bulk' => Http::response(['status' => 200], 200),
     ]);
     $this->actingAs(User::factory()->create());
 
@@ -57,6 +57,6 @@ test('spectech-manage save posts the bulk payload through ProjectWriter', functi
         ->call('save');
 
     Http::assertSent(fn ($request) => $request->method() === 'POST'
-        && str_ends_with($request->url(), '/activity-categories/bulk')
+        && str_ends_with($request->url(), '/spekteks/bulk')
         && $request['project_id'] === 100);
 });

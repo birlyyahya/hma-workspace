@@ -12,7 +12,7 @@ function fakeSpectechSearch(array $items = []): void
             'data' => $items,
             'pagination' => [],
         ], 200),
-        '*activity-categories' => Http::response([
+        '*spekteks' => Http::response([
             'status' => 201,
             'data' => [
                 'id' => 99,
@@ -77,7 +77,7 @@ test('create forwards the selected type to the spectech API', function () {
         ->call('create')
         ->assertHasNoErrors();
 
-    Http::assertSent(fn ($request) => str_contains($request->url(), 'activity-categories')
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'spekteks')
         && ! str_contains($request->url(), 'search')
         && $request['type'] === 'software');
 });

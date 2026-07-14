@@ -254,6 +254,41 @@ class ProjectCache
     }
 
     /**
+     * Daftar sub spektek milik satu spektek — dipakai panel expand di tab
+     * Spektek. Ikut tag TAG_SPECTECH agar flush spektek juga membuang sub.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function subSpectechFor(int $spektekId): array
+    {
+        $tags = [self::TAG_SPECTECH, "subspectech:spektek:{$spektekId}"];
+        $key = "subspectech:spektek:{$spektekId}";
+
+        if (is_array($cached = Cache::tags($tags)->get($key))) {
+            return $cached;
+        }
+
+        try {
+            $data = Http::timeout(15)
+                ->retry(2, 200, function ($e) {
+                    return $e instanceof ConnectionException
+                        || (method_exists($e, 'response') && optional($e->response)->serverError());
+                }, throw: false)
+                ->get($this->apiBase.'/sub-spekteks/search', [
+                    'spektek_id' => $spektekId,
+                ])->json('data') ?? [];
+        } catch (ConnectionException $e) {
+            Log::warning('ProjectCache subSpectechFor gagal', ['spektek_id' => $spektekId, 'error' => $e->getMessage()]);
+
+            return [];
+        }
+
+        Cache::tags($tags)->put($key, $data, self::TTL_USER);
+
+        return $data;
+    }
+
+    /**
      * Detail satu project by id. Endpoint mengembalikan `data` sebagai list;
      * project berada di elemen pertama. Dipakai di project-show/-edit/-preview.
      *
@@ -355,6 +390,11 @@ class ProjectCache
     public function flushSpectech(int $projectId): void
     {
         Cache::tags(["spectech:project:{$projectId}"])->flush();
+    }
+
+    public function flushSubSpectech(int $spektekId): void
+    {
+        Cache::tags(["subspectech:spektek:{$spektekId}"])->flush();
     }
 
     public function flushCompanies(): void
