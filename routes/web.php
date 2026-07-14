@@ -49,6 +49,13 @@ Route::middleware('auth')->group(function () {
     Volt::route('cashadvance/laporan/kegiatan/{kodeCa}', 'cashadvance.laporan-kegiatan')->name('cashadvance.laporan.kegiatan');
     // Volt::route('cashadvance', 'maintenance/comingsoon')->name('cashadvance');
 
+    // Pengajuan Barang
+    Route::prefix('pengajuan-barang')->group(function () {
+        Route::view('/', 'pengajuan-barang')->name('pengajuan-barang');
+        Volt::route('/create', 'pengajuan-barang.pengajuan-create')->name('pengajuan-barang.create');
+        Volt::route('/{kode}', 'pengajuan-barang.pengajuan-show')->name('pengajuan-barang.show');
+    });
+
     // Event
     Route::prefix('event')->group(function () {
         Route::view('/', 'events')->name('events');
