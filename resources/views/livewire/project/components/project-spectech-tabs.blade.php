@@ -1227,132 +1227,156 @@ new class extends Component {
                         @endphp
                         <div wire:key="spectech-mobile-{{ $data['id'] }}"
                             @class([
-                                'flex items-start gap-3 p-4 transition cursor-pointer',
+                                'p-4 transition',
                                 'bg-red-50/60' => $bulkMode && $isSelected,
                                 'bg-zinc-50/80' => $isExpanded,
-                            ])
-                            wire:click="{{ $bulkMode ? 'toggleSelect' : 'toggleExpand' }}({{ (int) $data['id'] }})">
-                            @if($bulkMode)
-                                <input type="checkbox"
-                                    class="mt-1 w-4 h-4 shrink-0 rounded border-zinc-300 text-red-600 focus:ring-red-500 cursor-pointer"
-                                    x-bind:checked="$wire.selectedIds.map(Number).includes({{ (int) $data['id'] }})"
-                                    x-on:click.stop.prevent="$wire.toggleSelect({{ (int) $data['id'] }})"
-                                />
-                            @endif
-                            <div class="min-w-0 flex-1">
-                                <div class="flex items-center gap-2 flex-wrap">
-                                    @unless($bulkMode)
-                                        <flux:icon.chevron-right @class([
-                                            'w-4 h-4 text-zinc-400 shrink-0 transition-transform',
-                                            'rotate-90' => $isExpanded,
-                                        ]) />
-                                    @endunless
-                                    <p class="font-medium text-zinc-900 truncate">{{ $data['name'] }}</p>
-                                    <span class="inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full ring-1 ring-inset {{ $statusColor }}">
-                                        {{ $statusLabel }}
-                                    </span>
-                                    @if($subCount > 0)
-                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-medium rounded-full bg-zinc-100 text-zinc-600">
-                                            <flux:icon.squares-2x2 class="w-3 h-3" />
-                                            {{ $subCount }} sub
-                                        </span>
-                                    @endif
-                                </div>
-                                <p class="text-xs text-zinc-500 mt-1">
-                                    {{ $qtyTotal }} × Rp {{ number_format($data['qty_nominal'] ?? 0, 0, ',', '.') }}
-                                </p>
-                                <p class="text-sm font-semibold text-zinc-900 mt-1">
-                                    Rp {{ number_format($data['total_nominal'] ?? 0, 0, ',', '.') }}
-                                </p>
-                                @if(!empty($data['note']))
-                                    <p class="text-xs text-amber-900 bg-amber-50/70 border border-amber-100 rounded-lg px-2.5 py-1.5 mt-2 leading-relaxed">
-                                        {{ $data['note'] }}
-                                    </p>
+                            ])>
+                            {{-- Header row --}}
+                            <div class="flex items-start gap-2.5 cursor-pointer"
+                                wire:click="{{ $bulkMode ? 'toggleSelect' : 'toggleExpand' }}({{ (int) $data['id'] }})">
+                                @if($bulkMode)
+                                    <input type="checkbox"
+                                        class="mt-0.5 w-4 h-4 shrink-0 rounded border-zinc-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                                        x-bind:checked="$wire.selectedIds.map(Number).includes({{ (int) $data['id'] }})"
+                                        x-on:click.stop.prevent="$wire.toggleSelect({{ (int) $data['id'] }})"
+                                    />
+                                @else
+                                    <flux:icon.chevron-right @class([
+                                        'w-4 h-4 mt-1 text-zinc-400 shrink-0 transition-transform',
+                                        'rotate-90' => $isExpanded,
+                                    ]) />
                                 @endif
-                                @if($isExpanded)
-                                    <div class="mt-3 rounded-lg bg-zinc-50 border border-zinc-200 p-3 space-y-3 cursor-default" x-on:click.stop>
-                                        <div class="flex items-center justify-between gap-2">
-                                            <p class="text-[11px] uppercase tracking-wide text-zinc-500">
-                                                Sub Spektek ({{ count($subItems) }})
-                                            </p>
-                                            @if($hasDetail)
-                                                <button type="button" wire:click="showDetail({{ (int) $data['id'] }})"
-                                                    class="text-xs font-medium text-red-600 cursor-pointer">
-                                                    Lihat Detail
-                                                </button>
-                                            @endif
-                                        </div>
 
-                                        @forelse($subItems as $sub)
-                                            <div wire:key="sub-mobile-{{ $sub['id'] }}"
-                                                class="flex items-center justify-between gap-2 rounded-lg bg-white border border-zinc-100 px-3 py-2">
-                                                <div class="min-w-0">
+                                <div class="min-w-0 flex-1">
+                                    <p class="font-medium text-zinc-900 truncate">{{ $data['name'] }}</p>
+                                    <div class="flex items-center gap-1.5 flex-wrap mt-1">
+                                        <span class="inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full ring-1 ring-inset {{ $statusColor }}">
+                                            {{ $statusLabel }}
+                                        </span>
+                                        @if($subCount > 0)
+                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-medium rounded-full bg-zinc-100 text-zinc-600">
+                                                <flux:icon.squares-2x2 class="w-3 h-3" />
+                                                {{ $subCount }} sub
+                                            </span>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <div class="text-right shrink-0">
+                                    <p class="text-sm font-semibold text-zinc-900 whitespace-nowrap">
+                                        Rp {{ number_format($data['total_nominal'] ?? 0, 0, ',', '.') }}
+                                    </p>
+                                    <p class="text-[11px] text-zinc-500 mt-0.5 whitespace-nowrap">
+                                        {{ $qtyTotal }} × Rp {{ number_format($data['qty_nominal'] ?? 0, 0, ',', '.') }}
+                                    </p>
+                                </div>
+
+                                @unless($bulkMode)
+                                    <flux:dropdown wire:key="spectech-mobile-menu-{{ $data['id'] }}" x-on:click.stop>
+                                        <flux:button variant="ghost" size="xs" icon="ellipsis-vertical" class="text-zinc-400 shrink-0 -mr-1.5 -mt-1" />
+                                        <flux:navmenu>
+                                            @if($hasDetail)
+                                                <flux:navmenu.item icon="eye" wire:click="showDetail({{ (int) $data['id'] }})">Lihat Detail</flux:navmenu.item>
+                                            @endif
+                                            <flux:navmenu.item icon="pencil-square" wire:click="editSpectech({{ $data['id'] }})">Edit</flux:navmenu.item>
+                                            <flux:navmenu.item icon="trash" variant="danger"
+                                                wire:click="confirmDelete({{ $data['id'] }})">Hapus</flux:navmenu.item>
+                                        </flux:navmenu>
+                                    </flux:dropdown>
+                                @endunless
+                            </div>
+
+                            @if(!empty($data['note']))
+                                <p class="text-xs text-amber-900 bg-amber-50/70 border border-amber-100 rounded-lg px-2.5 py-1.5 mt-2.5 leading-relaxed">
+                                    {{ $data['note'] }}
+                                </p>
+                            @endif
+
+                            @if($isExpanded)
+                                <div class="mt-3 rounded-lg bg-zinc-50 border border-zinc-200 p-3 space-y-3">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <p class="text-[11px] uppercase tracking-wide text-zinc-500">
+                                            Sub Spektek ({{ count($subItems) }})
+                                        </p>
+                                        @if($hasDetail)
+                                            <button type="button" wire:click="showDetail({{ (int) $data['id'] }})"
+                                                class="inline-flex items-center gap-1 text-xs font-medium text-red-600 cursor-pointer">
+                                                <flux:icon.document-text class="w-3.5 h-3.5" />
+                                                Detail Spesifikasi
+                                            </button>
+                                        @endif
+                                    </div>
+
+                                    @forelse($subItems as $sub)
+                                        <div wire:key="sub-mobile-{{ $sub['id'] }}"
+                                            class="rounded-lg bg-white border border-zinc-100 px-3 py-2.5">
+                                            <div class="flex items-start justify-between gap-2">
+                                                <div class="min-w-0 flex-1">
                                                     <p class="text-sm font-medium text-zinc-900 truncate">{{ $sub['name'] }}</p>
-                                                    <p class="text-xs text-zinc-500">
-                                                        {{ $sub['qty_received'] }}/{{ $sub['qty_total'] }} diterima
-                                                        · Rp {{ number_format($sub['total_nominal'], 0, ',', '.') }}
-                                                    </p>
+                                                    <p class="text-xs text-zinc-500 mt-0.5">{{ $sub['type'] === 'software' ? 'Aplikasi' : 'Barang' }}</p>
                                                 </div>
-                                                <div class="flex items-center shrink-0">
+                                                <div class="flex items-center shrink-0 -mr-1.5 -mt-1">
                                                     <flux:button wire:click="editSub({{ (int) $sub['id'] }})"
                                                         variant="ghost" size="xs" icon="pencil-square" class="text-zinc-400" />
                                                     <flux:button wire:click="confirmDeleteSub({{ (int) $sub['id'] }})"
                                                         variant="ghost" size="xs" icon="trash" class="text-zinc-400 hover:text-red-600!" />
                                                 </div>
                                             </div>
-                                        @empty
-                                            <p class="text-xs text-zinc-500">Belum ada sub spektek untuk item ini.</p>
-                                        @endforelse
+                                            <div class="flex items-center justify-between gap-2 mt-2">
+                                                <div class="flex items-center gap-1.5">
+                                                    <input type="number" min="0" max="{{ $sub['qty_total'] }}"
+                                                        value="{{ $sub['qty_received'] }}"
+                                                        wire:change="updateSubQty({{ (int) $sub['id'] }}, $event.target.value)"
+                                                        class="w-14 rounded-lg border border-zinc-300 bg-white text-sm py-1 px-2 focus:border-red-500 focus:ring-red-500" />
+                                                    <span class="text-xs text-zinc-500 whitespace-nowrap">/ {{ $sub['qty_total'] }} diterima</span>
+                                                </div>
+                                                <p class="text-sm font-semibold text-zinc-900">
+                                                    Rp {{ number_format($sub['total_nominal'], 0, ',', '.') }}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    @empty
+                                        <p class="text-xs text-zinc-500">Belum ada sub spektek untuk item ini.</p>
+                                    @endforelse
 
-                                        {{-- Inline add/edit form (collapsible) --}}
+                                    {{-- Inline add/edit form (collapsible) --}}
+                                    @if($showSubForm)
+                                        <form wire:submit="saveSub" class="space-y-2 rounded-lg border border-zinc-200 bg-white p-3">
+                                            <flux:input wire:model="subName" size="sm" placeholder="Nama sub spektek..." />
+                                            <flux:select wire:model="subType" size="sm">
+                                                <flux:select.option value="hardware">Barang</flux:select.option>
+                                                <flux:select.option value="software">Aplikasi</flux:select.option>
+                                            </flux:select>
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <flux:input wire:model="subQuantity" type="number" min="1" size="sm" placeholder="Qty" />
+                                                <flux:input wire:model="subPrice" type="number" min="0" size="sm" placeholder="Harga" />
+                                            </div>
+                                            <flux:error name="subName" />
+                                            <flux:error name="subQuantity" />
+                                            <flux:error name="subPrice" />
+                                            <div class="flex gap-2">
+                                                <flux:button type="submit" variant="primary" size="sm" class="flex-1"
+                                                    icon="{{ $subEditId ? 'check' : 'plus' }}"
+                                                    wire:loading.attr="disabled" wire:target="saveSub">
+                                                    {{ $subEditId ? 'Simpan Perubahan' : 'Tambah Sub' }}
+                                                </flux:button>
+                                                @if($subEditId)
+                                                    <flux:button wire:click="resetSubForm" variant="ghost" size="sm" icon="x-mark" />
+                                                @endif
+                                            </div>
+                                        </form>
+                                    @endif
+
+                                    <button type="button" wire:click="toggleSubForm"
+                                        class="text-xs font-medium text-zinc-500 hover:text-zinc-800 cursor-pointer">
                                         @if($showSubForm)
-                                            <form wire:submit="saveSub" class="space-y-2 rounded-lg border border-zinc-200 bg-white p-3">
-                                                <flux:input wire:model="subName" size="sm" placeholder="Nama sub spektek..." />
-                                                <div class="grid grid-cols-3 gap-2">
-                                                    <flux:select wire:model="subType" size="sm">
-                                                        <flux:select.option value="hardware">Barang</flux:select.option>
-                                                        <flux:select.option value="software">Aplikasi</flux:select.option>
-                                                    </flux:select>
-                                                    <flux:input wire:model="subQuantity" type="number" min="1" size="sm" placeholder="Qty" />
-                                                    <flux:input wire:model="subPrice" type="number" min="0" size="sm" placeholder="Harga" />
-                                                </div>
-                                                <flux:error name="subName" />
-                                                <flux:error name="subQuantity" />
-                                                <flux:error name="subPrice" />
-                                                <div class="flex gap-2">
-                                                    <flux:button type="submit" variant="primary" size="sm" class="flex-1"
-                                                        icon="{{ $subEditId ? 'check' : 'plus' }}"
-                                                        wire:loading.attr="disabled" wire:target="saveSub">
-                                                        {{ $subEditId ? 'Simpan Perubahan' : 'Tambah Sub' }}
-                                                    </flux:button>
-                                                    @if($subEditId)
-                                                        <flux:button wire:click="resetSubForm" variant="ghost" size="sm" icon="x-mark" />
-                                                    @endif
-                                                </div>
-                                            </form>
+                                            &minus; Sembunyikan form
+                                        @else
+                                            + Tambah sub spektek
                                         @endif
-
-                                        <button type="button" wire:click="toggleSubForm"
-                                            class="text-xs font-medium text-zinc-500 hover:text-zinc-800 cursor-pointer">
-                                            @if($showSubForm)
-                                                &minus; Sembunyikan form
-                                            @else
-                                                + Tambah sub spektek
-                                            @endif
-                                        </button>
-                                    </div>
-                                @endif
-                            </div>
-                            @unless($bulkMode)
-                                <flux:dropdown wire:key="spectech-mobile-menu-{{ $data['id'] }}" x-on:click.stop>
-                                    <flux:button variant="ghost" size="sm" icon="ellipsis-vertical" class="text-zinc-400 -mr-1" />
-                                    <flux:navmenu>
-                                        <flux:navmenu.item icon="pencil-square" wire:click="editSpectech({{ $data['id'] }})">Edit</flux:navmenu.item>
-                                        <flux:navmenu.item icon="trash" variant="danger"
-                                            wire:click="confirmDelete({{ $data['id'] }})">Hapus</flux:navmenu.item>
-                                    </flux:navmenu>
-                                </flux:dropdown>
-                            @endunless
+                                    </button>
+                                </div>
+                            @endif
                         </div>
                     @endforeach
                     <div class="flex items-center justify-between bg-zinc-50 px-4 py-3">
