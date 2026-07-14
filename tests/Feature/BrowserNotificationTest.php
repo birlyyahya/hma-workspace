@@ -3,6 +3,7 @@
 use App\Models\User;
 use App\Notifications\DarCommentReceived;
 use Livewire\Volt\Volt;
+use NotificationChannels\WebPush\PushSubscription;
 use NotificationChannels\WebPush\WebPushChannel;
 
 test('the subscribe action stores a push subscription for the logged-in user', function () {
@@ -35,6 +36,30 @@ test('subscribing twice with the same endpoint does not duplicate the subscripti
     $component->call('subscribe', $subscription);
 
     expect($user->pushSubscriptions()->count())->toBe(1);
+});
+
+test('logging in with a different account takes over the browser endpoint without a duplicate error', function () {
+    $firstUser = User::factory()->create();
+    $secondUser = User::factory()->create();
+
+    $subscription = [
+        'endpoint' => 'https://fcm.googleapis.com/fcm/send/shared-browser-endpoint',
+        'keys' => ['p256dh' => 'p256dh-key', 'auth' => 'auth-token'],
+    ];
+
+    Volt::actingAs($firstUser)
+        ->test('components.browser-notification')
+        ->call('subscribe', $subscription)
+        ->assertHasNoErrors();
+
+    Volt::actingAs($secondUser)
+        ->test('components.browser-notification')
+        ->call('subscribe', $subscription)
+        ->assertHasNoErrors();
+
+    expect($firstUser->pushSubscriptions()->count())->toBe(0)
+        ->and($secondUser->pushSubscriptions()->count())->toBe(1)
+        ->and(PushSubscription::query()->where('endpoint', $subscription['endpoint'])->count())->toBe(1);
 });
 
 test('a payload without an endpoint is ignored', function () {
