@@ -1066,10 +1066,11 @@ new class extends Component {
 
                                 {{-- Expandable sub spektek panel (visibilitas via Alpine) --}}
                                 @unless($bulkMode)
-                                    <tr wire:key="spectech-sub-{{ $data['id'] }}" class="border-t-0!"
-                                        x-show="openId === {{ (int) $data['id'] }}" x-cloak>
-                                        <td colspan="5" class="px-4 pb-5 pt-0">
-                                            <div class="ml-3 rounded-xl p-4 space-y-4">
+                                    <tr wire:key="spectech-sub-{{ $data['id'] }}" class="border-t-0!">
+                                        <td colspan="5" class="p-0">
+                                            {{-- x-collapse pada div block agar tinggi bisa dianimasikan (tak bisa di <tr>) --}}
+                                            <div x-show="openId === {{ (int) $data['id'] }}" x-collapse x-cloak>
+                                                <div class="ml-3 rounded-xl px-4 pb-5 pt-0 space-y-4">
                                                 <div class="flex items-center justify-between gap-3">
                                                     <p class="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-zinc-500">
                                                         <flux:icon.squares-2x2 class="w-3.5 h-3.5" />
@@ -1164,6 +1165,7 @@ new class extends Component {
                                                         + Tambah sub spektek
                                                     @endif
                                                 </button>
+                                                </div>
                                             </div>
                                         </td>
                                     </tr>
