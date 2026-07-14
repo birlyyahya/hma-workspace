@@ -63,6 +63,7 @@ test('save sends all drafts to the bulk endpoint and clears the queue', function
         ->set('draftName', 'Switch Cisco')
         ->set('draftQuantity', 3)
         ->set('draftPrice', '9.000.000')
+        ->set('draftDetail', '<ul><li>24 port</li></ul>')
         ->call('addDraft')
         ->set('draftName', 'Lisensi Office')
         ->set('draftType', 'software')
@@ -78,8 +79,26 @@ test('save sends all drafts to the bulk endpoint and clears the queue', function
         && count($request->data()) === 2
         && (int) $request->data()[0]['project_id'] === 42
         && $request->data()[0]['type'] === 'hardware'
+        && $request->data()[0]['detail'] === '<ul><li>24 port</li></ul>'
         && (int) $request->data()[0]['qty_recived'] === 0
         && $request->data()[1]['type'] === 'software');
+});
+
+test('draft detail is queued and reset after adding', function () {
+    Http::fake();
+
+    $this->actingAs(User::factory()->create());
+
+    $component = Volt::test('project.components.project-spectech-manage', ['id' => 1])
+        ->set('draftName', 'Server Rack')
+        ->set('draftQuantity', 1)
+        ->set('draftPrice', '1.000.000')
+        ->set('draftDetail', '<p>RAM 16GB</p>')
+        ->call('addDraft')
+        ->assertHasNoErrors()
+        ->assertSet('draftDetail', null);
+
+    expect($component->get('drafts')[0]['detail'])->toBe('<p>RAM 16GB</p>');
 });
 
 test('save does nothing when the queue is empty', function () {
@@ -102,7 +121,7 @@ test('importParsed sends the frontend-parsed rows to the bulk endpoint', functio
     $this->actingAs(User::factory()->create());
 
     $rows = [
-        ['name' => 'Switch Cisco', 'type' => 'hardware', 'qty_total' => 3, 'total_nominal' => 9000000, 'note' => ''],
+        ['name' => 'Switch Cisco', 'type' => 'hardware', 'qty_total' => 3, 'total_nominal' => 9000000, 'note' => '', 'detail' => '48 port PoE'],
         ['name' => 'Lisensi Office', 'type' => 'software', 'qty_total' => 2, 'total_nominal' => 2000000, 'note' => 'Volume'],
     ];
 
@@ -116,8 +135,10 @@ test('importParsed sends the frontend-parsed rows to the bulk endpoint', functio
         && count($request->data()) === 2
         && (int) $request->data()[0]['project_id'] === 7
         && $request->data()[0]['type'] === 'hardware'
+        && $request->data()[0]['detail'] === '48 port PoE'
         && (int) $request->data()[0]['qty_recived'] === 0
-        && $request->data()[1]['name'] === 'Lisensi Office');
+        && $request->data()[1]['name'] === 'Lisensi Office'
+        && $request->data()[1]['detail'] === null);
 });
 
 test('importParsed rejects invalid rows without hitting the API', function () {

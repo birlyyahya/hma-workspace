@@ -27,6 +27,7 @@ new class extends Component {
     public ?string $draftPrice = null;
     public ?int $draftQuantity = null;
     public ?string $draftNote = null;
+    public ?string $draftDetail = null;
 
     /**
      * Definisi kolom untuk import Excel (dibaca komponen frontend & validasi server).
@@ -46,6 +47,7 @@ new class extends Component {
             ['key' => 'qty_total', 'header' => 'Jumlah', 'required' => true, 'type' => 'int'],
             ['key' => 'total_nominal', 'header' => 'Total Harga', 'required' => true, 'type' => 'number'],
             ['key' => 'note', 'header' => 'Catatan', 'required' => false, 'type' => 'string'],
+            ['key' => 'detail', 'header' => 'Detail Spesifikasi', 'required' => false, 'type' => 'string'],
         ];
     }
 
@@ -55,8 +57,8 @@ new class extends Component {
     public function importExample(): array
     {
         return [
-            ['name' => 'Pipa PVC 4 inch', 'type' => 'Barang', 'qty_total' => 10, 'total_nominal' => 500000, 'note' => 'Merk bebas'],
-            ['name' => 'Lisensi Office', 'type' => 'Aplikasi', 'qty_total' => 2, 'total_nominal' => 2000000, 'note' => ''],
+            ['name' => 'Pipa PVC 4 inch', 'type' => 'Barang', 'qty_total' => 10, 'total_nominal' => 500000, 'note' => 'Merk bebas', 'detail' => 'Diameter 4 inch, tebal 3mm'],
+            ['name' => 'Lisensi Office', 'type' => 'Aplikasi', 'qty_total' => 2, 'total_nominal' => 2000000, 'note' => '', 'detail' => ''],
         ];
     }
 
@@ -81,6 +83,7 @@ new class extends Component {
             'draftQuantity' => 'required|integer|min:1',
             'draftPrice'    => 'required',
             'draftNote'     => 'nullable|string|max:500',
+            'draftDetail'   => 'nullable|string|max:20000',
         ];
     }
 
@@ -109,10 +112,11 @@ new class extends Component {
             'quantity' => (int) $this->draftQuantity,
             'price'    => (int) preg_replace('/[^0-9]/', '', (string) $this->draftPrice),
             'note'     => $this->draftNote,
+            'detail'   => $this->draftDetail,
         ];
 
         $keepType = $this->draftType;
-        $this->reset('draftName', 'draftPrice', 'draftQuantity', 'draftNote');
+        $this->reset('draftName', 'draftPrice', 'draftQuantity', 'draftNote', 'draftDetail');
         $this->draftType = $keepType;
         $this->resetErrorBag();
 
@@ -149,6 +153,7 @@ new class extends Component {
             'qty_recived'   => 0,
             'total_nominal' => $item['price'],
             'note'          => $item['note'],
+            'detail'        => $item['detail'] ?? null,
             'project_id'    => (int) $this->id,
         ], $this->drafts);
 
@@ -182,6 +187,7 @@ new class extends Component {
             'rows.*.qty_total'     => 'required|integer|min:1',
             'rows.*.total_nominal' => 'required|numeric|min:0',
             'rows.*.note'          => 'nullable|string|max:500',
+            'rows.*.detail'        => 'nullable|string|max:20000',
         ], [], [
             'rows' => 'data',
         ]);
@@ -198,6 +204,7 @@ new class extends Component {
             'qty_recived'   => 0,
             'total_nominal' => (int) $row['total_nominal'],
             'note'          => $row['note'] ?? null,
+            'detail'        => $row['detail'] ?? null,
             'project_id'    => (int) $this->id,
         ], $rows);
 
@@ -219,7 +226,7 @@ new class extends Component {
 
     protected function finishMutation(): void
     {
-        $this->reset('drafts', 'draftName', 'draftPrice', 'draftQuantity', 'draftNote');
+        $this->reset('drafts', 'draftName', 'draftPrice', 'draftQuantity', 'draftNote', 'draftDetail');
         $this->draftType = 'hardware';
         $this->manageTab = 'manual';
         $this->resetErrorBag();
@@ -231,7 +238,7 @@ new class extends Component {
 
     public function resetManage(): void
     {
-        $this->reset('drafts', 'draftName', 'draftPrice', 'draftQuantity', 'draftNote');
+        $this->reset('drafts', 'draftName', 'draftPrice', 'draftQuantity', 'draftNote', 'draftDetail');
         $this->draftType = 'hardware';
         $this->manageTab = 'manual';
         $this->resetErrorBag();
@@ -279,8 +286,8 @@ new class extends Component {
             <div x-show="$wire.manageTab === 'manual'" class="space-y-5">
                 {{-- Quick-add form --}}
                 <form wire:submit="addDraft" class="rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 space-y-3"
-                    x-data="{ showNote: false }"
-                    x-on:draft-added.window="$refs.draftName?.focus(); showNote = false">
+                    x-data="{ showNote: false, showDetail: false }"
+                    x-on:draft-added.window="$refs.draftName?.focus(); showNote = false; showDetail = false">
                     <div class="grid grid-cols-2 md:grid-cols-12 gap-3">
                         <flux:field class="col-span-2 md:col-span-5">
                             <flux:label badge="Wajib">Nama spektek</flux:label>
@@ -318,12 +325,30 @@ new class extends Component {
                         </flux:field>
                     </div>
 
+                    <div x-show="showDetail" x-collapse>
+                        <flux:field>
+                            <flux:label>Detail Spesifikasi</flux:label>
+                            <div wire:ignore x-data="spectechRichEditor(@entangle('draftDetail'))"
+                                class="spectech-editor overflow-hidden rounded-lg border border-zinc-200 bg-white focus-within:border-zinc-400">
+                                <div x-ref="editor" data-placeholder="Rincian spesifikasi lengkap — cth. RAM 16GB DDR5, SSD 512GB NVMe..."></div>
+                            </div>
+                            <flux:error name="draftDetail" />
+                        </flux:field>
+                    </div>
+
                     <div class="flex items-center justify-between gap-3">
-                        <button type="button" @click="showNote = !showNote"
-                            class="text-xs font-medium text-zinc-500 hover:text-zinc-800 cursor-pointer">
-                            <span x-show="!showNote">+ Tambah catatan</span>
-                            <span x-show="showNote" x-cloak>&minus; Sembunyikan catatan</span>
-                        </button>
+                        <div class="flex items-center gap-3 flex-wrap">
+                            <button type="button" @click="showNote = !showNote"
+                                class="text-xs font-medium text-zinc-500 hover:text-zinc-800 cursor-pointer">
+                                <span x-show="!showNote">+ Catatan</span>
+                                <span x-show="showNote" x-cloak>&minus; Catatan</span>
+                            </button>
+                            <button type="button" @click="showDetail = !showDetail"
+                                class="text-xs font-medium text-zinc-500 hover:text-zinc-800 cursor-pointer">
+                                <span x-show="!showDetail">+ Detail spesifikasi</span>
+                                <span x-show="showDetail" x-cloak>&minus; Detail spesifikasi</span>
+                            </button>
+                        </div>
                         <div class="flex items-center gap-3">
                             <flux:text class="hidden sm:block text-xs text-zinc-400">
                                 Enter untuk tambah cepat
@@ -367,7 +392,16 @@ new class extends Component {
                                         @foreach($drafts as $draft)
                                             <tr wire:key="draft-{{ $draft['uid'] }}" class="hover:bg-zinc-50/60">
                                                 <td class="px-4 py-2.5 align-top">
-                                                    <p class="font-medium text-zinc-900">{{ $draft['name'] }}</p>
+                                                    <div class="flex items-center gap-1.5">
+                                                        <p class="font-medium text-zinc-900">{{ $draft['name'] }}</p>
+                                                        @if(!empty($draft['detail']))
+                                                            <span class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-zinc-100 text-zinc-600"
+                                                                title="Punya detail spesifikasi">
+                                                                <flux:icon.document-text class="w-3 h-3" />
+                                                                Detail
+                                                            </span>
+                                                        @endif
+                                                    </div>
                                                     @if(!empty($draft['note']))
                                                         <p class="text-xs text-zinc-500 mt-0.5 truncate max-w-xs">{{ $draft['note'] }}</p>
                                                     @endif
