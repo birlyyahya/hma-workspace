@@ -831,10 +831,10 @@ new class extends Component {
                             Selesai
                         </flux:button>
                     @else
-                        <flux:button wire:click="toggleBulkMode" variant="ghost" size="sm" icon="check-circle"
+                        {{-- <flux:button wire:click="toggleBulkMode" variant="ghost" size="sm" icon="check-circle"
                             :disabled="$this->totalItems === 0">
                             Pilih
-                        </flux:button>
+                        </flux:button> --}}
                         <flux:dropdown position="bottom" align="end">
                             <flux:button variant="primary" size="sm" icon="plus" icon:trailing="chevron-down">
                                 Tambah
