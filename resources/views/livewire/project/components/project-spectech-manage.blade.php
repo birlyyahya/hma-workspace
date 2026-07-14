@@ -231,60 +231,60 @@ new class extends Component {
             {{-- ============ MANUAL INPUT ============ --}}
             <div x-show="$wire.manageTab === 'manual'" class="space-y-5">
                 {{-- Quick-add form --}}
-                <form wire:submit="addDraft" class="rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 space-y-4"
-                    x-data x-on:draft-added.window="$refs.draftName?.focus()">
-                    <flux:field>
-                        <flux:label>Tipe spektek</flux:label>
-                        <div class="bg-white border border-zinc-200 rounded-xl p-1 grid grid-cols-2 gap-1">
-                            @foreach ([
-                                ['key' => 'hardware', 'label' => 'Barang', 'icon' => 'cube'],
-                                ['key' => 'software', 'label' => 'Aplikasi', 'icon' => 'computer-desktop'],
-                            ] as $typeTab)
-                                <button type="button"
-                                    wire:click="$set('draftType', '{{ $typeTab['key'] }}')"
-                                    @class([
-                                        'flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer',
-                                        'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200' => $draftType === $typeTab['key'],
-                                        'text-zinc-600 hover:bg-zinc-50' => $draftType !== $typeTab['key'],
-                                    ])>
-                                    <flux:icon name="{{ $typeTab['icon'] }}" class="w-4 h-4" />
-                                    <span>{{ $typeTab['label'] }}</span>
-                                </button>
-                            @endforeach
-                        </div>
-                        <flux:error name="draftType" />
-                    </flux:field>
-
-                    <flux:field>
-                        <flux:label badge="Wajib">Nama spektek</flux:label>
-                        <flux:input wire:model="draftName" x-ref="draftName" placeholder="cth. Pipa PVC 4 inch" />
-                        <flux:error name="draftName" />
-                    </flux:field>
-
-                    <div class="grid grid-cols-3 gap-3">
-                        <flux:field class="col-span-2">
-                            <flux:label badge="Wajib">Total Harga</flux:label>
-                            <x-rupiah-input model="draftPrice" placeholder="0" />
-                            <flux:error name="draftPrice" />
+                <form wire:submit="addDraft" class="rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 space-y-3"
+                    x-data="{ showNote: false }"
+                    x-on:draft-added.window="$refs.draftName?.focus(); showNote = false">
+                    <div class="grid grid-cols-2 md:grid-cols-12 gap-3">
+                        <flux:field class="col-span-2 md:col-span-5">
+                            <flux:label badge="Wajib">Nama spektek</flux:label>
+                            <flux:input wire:model="draftName" x-ref="draftName" placeholder="cth. Pipa PVC 4 inch" />
+                            <flux:error name="draftName" />
                         </flux:field>
 
-                        <flux:field>
+                        <flux:field class="md:col-span-2">
+                            <flux:label>Tipe</flux:label>
+                            <flux:select wire:model="draftType">
+                                <flux:select.option value="hardware">Barang</flux:select.option>
+                                <flux:select.option value="software">Aplikasi</flux:select.option>
+                            </flux:select>
+                            <flux:error name="draftType" />
+                        </flux:field>
+
+                        <flux:field class="md:col-span-2">
                             <flux:label badge="Wajib">Jumlah</flux:label>
                             <flux:input wire:model="draftQuantity" type="number" min="1" placeholder="0" />
                             <flux:error name="draftQuantity" />
                         </flux:field>
+
+                        <flux:field class="col-span-2 md:col-span-3">
+                            <flux:label badge="Wajib">Total Harga</flux:label>
+                            <x-rupiah-input model="draftPrice" placeholder="0" />
+                            <flux:error name="draftPrice" />
+                        </flux:field>
                     </div>
 
-                    <flux:field>
-                        <flux:label>Catatan</flux:label>
-                        <flux:textarea wire:model="draftNote" rows="2" placeholder="Catatan tambahan (opsional)" />
-                        <flux:error name="draftNote" />
-                    </flux:field>
+                    <div x-show="showNote" x-collapse>
+                        <flux:field>
+                            <flux:label>Catatan</flux:label>
+                            <flux:input wire:model="draftNote" placeholder="Catatan tambahan (opsional)" />
+                            <flux:error name="draftNote" />
+                        </flux:field>
+                    </div>
 
-                    <div class="flex justify-end">
-                        <flux:button type="submit" variant="filled" icon="plus" size="sm">
-                            Tambah ke daftar
-                        </flux:button>
+                    <div class="flex items-center justify-between gap-3">
+                        <button type="button" @click="showNote = !showNote"
+                            class="text-xs font-medium text-zinc-500 hover:text-zinc-800 cursor-pointer">
+                            <span x-show="!showNote">+ Tambah catatan</span>
+                            <span x-show="showNote" x-cloak>&minus; Sembunyikan catatan</span>
+                        </button>
+                        <div class="flex items-center gap-3">
+                            <flux:text class="hidden sm:block text-xs text-zinc-400">
+                                Enter untuk tambah cepat
+                            </flux:text>
+                            <flux:button type="submit" variant="primary" icon="plus" size="sm">
+                                Tambah ke daftar
+                            </flux:button>
+                        </div>
                     </div>
                 </form>
 

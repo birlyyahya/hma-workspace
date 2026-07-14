@@ -754,7 +754,6 @@ new class extends Component {
                                         <flux:icon name="{{ $sortBy === 'total_nominal' ? ($sortDir === 'asc' ? 'chevron-up' : 'chevron-down') : 'chevron-up-down' }}" class="w-3.5 h-3.5" />
                                     </button>
                                 </th>
-                                <th class="px-3 py-3 font-medium w-28">Status</th>
                                 @unless($bulkMode)
                                     <th class="px-2 py-3 w-12"></th>
                                 @endunless
@@ -763,14 +762,7 @@ new class extends Component {
                         <tbody class="divide-y divide-zinc-100">
                             @foreach ($this->visibleSpectech as $data)
                                 @php
-                                    $qtyRecv = (int) ($data['qty_recived'] ?? 0);
                                     $qtyTotal = (int) ($data['qty_total'] ?? 0);
-                                    $percentage = (float) ($data['percentage'] ?? 0);
-                                    $isComplete = $percentage >= 100;
-                                    $statusLabel = $isComplete ? 'Selesai' : ($qtyRecv > 0 ? 'Berjalan' : 'Belum Mulai');
-                                    $statusColor = $isComplete
-                                        ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
-                                        : ($qtyRecv > 0 ? 'bg-amber-50 text-amber-700 ring-amber-600/20' : 'bg-zinc-50 text-zinc-600 ring-zinc-500/20');
                                     $isSelected = in_array((int) $data['id'], array_map('intval', $selectedIds), true);
                                 @endphp
                                 <tr wire:key="spectech-row-{{ $data['id'] }}"
@@ -807,11 +799,6 @@ new class extends Component {
                                     <td class="px-3 py-3 align-top text-right font-semibold text-zinc-900">
                                         Rp {{ number_format($data['total_nominal'] ?? 0, 0, ',', '.') }}
                                     </td>
-                                    <td class="px-3 py-3 align-top">
-                                        <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ring-1 ring-inset {{ $statusColor }}">
-                                            {{ $statusLabel }}
-                                        </span>
-                                    </td>
                                     @unless($bulkMode)
                                         <td class="px-2 py-2 align-top text-right">
                                             <flux:dropdown wire:key="spectech-menu-{{ $data['id'] }}">
@@ -835,7 +822,9 @@ new class extends Component {
                                 <td class="px-3 py-3 text-right text-sm font-semibold text-red-600">
                                     Rp {{ number_format($this->filteredTotalNominal, 0, ',', '.') }}
                                 </td>
-                                <td colspan="{{ $bulkMode ? 1 : 2 }}"></td>
+                                @unless($bulkMode)
+                                    <td></td>
+                                @endunless
                             </tr>
                         </tfoot>
                     </table>
