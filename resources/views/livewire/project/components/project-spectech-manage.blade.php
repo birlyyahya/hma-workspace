@@ -32,8 +32,12 @@ new class extends Component {
     public $importFile = null;
 
     #[On('openManageSpectech')]
-    public function open(): void
+    public function open(string $tab = 'manual'): void
     {
+        if (in_array($tab, ['manual', 'import'], true)) {
+            $this->manageTab = $tab;
+        }
+
         Flux::modal('manageSpectech')->show();
     }
 

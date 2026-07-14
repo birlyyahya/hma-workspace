@@ -19,7 +19,6 @@ new class extends Component {
     public array $spectech = [];
     public bool $loadingSpectech = false;
     public $id;
-    public int $ppn = 0;
 
     public ?int $deletingId = null;
     public ?string $deletingName = null;
@@ -35,6 +34,10 @@ new class extends Component {
 
     public string $search = '';
     public string $statusFilter = 'all';
+
+    public string $sortBy = 'default';
+    public string $sortDir = 'asc';
+    public int $visibleLimit = 25;
 
     public function placeholder()
     {
@@ -197,6 +200,13 @@ new class extends Component {
         $this->resetErrorBag();
     }
 
+    public function openAdd(): void
+    {
+        $this->resetForm();
+        $this->form->type = $this->activeType;
+        Flux::modal('addSpectech')->show();
+    }
+
     public function setType(string $type): void
     {
         if (! in_array($type, ['hardware', 'software'], true)) {
@@ -205,6 +215,44 @@ new class extends Component {
 
         $this->activeType = $type;
         $this->selectedIds = [];
+        $this->reset('visibleLimit');
+    }
+
+    public function sortByColumn(string $column): void
+    {
+        if (! in_array($column, ['name', 'qty_total', 'total_nominal'], true)) {
+            return;
+        }
+
+        if ($this->sortBy !== $column) {
+            $this->sortBy = $column;
+            $this->sortDir = 'asc';
+
+            return;
+        }
+
+        if ($this->sortDir === 'asc') {
+            $this->sortDir = 'desc';
+
+            return;
+        }
+
+        $this->reset('sortBy', 'sortDir');
+    }
+
+    public function showMore(): void
+    {
+        $this->visibleLimit += 25;
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->reset('visibleLimit');
+    }
+
+    public function updatedStatusFilter(): void
+    {
+        $this->reset('visibleLimit');
     }
 
     public function toggleBulkMode(): void
@@ -347,7 +395,7 @@ new class extends Component {
 
     public function resetFilters(): void
     {
-        $this->reset('search', 'statusFilter');
+        $this->reset('search', 'statusFilter', 'visibleLimit');
     }
 
     /**
@@ -372,18 +420,54 @@ new class extends Component {
     public function filteredSpectech(): array
     {
         $needle = trim(mb_strtolower($this->search));
-        return collect($this->spectech)
+
+        $items = collect($this->spectech)
             ->filter(fn ($item) => ($item['type'] ?? 'hardware') === $this->activeType)
             ->when($needle !== '', fn ($items) => $items->filter(
                 fn ($item) => str_contains(mb_strtolower((string) ($item['name'] ?? '')), $needle),
             ))
             ->when($this->statusFilter !== 'all', fn ($items) => $items->filter(
                 fn ($item) => $this->statusOf($item) === $this->statusFilter,
-            ))
-            ->values()
-            ->all();
+            ));
 
+        if ($this->sortBy !== 'default') {
+            $items = $items->sortBy(
+                fn ($item) => $this->sortBy === 'name'
+                    ? mb_strtolower((string) ($item['name'] ?? ''))
+                    : (float) ($item[$this->sortBy] ?? 0),
+                SORT_REGULAR,
+                $this->sortDir === 'desc',
+            );
+        }
 
+        return $items->values()->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    #[Computed]
+    public function visibleSpectech(): array
+    {
+        return array_slice($this->filteredSpectech, 0, $this->visibleLimit);
+    }
+
+    #[Computed]
+    public function hiddenCount(): int
+    {
+        return max(0, count($this->filteredSpectech) - $this->visibleLimit);
+    }
+
+    #[Computed]
+    public function filteredTotalNominal(): float
+    {
+        return collect($this->filteredSpectech)->sum(fn ($item) => (float) ($item['total_nominal'] ?? 0));
+    }
+
+    #[Computed]
+    public function allTotalNominal(): float
+    {
+        return collect($this->spectech)->sum(fn ($item) => (float) ($item['total_nominal'] ?? 0));
     }
 
     #[Computed]
@@ -421,16 +505,6 @@ new class extends Component {
     }
 
     #[Computed]
-    public function nilaiDiterima(): float
-    {
-        $total = collect($this->spectech)->sum(
-            fn ($item) => (float) $item['qty_nominal'] * (float) $item['qty_recived']
-        );
-
-        return $total * (1 + ($this->ppn / 100));
-    }
-
-    #[Computed]
     public function totalItems(): int
     {
         return count($this->spectech);
@@ -439,9 +513,53 @@ new class extends Component {
 }; ?>
 
 <div>
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-        {{-- ============ LEFT: SPECTECH LIST ============ --}}
-        <div class="space-y-4 lg:col-span-3">
+    <div class="space-y-4">
+        {{-- ============ SUMMARY STRIP ============ --}}
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="bg-white border border-zinc-200 rounded-xl p-4 flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                    <flux:icon.squares-2x2 class="w-5 h-5 text-red-600" />
+                </div>
+                <div class="min-w-0">
+                    <p class="text-[11px] uppercase tracking-wide text-zinc-500">Total Item</p>
+                    <p class="text-base font-semibold text-zinc-900">{{ $this->totalItems }}</p>
+                </div>
+            </div>
+            <div class="bg-white border border-zinc-200 rounded-xl p-4 flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+                    <flux:icon.banknotes class="w-5 h-5 text-emerald-600" />
+                </div>
+                <div class="min-w-0">
+                    <p class="text-[11px] uppercase tracking-wide text-zinc-500">Nominal Spektek</p>
+                    <p class="text-base font-semibold text-zinc-900 truncate">
+                        Rp {{ number_format($this->allTotalNominal, 0, ',', '.') }}
+                    </p>
+                </div>
+            </div>
+            <div class="bg-white border border-zinc-200 rounded-xl p-4 flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                    <flux:icon.briefcase class="w-5 h-5 text-blue-600" />
+                </div>
+                <div class="min-w-0">
+                    <p class="text-[11px] uppercase tracking-wide text-zinc-500">Total Proyek</p>
+                    <p class="text-base font-semibold text-zinc-900 truncate">
+                        Rp {{ number_format($totalproject ?? 0, 0, ',', '.') }}
+                    </p>
+                </div>
+            </div>
+            <div class="bg-white border border-zinc-200 rounded-xl p-4">
+                <div class="flex items-center justify-between">
+                    <p class="text-[11px] uppercase tracking-wide text-zinc-500">Progress</p>
+                    <p class="text-base font-semibold text-zinc-900">{{ number_format($this->progress ?? 0, 0) }}%</p>
+                </div>
+                <div class="mt-2.5 w-full h-2 bg-zinc-100 rounded-full overflow-hidden">
+                    <div class="h-full bg-linear-to-r from-red-500 to-red-600 rounded-full transition-all"
+                         style="width: {{ min($this->progress ?? 0, 100) }}%"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-4">
             {{-- List header --}}
             <div class="flex items-center justify-between gap-3">
                 <div class="min-w-0">
@@ -460,16 +578,26 @@ new class extends Component {
                             Selesai
                         </flux:button>
                     @else
-                        {{-- <flux:button class="" wire:click="toggleBulkMode" variant="ghost" size="sm" icon="check-circle"
+                        <flux:button wire:click="toggleBulkMode" variant="ghost" size="sm" icon="check-circle"
                             :disabled="$this->totalItems === 0">
                             Pilih
                         </flux:button>
-                        <flux:button wire:click="$dispatch('openManageSpectech')" variant="filled" icon="squares-plus" size="sm">
-                            Bulk Tambah
-                        </flux:button> --}}
-                        <flux:modal.trigger name="addSpectech">
-                            <flux:button variant="primary" icon="plus" size="sm">Tambah</flux:button>
-                        </flux:modal.trigger>
+                        <flux:dropdown position="bottom" align="end">
+                            <flux:button variant="primary" size="sm" icon="plus" icon:trailing="chevron-down">
+                                Tambah
+                            </flux:button>
+                            <flux:navmenu>
+                                <flux:navmenu.item icon="plus" wire:click="openAdd">
+                                    Tambah Satu Item
+                                </flux:navmenu.item>
+                                <flux:navmenu.item icon="squares-plus" wire:click="$dispatch('openManageSpectech', { tab: 'manual' })">
+                                    Tambah Banyak
+                                </flux:navmenu.item>
+                                <flux:navmenu.item icon="arrow-up-tray" wire:click="$dispatch('openManageSpectech', { tab: 'import' })">
+                                    Import Excel
+                                </flux:navmenu.item>
+                            </flux:navmenu>
+                        </flux:dropdown>
                     @endif
                 </div>
             </div>
@@ -520,15 +648,15 @@ new class extends Component {
                 @endif
             </div>
 
-            {{-- Bulk select-all toolbar --}}
+            {{-- Bulk select-all toolbar (mobile; desktop pakai checkbox di header tabel) --}}
             @if($bulkMode && !$this->loadingSpectech && count($this->filteredSpectech) > 0)
-                @php $visibleCount = count($this->filteredSpectech); @endphp
-                <div class="flex items-center justify-between bg-zinc-50 border border-zinc-200 rounded-lg px-4 py-2.5">
+                @php $filteredCount = count($this->filteredSpectech); @endphp
+                <div class="md:hidden flex items-center justify-between bg-zinc-50 border border-zinc-200 rounded-lg px-4 py-2.5">
                     <label class="flex items-center gap-2 cursor-pointer text-sm text-zinc-700">
                         <input type="checkbox"
                             class="rounded border-zinc-300 text-red-600 focus:ring-red-500 cursor-pointer"
                             x-on:click.prevent="$wire.toggleSelectAllVisible()"
-                            x-bind:checked="$wire.selectedIds.length === {{ $visibleCount }} && {{ $visibleCount }} > 0"
+                            x-bind:checked="$wire.selectedIds.length === {{ $filteredCount }} && {{ $filteredCount }} > 0"
                         />
                         <span>Pilih semua di tab ini</span>
                     </label>
@@ -543,74 +671,226 @@ new class extends Component {
 
             {{-- Loading state --}}
             @if($this->loadingSpectech)
-                @for ($i = 0; $i < 3; $i++)
-                    <div class="bg-white border border-zinc-200 rounded-xl p-6 animate-pulse">
-                        <div class="flex items-start justify-between">
-                            <div class="space-y-2 w-full">
-                                <div class="h-4 bg-zinc-200 rounded w-1/3"></div>
-                                <div class="h-3 bg-zinc-100 rounded w-1/2"></div>
-                            </div>
-                            <div class="h-6 w-6 bg-zinc-100 rounded"></div>
+                <div class="bg-white border border-zinc-200 rounded-xl p-4 space-y-3 animate-pulse">
+                    <div class="h-9 bg-zinc-100 rounded-lg"></div>
+                    @for ($i = 0; $i < 6; $i++)
+                        <div class="flex items-center gap-4">
+                            <div class="h-4 bg-zinc-100 rounded flex-1"></div>
+                            <div class="h-4 bg-zinc-100 rounded w-14"></div>
+                            <div class="h-4 bg-zinc-100 rounded w-28 hidden sm:block"></div>
+                            <div class="h-4 bg-zinc-100 rounded w-20"></div>
                         </div>
-                        <div class="grid grid-cols-3 gap-3 mt-5">
-                            <div class="h-16 bg-zinc-100 rounded-lg"></div>
-                            <div class="h-16 bg-zinc-100 rounded-lg"></div>
-                            <div class="h-16 bg-zinc-100 rounded-lg"></div>
+                    @endfor
+                </div>
+            @elseif(count($this->filteredSpectech) === 0)
+                @if($this->hasActiveFilters)
+                    {{-- No-results state --}}
+                    <div class="bg-white border border-dashed border-zinc-200 rounded-xl p-12 text-center">
+                        <div class="mx-auto w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center">
+                            <flux:icon.magnifying-glass class="w-6 h-6 text-zinc-400" />
                         </div>
-                        <div class="mt-5 h-3 bg-zinc-100 rounded-full"></div>
+                        <flux:heading size="md" class="mt-4 text-zinc-900">Tidak ada hasil</flux:heading>
+                        <flux:text class="text-sm text-zinc-500 mt-1">
+                            Tidak ada spektek yang cocok dengan pencarian atau filter saat ini.
+                        </flux:text>
+                        <flux:button wire:click="resetFilters" variant="ghost" size="sm" icon="x-mark" class="mt-4">
+                            Bersihkan filter
+                        </flux:button>
                     </div>
-                @endfor
+                @else
+                    {{-- Empty state --}}
+                    <div class="bg-white border border-dashed border-zinc-200 rounded-xl p-12 text-center">
+                        <div class="mx-auto w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center">
+                            <flux:icon name="{{ $activeType === 'software' ? 'computer-desktop' : 'cube' }}" class="w-6 h-6 text-zinc-400" />
+                        </div>
+                        <flux:heading size="md" class="mt-4 text-zinc-900">
+                            Belum ada {{ $activeType === 'software' ? 'Spektek Aplikasi' : 'Spektek Barang' }}
+                        </flux:heading>
+                        <flux:text class="text-sm text-zinc-500 mt-1">
+                            Tambahkan item {{ $activeType === 'software' ? 'aplikasi' : 'barang' }} pertama untuk mulai melacak progress pekerjaan.
+                        </flux:text>
+                        <div class="mt-4 flex items-center justify-center gap-2">
+                            <flux:button wire:click="openAdd" variant="primary" icon="plus" size="sm">Tambah Spektek</flux:button>
+                            <flux:button wire:click="$dispatch('openManageSpectech', { tab: 'import' })" variant="ghost" icon="arrow-up-tray" size="sm">
+                                Import Excel
+                            </flux:button>
+                        </div>
+                    </div>
+                @endif
             @else
-                @forelse ($this->filteredSpectech as $data)
-                    @php
-                        $qtyRecv = (int) ($data['qty_recived'] ?? 0);
-                        $qtyTotal = (int) ($data['qty_total'] ?? 0);
-                        $percentage = (float) ($data['percentage'] ?? 0);
-                        $isComplete = $percentage >= 100;
-                        $isStarted = $qtyRecv > 0;
-                        $statusLabel = $isComplete ? 'Selesai' : ($isStarted ? 'Berjalan' : 'Belum Mulai');
-                        $statusColor = $isComplete
-                            ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
-                            : ($isStarted ? 'bg-amber-50 text-amber-700 ring-amber-600/20' : 'bg-zinc-50 text-zinc-600 ring-zinc-500/20');
-                        $isSelected = in_array((int) $data['id'], array_map('intval', $selectedIds), true);
-                    @endphp
+                {{-- ============ TABLE VIEW (desktop) ============ --}}
+                <div class="hidden md:block bg-white border border-zinc-200 rounded-xl overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead class="bg-zinc-50 border-b border-zinc-200">
+                            <tr class="text-left text-[11px] uppercase tracking-wide text-zinc-500">
+                                @if($bulkMode)
+                                    <th class="px-4 py-3 w-10">
+                                        <input type="checkbox"
+                                            class="rounded border-zinc-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                                            x-on:click.prevent="$wire.toggleSelectAllVisible()"
+                                            x-bind:checked="$wire.selectedIds.length === {{ count($this->filteredSpectech) }}"
+                                        />
+                                    </th>
+                                @endif
+                                <th class="px-4 py-3 font-medium">
+                                    <button type="button" wire:click="sortByColumn('name')"
+                                        class="inline-flex items-center gap-1 uppercase tracking-wide font-medium hover:text-zinc-800 cursor-pointer">
+                                        Nama Spektek
+                                        <flux:icon name="{{ $sortBy === 'name' ? ($sortDir === 'asc' ? 'chevron-up' : 'chevron-down') : 'chevron-up-down' }}" class="w-3.5 h-3.5" />
+                                    </button>
+                                </th>
+                                <th class="px-3 py-3 font-medium w-24 text-right">
+                                    <button type="button" wire:click="sortByColumn('qty_total')"
+                                        class="inline-flex items-center gap-1 uppercase tracking-wide font-medium hover:text-zinc-800 cursor-pointer">
+                                        Qty
+                                        <flux:icon name="{{ $sortBy === 'qty_total' ? ($sortDir === 'asc' ? 'chevron-up' : 'chevron-down') : 'chevron-up-down' }}" class="w-3.5 h-3.5" />
+                                    </button>
+                                </th>
+                                <th class="px-3 py-3 font-medium w-36 text-right">Harga Satuan</th>
+                                <th class="px-3 py-3 font-medium w-40 text-right">
+                                    <button type="button" wire:click="sortByColumn('total_nominal')"
+                                        class="inline-flex items-center gap-1 uppercase tracking-wide font-medium hover:text-zinc-800 cursor-pointer">
+                                        Total Nominal
+                                        <flux:icon name="{{ $sortBy === 'total_nominal' ? ($sortDir === 'asc' ? 'chevron-up' : 'chevron-down') : 'chevron-up-down' }}" class="w-3.5 h-3.5" />
+                                    </button>
+                                </th>
+                                <th class="px-3 py-3 font-medium w-28">Status</th>
+                                @unless($bulkMode)
+                                    <th class="px-2 py-3 w-12"></th>
+                                @endunless
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-zinc-100">
+                            @foreach ($this->visibleSpectech as $data)
+                                @php
+                                    $qtyRecv = (int) ($data['qty_recived'] ?? 0);
+                                    $qtyTotal = (int) ($data['qty_total'] ?? 0);
+                                    $percentage = (float) ($data['percentage'] ?? 0);
+                                    $isComplete = $percentage >= 100;
+                                    $statusLabel = $isComplete ? 'Selesai' : ($qtyRecv > 0 ? 'Berjalan' : 'Belum Mulai');
+                                    $statusColor = $isComplete
+                                        ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
+                                        : ($qtyRecv > 0 ? 'bg-amber-50 text-amber-700 ring-amber-600/20' : 'bg-zinc-50 text-zinc-600 ring-zinc-500/20');
+                                    $isSelected = in_array((int) $data['id'], array_map('intval', $selectedIds), true);
+                                @endphp
+                                <tr wire:key="spectech-row-{{ $data['id'] }}"
+                                    @class([
+                                        'transition',
+                                        'bg-red-50/60' => $bulkMode && $isSelected,
+                                        'hover:bg-zinc-50/60' => !($bulkMode && $isSelected),
+                                        'cursor-pointer' => $bulkMode,
+                                    ])
+                                    @if($bulkMode) wire:click="toggleSelect({{ (int) $data['id'] }})" @endif>
+                                    @if($bulkMode)
+                                        <td class="px-4 py-3 align-top">
+                                            <input type="checkbox"
+                                                class="w-4 h-4 rounded border-zinc-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                                                x-bind:checked="$wire.selectedIds.map(Number).includes({{ (int) $data['id'] }})"
+                                                x-on:click.stop.prevent="$wire.toggleSelect({{ (int) $data['id'] }})"
+                                            />
+                                        </td>
+                                    @endif
+                                    <td class="px-4 py-3 align-top">
+                                        <p class="font-medium text-zinc-900">{{ $data['name'] }}</p>
+                                        @if(!empty($data['note']))
+                                            <p class="text-xs text-zinc-500 mt-0.5 truncate max-w-md" title="{{ $data['note'] }}">
+                                                {{ $data['note'] }}
+                                            </p>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-3 align-top text-right text-zinc-700 font-medium">
+                                        {{ $qtyTotal }}
+                                    </td>
+                                    <td class="px-3 py-3 align-top text-right text-zinc-600">
+                                        Rp {{ number_format($data['qty_nominal'] ?? 0, 0, ',', '.') }}
+                                    </td>
+                                    <td class="px-3 py-3 align-top text-right font-semibold text-zinc-900">
+                                        Rp {{ number_format($data['total_nominal'] ?? 0, 0, ',', '.') }}
+                                    </td>
+                                    <td class="px-3 py-3 align-top">
+                                        <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ring-1 ring-inset {{ $statusColor }}">
+                                            {{ $statusLabel }}
+                                        </span>
+                                    </td>
+                                    @unless($bulkMode)
+                                        <td class="px-2 py-2 align-top text-right">
+                                            <flux:dropdown wire:key="spectech-menu-{{ $data['id'] }}">
+                                                <flux:button variant="ghost" size="sm" icon="ellipsis-vertical" class="text-zinc-400" />
+                                                <flux:navmenu>
+                                                    <flux:navmenu.item icon="pencil-square" wire:click="editSpectech({{ $data['id'] }})">Edit</flux:navmenu.item>
+                                                    <flux:navmenu.item icon="trash" variant="danger"
+                                                        wire:click="confirmDelete({{ $data['id'] }})">Hapus</flux:navmenu.item>
+                                                </flux:navmenu>
+                                            </flux:dropdown>
+                                        </td>
+                                    @endunless
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        <tfoot class="bg-zinc-50 border-t border-zinc-200">
+                            <tr>
+                                <td colspan="{{ $bulkMode ? 4 : 3 }}" class="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                                    Total {{ count($this->filteredSpectech) }} item
+                                </td>
+                                <td class="px-3 py-3 text-right text-sm font-semibold text-red-600">
+                                    Rp {{ number_format($this->filteredTotalNominal, 0, ',', '.') }}
+                                </td>
+                                <td colspan="{{ $bulkMode ? 1 : 2 }}"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
 
-                    <div wire:key="spectech-card-{{ $data['id'] }}"
-                         @class([
-                            'group bg-white border rounded-xl p-4 sm:p-6 transition',
-                            'border-red-300 ring-1 ring-red-200 shadow-sm' => $bulkMode && $isSelected,
-                            'border-zinc-200 hover:border-zinc-300 hover:shadow-sm' => !($bulkMode && $isSelected),
-                            'cursor-pointer' => $bulkMode,
-                         ])
-                         @if($bulkMode) wire:click="toggleSelect({{ $data['id'] }})" @endif>
-                        {{-- Header --}}
-                        <div class="flex items-start justify-between gap-4">
+                {{-- ============ COMPACT LIST (mobile) ============ --}}
+                <div class="md:hidden bg-white border border-zinc-200 rounded-xl divide-y divide-zinc-100 overflow-hidden">
+                    @foreach ($this->visibleSpectech as $data)
+                        @php
+                            $qtyRecv = (int) ($data['qty_recived'] ?? 0);
+                            $qtyTotal = (int) ($data['qty_total'] ?? 0);
+                            $percentage = (float) ($data['percentage'] ?? 0);
+                            $isComplete = $percentage >= 100;
+                            $statusLabel = $isComplete ? 'Selesai' : ($qtyRecv > 0 ? 'Berjalan' : 'Belum Mulai');
+                            $statusColor = $isComplete
+                                ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
+                                : ($qtyRecv > 0 ? 'bg-amber-50 text-amber-700 ring-amber-600/20' : 'bg-zinc-50 text-zinc-600 ring-zinc-500/20');
+                            $isSelected = in_array((int) $data['id'], array_map('intval', $selectedIds), true);
+                        @endphp
+                        <div wire:key="spectech-mobile-{{ $data['id'] }}"
+                            @class([
+                                'flex items-start gap-3 p-4 transition',
+                                'bg-red-50/60' => $bulkMode && $isSelected,
+                                'cursor-pointer' => $bulkMode,
+                            ])
+                            @if($bulkMode) wire:click="toggleSelect({{ (int) $data['id'] }})" @endif>
                             @if($bulkMode)
-                                <div class="pt-1 shrink-0">
-                                    <input type="checkbox"
-                                        class="w-4 h-4 rounded border-zinc-300 text-red-600 focus:ring-red-500 cursor-pointer"
-                                        x-bind:checked="$wire.selectedIds.map(Number).includes({{ (int) $data['id'] }})"
-                                        x-on:click.stop.prevent="$wire.toggleSelect({{ (int) $data['id'] }})"
-                                    />
-                                </div>
+                                <input type="checkbox"
+                                    class="mt-1 w-4 h-4 shrink-0 rounded border-zinc-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                                    x-bind:checked="$wire.selectedIds.map(Number).includes({{ (int) $data['id'] }})"
+                                    x-on:click.stop.prevent="$wire.toggleSelect({{ (int) $data['id'] }})"
+                                />
                             @endif
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2 flex-wrap">
-                                    <h3 class="text-base font-semibold text-zinc-900 truncate">
-                                        {{ $data['name'] }}
-                                    </h3>
-                                    {{-- <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ring-1 ring-inset {{ $statusColor }}">
+                                    <p class="font-medium text-zinc-900 truncate">{{ $data['name'] }}</p>
+                                    <span class="inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full ring-1 ring-inset {{ $statusColor }}">
                                         {{ $statusLabel }}
-                                    </span> --}}
+                                    </span>
                                 </div>
-                                <p class="mt-1 text-xs text-zinc-500">
-                                    Harga satuan: <span class="font-medium text-zinc-700">Rp {{ number_format($data['qty_nominal'] ?? 0, 0, ',', '.') }}</span>
+                                <p class="text-xs text-zinc-500 mt-1">
+                                    {{ $qtyTotal }} × Rp {{ number_format($data['qty_nominal'] ?? 0, 0, ',', '.') }}
                                 </p>
+                                <p class="text-sm font-semibold text-zinc-900 mt-1">
+                                    Rp {{ number_format($data['total_nominal'] ?? 0, 0, ',', '.') }}
+                                </p>
+                                @if(!empty($data['note']))
+                                    <p class="text-xs text-amber-900 bg-amber-50/70 border border-amber-100 rounded-lg px-2.5 py-1.5 mt-2 leading-relaxed">
+                                        {{ $data['note'] }}
+                                    </p>
+                                @endif
                             </div>
-
                             @unless($bulkMode)
-                                <flux:dropdown wire:key="spectech-menu-{{ $data['id'] }}">
-                                    <flux:button variant="ghost" size="sm" icon="ellipsis-vertical" class="text-zinc-400" />
+                                <flux:dropdown wire:key="spectech-mobile-menu-{{ $data['id'] }}">
+                                    <flux:button variant="ghost" size="sm" icon="ellipsis-vertical" class="text-zinc-400 -mr-1" />
                                     <flux:navmenu>
                                         <flux:navmenu.item icon="pencil-square" wire:click="editSpectech({{ $data['id'] }})">Edit</flux:navmenu.item>
                                         <flux:navmenu.item icon="trash" variant="danger"
@@ -619,79 +899,26 @@ new class extends Component {
                                 </flux:dropdown>
                             @endunless
                         </div>
-
-                        {{-- Stats grid --}}
-                        <div class="grid grid-cols-2 gap-3 mt-5">
-                            <div class="rounded-lg bg-zinc-50 p-3">
-                                <p class="text-[11px] uppercase tracking-wide text-zinc-500">Quantity</p>
-                                <p class="mt-1 text-sm font-semibold text-zinc-900">
-                                    {{ $qtyTotal }}
-                                    {{-- <span class="text-zinc-400 font-normal"></span> --}}
-                                </p>
-                            </div>
-                            <div class="rounded-lg bg-zinc-50 p-3">
-                                <p class="text-[11px] uppercase tracking-wide text-zinc-500">Total Nominal</p>
-                                <p class="mt-1 text-sm font-semibold text-zinc-900 truncate">
-                                    Rp {{ number_format(($data['total_nominal'] ?? 0), 0, ',', '.') }}
-                                </p>
-                            </div>
-                        </div>
-
-                        {{-- Progress --}}
-                        {{-- <div class="mt-5">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-xs font-medium text-zinc-500">Progress Penerimaan</span>
-                                <span class="text-xs font-semibold {{ $isComplete ? 'text-emerald-700' : 'text-zinc-800' }}">
-                                    {{ number_format($percentage, 0) }}%
-                                </span>
-                            </div>
-                            <div class="w-full h-2 bg-zinc-100 rounded-full overflow-hidden">
-                                <div class="h-full {{ $isComplete ? 'bg-emerald-600' : 'bg-red-600' }} rounded-full transition-all"
-                                     style="width: {{ min($percentage, 100) }}%"></div>
-                            </div>
-                        </div> --}}
-
-                        {{-- Note --}}
-                        @if(!empty($data['note']))
-                            <div class="mt-4 flex gap-2 rounded-lg bg-amber-50/60 border border-amber-100 p-3">
-                                <flux:icon.information-circle class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                                <p class="text-xs text-amber-900 leading-relaxed">{{ $data['note'] }}</p>
-                            </div>
-                        @endif
+                    @endforeach
+                    <div class="flex items-center justify-between bg-zinc-50 px-4 py-3">
+                        <span class="text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                            Total {{ count($this->filteredSpectech) }} item
+                        </span>
+                        <span class="text-sm font-semibold text-red-600">
+                            Rp {{ number_format($this->filteredTotalNominal, 0, ',', '.') }}
+                        </span>
                     </div>
-                @empty
-                    @if($this->hasActiveFilters)
-                        {{-- No-results state --}}
-                        <div class="bg-white border border-dashed border-zinc-200 rounded-xl p-12 text-center">
-                            <div class="mx-auto w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center">
-                                <flux:icon.magnifying-glass class="w-6 h-6 text-zinc-400" />
-                            </div>
-                            <flux:heading size="md" class="mt-4 text-zinc-900">Tidak ada hasil</flux:heading>
-                            <flux:text class="text-sm text-zinc-500 mt-1">
-                                Tidak ada spektek yang cocok dengan pencarian atau filter saat ini.
-                            </flux:text>
-                            <flux:button wire:click="resetFilters" variant="ghost" size="sm" icon="x-mark" class="mt-4">
-                                Bersihkan filter
-                            </flux:button>
-                        </div>
-                    @else
-                        {{-- Empty state --}}
-                        <div class="bg-white border border-dashed border-zinc-200 rounded-xl p-12 text-center">
-                            <div class="mx-auto w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center">
-                                <flux:icon name="{{ $activeType === 'software' ? 'computer-desktop' : 'cube' }}" class="w-6 h-6 text-zinc-400" />
-                            </div>
-                            <flux:heading size="md" class="mt-4 text-zinc-900">
-                                Belum ada {{ $activeType === 'software' ? 'Spektek Aplikasi' : 'Spektek Barang' }}
-                            </flux:heading>
-                            <flux:text class="text-sm text-zinc-500 mt-1">
-                                Tambahkan item {{ $activeType === 'software' ? 'aplikasi' : 'barang' }} pertama untuk mulai melacak progress pekerjaan.
-                            </flux:text>
-                            <flux:modal.trigger name="addSpectech">
-                                <flux:button variant="primary" icon="plus" size="sm" class="mt-4">Tambah Spektek</flux:button>
-                            </flux:modal.trigger>
-                        </div>
-                    @endif
-                @endforelse
+                </div>
+
+                {{-- Show more --}}
+                @if($this->hiddenCount > 0)
+                    <div class="flex justify-center">
+                        <flux:button wire:click="showMore" variant="ghost" size="sm" icon="chevron-down"
+                            wire:loading.attr="disabled" wire:target="showMore">
+                            Tampilkan lebih banyak ({{ $this->hiddenCount }} tersisa)
+                        </flux:button>
+                    </div>
+                @endif
             @endif
 
             {{-- Sticky bulk action bar --}}
@@ -714,99 +941,6 @@ new class extends Component {
                     </div>
                 </div>
             @endif
-        </div>
-
-        {{-- ============ RIGHT: SUMMARY ============ --}}
-        <div class="hidden space-y-4">
-            {{-- Progress widget --}}
-            <div class="bg-white rounded-xl p-6 border border-zinc-200 space-y-5 md:sticky md:top-12 top-4">
-                <div class="flex items-center justify-between gap-3">
-                    <flux:heading size="md" class="font-semibold text-zinc-900">
-                        Progress Spektek
-                    </flux:heading>
-                    <flux:field class="w-24">
-                        <flux:input.group>
-                            <flux:input wire:model.live.debounce.500ms="ppn" placeholder="PPN" size="sm" />
-                            <flux:input.group.suffix>%</flux:input.group.suffix>
-                        </flux:input.group>
-                    </flux:field>
-                </div>
-
-                {{-- Progress center --}}
-                <div class="text-center py-2">
-                    <div class="text-4xl font-bold text-zinc-900 tracking-tight">
-                        {{ number_format($this->progress ?? 0, 0) }}<span class="text-2xl text-zinc-400">%</span>
-                    </div>
-                    <flux:text class="text-zinc-500 text-xs mt-1">Progress Spektek Keseluruhan</flux:text>
-                </div>
-
-                {{-- Progress bar --}}
-                <div class="w-full h-2.5 bg-zinc-100 rounded-full overflow-hidden">
-                    <div class="h-full bg-linear-to-r from-red-500 to-red-600 rounded-full transition-all"
-                         style="width: {{ min($this->progress ?? 0, 100) }}%"></div>
-                </div>
-
-                {{-- Stats --}}
-                <div class="grid grid-cols-2 gap-3 pt-2 border-t border-zinc-100">
-                    <div>
-                        <flux:text class="text-[11px] uppercase tracking-wide text-zinc-500">Nilai Diterima</flux:text>
-                        <p class="text-sm font-semibold text-red-600 mt-0.5">
-                            Rp {{ number_format($this->nilaiDiterima, 0, ',', '.') }}
-                        </p>
-                    </div>
-                    <div class="text-right">
-                        <flux:text class="text-[11px] uppercase tracking-wide text-zinc-500">Total Proyek</flux:text>
-                        <p class="text-sm font-semibold text-zinc-900 mt-0.5">
-                            Rp {{ number_format($totalproject ?? 0, 0, ',', '.') }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Formula explainer --}}
-            <div x-data="{ open: false }" class="bg-white border border-zinc-200 rounded-xl overflow-hidden">
-                <button type="button" class="w-full p-4 flex items-center justify-between text-left hover:bg-zinc-50 transition" @click="open = !open">
-                    <div class="flex items-center gap-2">
-                        <flux:icon.calculator class="w-4 h-4 text-zinc-500" />
-                        <flux:heading size="sm" class="font-medium text-zinc-900">Cara Perhitungan</flux:heading>
-                    </div>
-                    <svg :class="{'rotate-180': open}" class="w-4 h-4 text-zinc-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                    </svg>
-                </button>
-
-                <div x-show="open" x-collapse class="px-4 pb-4 space-y-4 border-t border-zinc-100">
-                    <flux:text class="text-zinc-500 text-xs leading-relaxed pt-3">
-                        Progress dihitung dari nilai barang yang telah diterima dibanding total nilai proyek.
-                        Nilai sudah termasuk <span class="font-medium text-zinc-700">PPN {{ $ppn }}%</span>.
-                    </flux:text>
-
-                    <div class="bg-zinc-50 rounded-lg p-3 text-center">
-                        <flux:text class="text-[11px] uppercase tracking-wide text-zinc-500">Rumus</flux:text>
-                        <p class="text-sm font-semibold text-zinc-800 mt-1">
-                            (Nilai Diterima ÷ Total Proyek) × 100%
-                        </p>
-                    </div>
-
-                    <div class="space-y-2">
-                        <flux:text class="text-xs font-medium text-zinc-700">Contoh</flux:text>
-                        <div class="grid grid-cols-2 gap-2 text-xs">
-                            <div class="bg-zinc-50 rounded-lg p-2.5">
-                                <p class="text-zinc-500 text-[10px]">Diterima</p>
-                                <p class="font-semibold text-zinc-800">Rp 35.000.000</p>
-                            </div>
-                            <div class="bg-zinc-50 rounded-lg p-2.5">
-                                <p class="text-zinc-500 text-[10px]">Total</p>
-                                <p class="font-semibold text-zinc-800">Rp 100.000.000</p>
-                            </div>
-                        </div>
-                        <div class="bg-red-50 border border-red-100 rounded-lg p-2.5 text-center">
-                            <p class="text-red-700 text-[11px]">Hasil Progress</p>
-                            <p class="text-base font-bold text-red-700">35%</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 
