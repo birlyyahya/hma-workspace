@@ -60,6 +60,7 @@ test('expanding a row lazy-loads its sub spekteks', function () {
     ])
         ->call('toggleExpand', 5)
         ->assertSet('expandedId', 5)
+        ->assertSet('showSubForm', false)
         ->assertCount('subItems', 1)
         ->assertSee('Device Finder');
 
@@ -139,6 +140,7 @@ test('editSub prefills the inline form and saveSub patches the sub spektek', fun
     ])
         ->call('toggleExpand', 5)
         ->call('editSub', 2)
+        ->assertSet('showSubForm', true)
         ->assertSet('subName', 'Device Finder')
         ->assertSet('subQuantity', 5)
         ->set('subName', 'Device Finder V2')
@@ -192,6 +194,26 @@ test('deleteSub sends a DELETE for the selected sub spektek', function () {
 
     Http::assertSent(fn ($request) => $request->method() === 'DELETE'
         && str_ends_with($request->url(), '/sub-spekteks/2'));
+});
+
+test('sub form is collapsible and closing it cancels an in-progress edit', function () {
+    fakeSubSpectechApi([subSpectechItem()]);
+
+    $this->actingAs(User::factory()->create());
+
+    Volt::test('project.components.project-spectech-tabs', [
+        'totalproject' => 100000000,
+        'id' => 1,
+        'progress' => 0,
+    ])
+        ->call('toggleExpand', 5)
+        ->call('toggleSubForm')
+        ->assertSet('showSubForm', true)
+        ->call('editSub', 2)
+        ->call('toggleSubForm')
+        ->assertSet('showSubForm', false)
+        ->assertSet('subEditId', null)
+        ->assertSet('subName', '');
 });
 
 test('bulk mode disables row expansion', function () {

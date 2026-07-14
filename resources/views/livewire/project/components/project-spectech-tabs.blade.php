@@ -46,6 +46,7 @@ new class extends Component {
      */
     public array $subItems = [];
 
+    public bool $showSubForm = false;
     public ?int $subEditId = null;
     public string $subName = '';
     public ?int $subQuantity = null;
@@ -287,6 +288,7 @@ new class extends Component {
         }
 
         $this->expandedId = $id;
+        $this->reset('showSubForm');
         $this->resetSubForm();
         $this->loadSubItems();
     }
@@ -295,7 +297,17 @@ new class extends Component {
     {
         $this->expandedId = null;
         $this->subItems = [];
+        $this->reset('showSubForm');
         $this->resetSubForm();
+    }
+
+    public function toggleSubForm(): void
+    {
+        $this->showSubForm = ! $this->showSubForm;
+
+        if (! $this->showSubForm) {
+            $this->resetSubForm();
+        }
     }
 
     protected function loadSubItems(): void
@@ -400,6 +412,7 @@ new class extends Component {
         $this->subQuantity = (int) $item['qty_total'];
         $this->subPrice = (string) (int) $item['total_nominal'];
         $this->subType = $item['type'];
+        $this->showSubForm = true;
     }
 
     public function confirmDeleteSub(int $id): void
@@ -1043,7 +1056,7 @@ new class extends Component {
                                 @if($isExpanded)
                                     <tr wire:key="spectech-sub-{{ $data['id'] }}" class="border-t-0!">
                                         <td colspan="5" class="px-4 pb-5 pt-0">
-                                            <div class="ml-6 rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 space-y-4">
+                                            <div class="ml-3 rounded-xl p-4 space-y-4">
                                                 <div class="flex items-center justify-between gap-3">
                                                     <p class="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-zinc-500">
                                                         <flux:icon.squares-2x2 class="w-3.5 h-3.5" />
@@ -1059,85 +1072,82 @@ new class extends Component {
                                                 </div>
 
                                                 @if(count($subItems) > 0)
-                                                    <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
-                                                        <table class="w-full text-sm">
-                                                            <thead class="bg-zinc-50 border-b border-zinc-200">
-                                                                <tr class="text-left text-[11px] uppercase tracking-wide text-zinc-500">
-                                                                    <th class="px-3 py-2 font-medium">Nama</th>
-                                                                    <th class="px-3 py-2 font-medium w-36">Diterima / Qty</th>
-                                                                    <th class="px-3 py-2 font-medium w-36 text-right">Total Nominal</th>
-                                                                    <th class="px-2 py-2 w-20"></th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody class="divide-y divide-zinc-100">
-                                                                @foreach($subItems as $sub)
-                                                                    <tr wire:key="sub-row-{{ $sub['id'] }}">
-                                                                        <td class="px-3 py-2">
-                                                                            <p class="font-medium text-zinc-900">{{ $sub['name'] }}</p>
-                                                                            <p class="text-xs text-zinc-500">{{ $sub['type'] === 'software' ? 'Aplikasi' : 'Barang' }}</p>
-                                                                        </td>
-                                                                        <td class="px-3 py-2">
-                                                                            <div class="flex items-center gap-1.5">
-                                                                                <input type="number" min="0" max="{{ $sub['qty_total'] }}"
-                                                                                    value="{{ $sub['qty_received'] }}"
-                                                                                    wire:change="updateSubQty({{ (int) $sub['id'] }}, $event.target.value)"
-                                                                                    class="w-16 rounded-lg border border-zinc-300 bg-white text-sm py-1 px-2 focus:border-red-500 focus:ring-red-500" />
-                                                                                <span class="text-xs text-zinc-500">/ {{ $sub['qty_total'] }}</span>
-                                                                            </div>
-                                                                        </td>
-                                                                        <td class="px-3 py-2 text-right font-medium text-zinc-900">
-                                                                            Rp {{ number_format($sub['total_nominal'], 0, ',', '.') }}
-                                                                        </td>
-                                                                        <td class="px-2 py-2 text-right whitespace-nowrap">
-                                                                            <flux:button wire:click="editSub({{ (int) $sub['id'] }})"
-                                                                                variant="ghost" size="xs" icon="pencil-square" class="text-zinc-400" />
-                                                                            <flux:button wire:click="confirmDeleteSub({{ (int) $sub['id'] }})"
-                                                                                variant="ghost" size="xs" icon="trash" class="text-zinc-400 hover:text-red-600!" />
-                                                                        </td>
-                                                                    </tr>
-                                                                @endforeach
-                                                            </tbody>
-                                                        </table>
+                                                    <div class="rounded-lg border border-zinc-200 bg-white divide-y divide-zinc-100 overflow-hidden">
+                                                        @foreach($subItems as $sub)
+                                                            <div wire:key="sub-row-{{ $sub['id'] }}" class="flex items-center gap-4 px-4 py-2.5">
+                                                                <div class="min-w-0 flex-1">
+                                                                    <p class="text-sm font-medium text-zinc-900 truncate">{{ $sub['name'] }}</p>
+                                                                    <p class="text-xs text-zinc-500">{{ $sub['type'] === 'software' ? 'Aplikasi' : 'Barang' }}</p>
+                                                                </div>
+                                                                <div class="flex items-center gap-1.5 shrink-0">
+                                                                    <input type="number" min="0" max="{{ $sub['qty_total'] }}"
+                                                                        value="{{ $sub['qty_received'] }}"
+                                                                        wire:change="updateSubQty({{ (int) $sub['id'] }}, $event.target.value)"
+                                                                        class="w-16 rounded-lg border border-zinc-300 bg-white text-sm py-1 px-2 focus:border-red-500 focus:ring-red-500" />
+                                                                    <span class="text-xs text-zinc-500 whitespace-nowrap">/ {{ $sub['qty_total'] }} diterima</span>
+                                                                </div>
+                                                                <p class="w-28 text-right text-sm font-semibold text-zinc-900 shrink-0">
+                                                                    Rp {{ number_format($sub['total_nominal'], 0, ',', '.') }}
+                                                                </p>
+                                                                <div class="flex items-center shrink-0 -mr-1">
+                                                                    <flux:button wire:click="editSub({{ (int) $sub['id'] }})"
+                                                                        variant="ghost" size="xs" icon="pencil-square" class="text-zinc-400" />
+                                                                    <flux:button wire:click="confirmDeleteSub({{ (int) $sub['id'] }})"
+                                                                        variant="ghost" size="xs" icon="trash" class="text-zinc-400 hover:text-red-600!" />
+                                                                </div>
+                                                            </div>
+                                                        @endforeach
                                                     </div>
                                                 @else
                                                     <p class="text-sm text-zinc-500">
-                                                        Belum ada sub spektek untuk item ini — tambahkan lewat form di bawah (opsional).
+                                                        Belum ada sub spektek untuk item ini.
                                                     </p>
                                                 @endif
 
-                                                {{-- Inline add/edit form --}}
-                                                <form wire:submit="saveSub" class="space-y-2">
-                                                    <div class="grid grid-cols-12 gap-2">
-                                                        <div class="col-span-4">
-                                                            <flux:input wire:model="subName" size="sm" placeholder="Nama sub spektek..." />
+                                                {{-- Inline add/edit form (collapsible) --}}
+                                                @if($showSubForm)
+                                                    <form wire:submit="saveSub" class="space-y-2 rounded-lg border border-zinc-200 bg-white p-3">
+                                                        <div class="grid grid-cols-12 gap-2">
+                                                            <div class="col-span-4">
+                                                                <flux:input wire:model="subName" size="sm" placeholder="Nama sub spektek..." />
+                                                            </div>
+                                                            <div class="col-span-2">
+                                                                <flux:select wire:model="subType" size="sm">
+                                                                    <flux:select.option value="hardware">Barang</flux:select.option>
+                                                                    <flux:select.option value="software">Aplikasi</flux:select.option>
+                                                                </flux:select>
+                                                            </div>
+                                                            <div class="col-span-2">
+                                                                <flux:input wire:model="subQuantity" type="number" min="1" size="sm" placeholder="Qty" />
+                                                            </div>
+                                                            <div class="col-span-2">
+                                                                <flux:input wire:model="subPrice" type="number" min="0" size="sm" placeholder="Total harga" />
+                                                            </div>
+                                                            <div class="col-span-2 flex items-start gap-1">
+                                                                <flux:button type="submit" variant="primary" size="sm" class="flex-1"
+                                                                    icon="{{ $subEditId ? 'check' : 'plus' }}"
+                                                                    wire:loading.attr="disabled" wire:target="saveSub">
+                                                                    {{ $subEditId ? 'Simpan' : 'Tambah' }}
+                                                                </flux:button>
+                                                                @if($subEditId)
+                                                                    <flux:button wire:click="resetSubForm" variant="ghost" size="sm" icon="x-mark" tooltip="Batal edit" />
+                                                                @endif
+                                                            </div>
                                                         </div>
-                                                        <div class="col-span-2">
-                                                            <flux:select wire:model="subType" size="sm">
-                                                                <flux:select.option value="hardware">Barang</flux:select.option>
-                                                                <flux:select.option value="software">Aplikasi</flux:select.option>
-                                                            </flux:select>
-                                                        </div>
-                                                        <div class="col-span-2">
-                                                            <flux:input wire:model="subQuantity" type="number" min="1" size="sm" placeholder="Qty" />
-                                                        </div>
-                                                        <div class="col-span-2">
-                                                            <flux:input wire:model="subPrice" type="number" min="0" size="sm" placeholder="Total harga" />
-                                                        </div>
-                                                        <div class="col-span-2 flex items-start gap-1">
-                                                            <flux:button type="submit" variant="primary" size="sm" class="flex-1"
-                                                                icon="{{ $subEditId ? 'check' : 'plus' }}"
-                                                                wire:loading.attr="disabled" wire:target="saveSub">
-                                                                {{ $subEditId ? 'Simpan' : 'Tambah' }}
-                                                            </flux:button>
-                                                            @if($subEditId)
-                                                                <flux:button wire:click="resetSubForm" variant="ghost" size="sm" icon="x-mark" tooltip="Batal edit" />
-                                                            @endif
-                                                        </div>
-                                                    </div>
-                                                    <flux:error name="subName" />
-                                                    <flux:error name="subQuantity" />
-                                                    <flux:error name="subPrice" />
-                                                </form>
+                                                        <flux:error name="subName" />
+                                                        <flux:error name="subQuantity" />
+                                                        <flux:error name="subPrice" />
+                                                    </form>
+                                                @endif
+
+                                                <button type="button" wire:click="toggleSubForm"
+                                                    class="text-xs font-medium text-zinc-500 hover:text-zinc-800 cursor-pointer">
+                                                    @if($showSubForm)
+                                                        &minus; Sembunyikan form
+                                                    @else
+                                                        + Tambah sub spektek
+                                                    @endif
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -1249,31 +1259,42 @@ new class extends Component {
                                             <p class="text-xs text-zinc-500">Belum ada sub spektek untuk item ini.</p>
                                         @endforelse
 
-                                        {{-- Inline add/edit form --}}
-                                        <form wire:submit="saveSub" class="space-y-2">
-                                            <flux:input wire:model="subName" size="sm" placeholder="Nama sub spektek..." />
-                                            <div class="grid grid-cols-3 gap-2">
-                                                <flux:select wire:model="subType" size="sm">
-                                                    <flux:select.option value="hardware">Barang</flux:select.option>
-                                                    <flux:select.option value="software">Aplikasi</flux:select.option>
-                                                </flux:select>
-                                                <flux:input wire:model="subQuantity" type="number" min="1" size="sm" placeholder="Qty" />
-                                                <flux:input wire:model="subPrice" type="number" min="0" size="sm" placeholder="Harga" />
-                                            </div>
-                                            <flux:error name="subName" />
-                                            <flux:error name="subQuantity" />
-                                            <flux:error name="subPrice" />
-                                            <div class="flex gap-2">
-                                                <flux:button type="submit" variant="primary" size="sm" class="flex-1"
-                                                    icon="{{ $subEditId ? 'check' : 'plus' }}"
-                                                    wire:loading.attr="disabled" wire:target="saveSub">
-                                                    {{ $subEditId ? 'Simpan Perubahan' : 'Tambah Sub' }}
-                                                </flux:button>
-                                                @if($subEditId)
-                                                    <flux:button wire:click="resetSubForm" variant="ghost" size="sm" icon="x-mark" />
-                                                @endif
-                                            </div>
-                                        </form>
+                                        {{-- Inline add/edit form (collapsible) --}}
+                                        @if($showSubForm)
+                                            <form wire:submit="saveSub" class="space-y-2 rounded-lg border border-zinc-200 bg-white p-3">
+                                                <flux:input wire:model="subName" size="sm" placeholder="Nama sub spektek..." />
+                                                <div class="grid grid-cols-3 gap-2">
+                                                    <flux:select wire:model="subType" size="sm">
+                                                        <flux:select.option value="hardware">Barang</flux:select.option>
+                                                        <flux:select.option value="software">Aplikasi</flux:select.option>
+                                                    </flux:select>
+                                                    <flux:input wire:model="subQuantity" type="number" min="1" size="sm" placeholder="Qty" />
+                                                    <flux:input wire:model="subPrice" type="number" min="0" size="sm" placeholder="Harga" />
+                                                </div>
+                                                <flux:error name="subName" />
+                                                <flux:error name="subQuantity" />
+                                                <flux:error name="subPrice" />
+                                                <div class="flex gap-2">
+                                                    <flux:button type="submit" variant="primary" size="sm" class="flex-1"
+                                                        icon="{{ $subEditId ? 'check' : 'plus' }}"
+                                                        wire:loading.attr="disabled" wire:target="saveSub">
+                                                        {{ $subEditId ? 'Simpan Perubahan' : 'Tambah Sub' }}
+                                                    </flux:button>
+                                                    @if($subEditId)
+                                                        <flux:button wire:click="resetSubForm" variant="ghost" size="sm" icon="x-mark" />
+                                                    @endif
+                                                </div>
+                                            </form>
+                                        @endif
+
+                                        <button type="button" wire:click="toggleSubForm"
+                                            class="text-xs font-medium text-zinc-500 hover:text-zinc-800 cursor-pointer">
+                                            @if($showSubForm)
+                                                &minus; Sembunyikan form
+                                            @else
+                                                + Tambah sub spektek
+                                            @endif
+                                        </button>
                                     </div>
                                 @endif
                             </div>
