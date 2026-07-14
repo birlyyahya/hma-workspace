@@ -133,7 +133,13 @@ class extends Component {
             display: block;
             border: 1px solid #a0a0a0;
             -ms-touch-action: none;
+            touch-action: none;
             width: 100% !important;
+        }
+
+        #sig,
+        #sig canvas {
+            touch-action: none;
         }
 
         .kbw-signature-disabled {
@@ -194,6 +200,45 @@ class extends Component {
                 }
             }
 
+            // Plugin kbw-signature hanya mengikat event mouse (jQuery UI Mouse),
+            // jadi sentuhan di mobile diteruskan sebagai event mouse sintetis.
+            function enableTouchDrawing() {
+                var el = $sig.get(0);
+
+                if (!el || el.dataset.touchDrawing) {
+                    return;
+                }
+                el.dataset.touchDrawing = 'true';
+
+                function forward(event, type) {
+                    if (event.type !== 'touchend' && event.touches.length > 1) {
+                        return;
+                    }
+
+                    event.preventDefault();
+
+                    var touch = event.changedTouches[0];
+                    touch.target.dispatchEvent(new MouseEvent(type, {
+                        bubbles: true
+                        , cancelable: true
+                        , view: window
+                        , clientX: touch.clientX
+                        , clientY: touch.clientY
+                        , button: 0
+                    }));
+                }
+
+                el.addEventListener('touchstart', function(e) {
+                    forward(e, 'mousedown');
+                }, { passive: false });
+                el.addEventListener('touchmove', function(e) {
+                    forward(e, 'mousemove');
+                }, { passive: false });
+                el.addEventListener('touchend', function(e) {
+                    forward(e, 'mouseup');
+                }, { passive: false });
+            }
+
             function resizeSignature() {
                 if (!$sig.data('kbwSignature')) {
                     initSignature();
@@ -216,6 +261,7 @@ class extends Component {
             }
 
             initSignature();
+            enableTouchDrawing();
 
             $('#open-draw-signature').on('click', function() {
                 setTimeout(resizeSignature, 80);
