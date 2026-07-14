@@ -8,8 +8,8 @@ window.ClassicEditor = ClassicEditor;
 // Komponen Alpine reusable untuk import Excel sisi-frontend (lihat
 // resources/views/components/excel-import.blade.php). Parsing & validasi baris
 // dilakukan di browser; hasilnya dikirim ke Livewire sebagai array JSON.
-document.addEventListener('alpine:init', () => {
-    window.Alpine.data('excelImport', (config = {}) => ({
+const registerExcelImport = (Alpine) => {
+    Alpine.data('excelImport', (config = {}) => ({
         columns: config.columns ?? [],
         example: config.example ?? [],
         templateName: config.templateName ?? 'template.xlsx',
@@ -81,4 +81,13 @@ document.addEventListener('alpine:init', () => {
             }
         },
     }));
-});
+};
+
+// Daftarkan segera bila Alpine sudah aktif (mis. Livewire memulai Alpine sebelum
+// modul ini dieksekusi), selain itu tunggu event alpine:init. Ini mencegah
+// "excelImport is not defined" akibat urutan pemuatan skrip.
+if (window.Alpine) {
+    registerExcelImport(window.Alpine);
+} else {
+    document.addEventListener('alpine:init', () => registerExcelImport(window.Alpine));
+}
