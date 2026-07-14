@@ -20,6 +20,9 @@ class SpectechForm extends Form
     #[Validate('nullable|string|max:500')]
     public ?string $notes = null;
 
+    #[Validate('nullable|string|max:20000')]
+    public ?string $detail = null;
+
     #[Validate('nullable|integer|min:0|lte:quantity')]
     public ?int $received_quantity = 0;
 
@@ -35,6 +38,7 @@ class SpectechForm extends Form
             'qty_total' => $this->quantity,
             'total_nominal' => (int) preg_replace('/[^0-9]/', '', (string) $this->price),
             'note' => $this->notes,
+            'detail' => $this->detail,
             'type' => $this->type,
         ];
 
@@ -67,6 +71,7 @@ class SpectechForm extends Form
         $this->received_quantity = (int) ($spectech['qty_recived'] ?? 0);
 
         $this->notes = $spectech['note'] ?? null;
+        $this->detail = $spectech['detail'] ?? null;
 
         $this->type = $spectech['type'] ?? 'hardware';
         $this->idUpdate = (int) $spectech['id'];

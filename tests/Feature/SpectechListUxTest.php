@@ -15,6 +15,10 @@ function fakeSpectechListApi(array $items): void
             'data' => $items,
             'pagination' => [],
         ], 200),
+        '*activity-categories*' => Http::response([
+            'status' => 201,
+            'data' => [],
+        ], 201),
     ]);
 }
 
@@ -135,6 +139,62 @@ test('openAdd presets the form type to the active tab', function () {
         ->call('setType', 'software')
         ->call('openAdd')
         ->assertSet('form.type', 'software');
+});
+
+test('create forwards the detail field to the spectech API', function () {
+    fakeSpectechListApi([]);
+
+    $this->actingAs(User::factory()->create());
+
+    Volt::test('project.components.project-spectech-tabs', [
+        'totalproject' => 100000000,
+        'id' => 1,
+        'progress' => 0,
+    ])
+        ->set('form.name', 'Server Rack')
+        ->set('form.quantity', 1)
+        ->set('form.price', '1.000.000')
+        ->set('form.detail', '<ul><li>RAM 16GB DDR5</li><li>SSD 512GB NVMe</li></ul>')
+        ->call('create')
+        ->assertHasNoErrors();
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'activity-categories')
+        && ! str_contains($request->url(), 'search')
+        && $request['detail'] === '<ul><li>RAM 16GB DDR5</li><li>SSD 512GB NVMe</li></ul>');
+});
+
+test('editing an item populates the detail field on the form', function () {
+    $item = makeSpectechItems(1)[0];
+    $item['detail'] = '<p>Prosesor Intel i7</p>';
+
+    fakeSpectechListApi([$item]);
+
+    $this->actingAs(User::factory()->create());
+
+    Volt::test('project.components.project-spectech-tabs', [
+        'totalproject' => 100000000,
+        'id' => 1,
+        'progress' => 0,
+    ])
+        ->call('editSpectech', 1)
+        ->assertSet('form.detail', '<p>Prosesor Intel i7</p>');
+});
+
+test('item detail is rendered in the expandable row', function () {
+    $item = makeSpectechItems(1)[0];
+    $item['detail'] = '<ul><li>RAM 16GB DDR5</li></ul>';
+
+    fakeSpectechListApi([$item]);
+
+    $this->actingAs(User::factory()->create());
+
+    Volt::test('project.components.project-spectech-tabs', [
+        'totalproject' => 100000000,
+        'id' => 1,
+        'progress' => 0,
+    ])
+        ->assertSee('<li>RAM 16GB DDR5</li>', false)
+        ->assertSee('Detail Spesifikasi');
 });
 
 test('manage modal opens on the requested tab', function () {

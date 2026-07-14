@@ -74,6 +74,7 @@ new class extends Component {
             'qty_nominal'   => $data['qty_nominal'],
             'percentage'    => $data['percentage'],
             'note'          => $data['note'],
+            'detail'        => $data['detail'] ?? '',
             'images'        => $data['images'] ?? [],
             // Field type belum tersedia dari API; default hardware sampai backend menambahkan kolom ini.
             'type'          => $data['type'] ?? 'hardware',
@@ -719,7 +720,8 @@ new class extends Component {
                 @endif
             @else
                 {{-- ============ TABLE VIEW (desktop) ============ --}}
-                <div class="hidden md:block bg-white border border-zinc-200 rounded-xl overflow-hidden">
+                <div class="hidden md:block bg-white border border-zinc-200 rounded-xl overflow-hidden"
+                    x-data="{ expandedId: null, toggleDetail(id) { this.expandedId = this.expandedId === id ? null : id } }">
                     <table class="w-full text-sm">
                         <thead class="bg-zinc-50 border-b border-zinc-200">
                             <tr class="text-left text-[11px] uppercase tracking-wide text-zinc-500">
@@ -764,15 +766,20 @@ new class extends Component {
                                 @php
                                     $qtyTotal = (int) ($data['qty_total'] ?? 0);
                                     $isSelected = in_array((int) $data['id'], array_map('intval', $selectedIds), true);
+                                    $hasDetail = ! empty($data['detail']);
                                 @endphp
                                 <tr wire:key="spectech-row-{{ $data['id'] }}"
                                     @class([
                                         'transition',
                                         'bg-red-50/60' => $bulkMode && $isSelected,
                                         'hover:bg-zinc-50/60' => !($bulkMode && $isSelected),
-                                        'cursor-pointer' => $bulkMode,
+                                        'cursor-pointer' => $bulkMode || $hasDetail,
                                     ])
-                                    @if($bulkMode) wire:click="toggleSelect({{ (int) $data['id'] }})" @endif>
+                                    @if($bulkMode)
+                                        wire:click="toggleSelect({{ (int) $data['id'] }})"
+                                    @elseif($hasDetail)
+                                        x-on:click="toggleDetail({{ (int) $data['id'] }})"
+                                    @endif>
                                     @if($bulkMode)
                                         <td class="px-4 py-3 align-top">
                                             <input type="checkbox"
@@ -783,12 +790,20 @@ new class extends Component {
                                         </td>
                                     @endif
                                     <td class="px-4 py-3 align-top">
-                                        <p class="font-medium text-zinc-900">{{ $data['name'] }}</p>
-                                        @if(!empty($data['note']))
-                                            <p class="text-xs text-zinc-500 mt-0.5 truncate max-w-md" title="{{ $data['note'] }}">
-                                                {{ $data['note'] }}
-                                            </p>
-                                        @endif
+                                        <div class="flex items-start gap-2">
+                                            @if($hasDetail && !$bulkMode)
+                                                <flux:icon.chevron-right class="w-4 h-4 mt-0.5 text-zinc-400 shrink-0 transition-transform"
+                                                    x-bind:class="expandedId === {{ (int) $data['id'] }} && 'rotate-90'" />
+                                            @endif
+                                            <div class="min-w-0">
+                                                <p class="font-medium text-zinc-900">{{ $data['name'] }}</p>
+                                                @if(!empty($data['note']))
+                                                    <p class="text-xs text-zinc-500 mt-0.5 truncate max-w-md" title="{{ $data['note'] }}">
+                                                        {{ $data['note'] }}
+                                                    </p>
+                                                @endif
+                                            </div>
+                                        </div>
                                     </td>
                                     <td class="px-3 py-3 align-top text-right text-zinc-700 font-medium">
                                         {{ $qtyTotal }}
@@ -800,10 +815,13 @@ new class extends Component {
                                         Rp {{ number_format($data['total_nominal'] ?? 0, 0, ',', '.') }}
                                     </td>
                                     @unless($bulkMode)
-                                        <td class="px-2 py-2 align-top text-right">
+                                        <td class="px-2 py-2 align-top text-right" x-on:click.stop>
                                             <flux:dropdown wire:key="spectech-menu-{{ $data['id'] }}">
                                                 <flux:button variant="ghost" size="sm" icon="ellipsis-vertical" class="text-zinc-400" />
                                                 <flux:navmenu>
+                                                    @if($hasDetail)
+                                                        <flux:navmenu.item icon="eye" x-on:click="toggleDetail({{ (int) $data['id'] }})">Lihat Detail</flux:navmenu.item>
+                                                    @endif
                                                     <flux:navmenu.item icon="pencil-square" wire:click="editSpectech({{ $data['id'] }})">Edit</flux:navmenu.item>
                                                     <flux:navmenu.item icon="trash" variant="danger"
                                                         wire:click="confirmDelete({{ $data['id'] }})">Hapus</flux:navmenu.item>
@@ -812,6 +830,25 @@ new class extends Component {
                                         </td>
                                     @endunless
                                 </tr>
+
+                                {{-- Expandable detail row --}}
+                                @if($hasDetail && !$bulkMode)
+                                    <tr wire:key="spectech-detail-{{ $data['id'] }}" x-cloak
+                                        x-show="expandedId === {{ (int) $data['id'] }}"
+                                        class="border-t-0!">
+                                        <td colspan="5" class="px-4 pb-4 pt-0">
+                                            <div class="ml-6 rounded-lg bg-zinc-50 border border-zinc-200 p-4">
+                                                <p class="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-zinc-500 mb-2">
+                                                    <flux:icon.list-bullet class="w-3.5 h-3.5" />
+                                                    Detail Spesifikasi
+                                                </p>
+                                                <div class="spectech-prose text-sm text-zinc-700 leading-relaxed">
+                                                    {!! $data['detail'] !!}
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endif
                             @endforeach
                         </tbody>
                         <tfoot class="bg-zinc-50 border-t border-zinc-200">
@@ -831,7 +868,8 @@ new class extends Component {
                 </div>
 
                 {{-- ============ COMPACT LIST (mobile) ============ --}}
-                <div class="md:hidden bg-white border border-zinc-200 rounded-xl divide-y divide-zinc-100 overflow-hidden">
+                <div class="md:hidden bg-white border border-zinc-200 rounded-xl divide-y divide-zinc-100 overflow-hidden"
+                    x-data="{ expandedId: null, toggleDetail(id) { this.expandedId = this.expandedId === id ? null : id } }">
                     @foreach ($this->visibleSpectech as $data)
                         @php
                             $qtyRecv = (int) ($data['qty_recived'] ?? 0);
@@ -843,14 +881,19 @@ new class extends Component {
                                 ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
                                 : ($qtyRecv > 0 ? 'bg-amber-50 text-amber-700 ring-amber-600/20' : 'bg-zinc-50 text-zinc-600 ring-zinc-500/20');
                             $isSelected = in_array((int) $data['id'], array_map('intval', $selectedIds), true);
+                            $hasDetail = ! empty($data['detail']);
                         @endphp
                         <div wire:key="spectech-mobile-{{ $data['id'] }}"
                             @class([
                                 'flex items-start gap-3 p-4 transition',
                                 'bg-red-50/60' => $bulkMode && $isSelected,
-                                'cursor-pointer' => $bulkMode,
+                                'cursor-pointer' => $bulkMode || $hasDetail,
                             ])
-                            @if($bulkMode) wire:click="toggleSelect({{ (int) $data['id'] }})" @endif>
+                            @if($bulkMode)
+                                wire:click="toggleSelect({{ (int) $data['id'] }})"
+                            @elseif($hasDetail)
+                                x-on:click="toggleDetail({{ (int) $data['id'] }})"
+                            @endif>
                             @if($bulkMode)
                                 <input type="checkbox"
                                     class="mt-1 w-4 h-4 shrink-0 rounded border-zinc-300 text-red-600 focus:ring-red-500 cursor-pointer"
@@ -860,6 +903,10 @@ new class extends Component {
                             @endif
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2 flex-wrap">
+                                    @if($hasDetail && !$bulkMode)
+                                        <flux:icon.chevron-right class="w-4 h-4 text-zinc-400 shrink-0 transition-transform"
+                                            x-bind:class="expandedId === {{ (int) $data['id'] }} && 'rotate-90'" />
+                                    @endif
                                     <p class="font-medium text-zinc-900 truncate">{{ $data['name'] }}</p>
                                     <span class="inline-flex items-center px-2 py-0.5 text-[11px] font-medium rounded-full ring-1 ring-inset {{ $statusColor }}">
                                         {{ $statusLabel }}
@@ -876,9 +923,22 @@ new class extends Component {
                                         {{ $data['note'] }}
                                     </p>
                                 @endif
+                                @if($hasDetail && !$bulkMode)
+                                    <div x-show="expandedId === {{ (int) $data['id'] }}" x-collapse x-cloak>
+                                        <div class="mt-2 rounded-lg bg-zinc-50 border border-zinc-200 p-3">
+                                            <p class="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-zinc-500 mb-2">
+                                                <flux:icon.list-bullet class="w-3.5 h-3.5" />
+                                                Detail Spesifikasi
+                                            </p>
+                                            <div class="spectech-prose text-sm text-zinc-700 leading-relaxed">
+                                                {!! $data['detail'] !!}
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
                             </div>
                             @unless($bulkMode)
-                                <flux:dropdown wire:key="spectech-mobile-menu-{{ $data['id'] }}">
+                                <flux:dropdown wire:key="spectech-mobile-menu-{{ $data['id'] }}" x-on:click.stop>
                                     <flux:button variant="ghost" size="sm" icon="ellipsis-vertical" class="text-zinc-400 -mr-1" />
                                     <flux:navmenu>
                                         <flux:navmenu.item icon="pencil-square" wire:click="editSpectech({{ $data['id'] }})">Edit</flux:navmenu.item>
@@ -989,6 +1049,16 @@ new class extends Component {
             </div>
 
             <flux:field>
+                <flux:label>Detail Spesifikasi</flux:label>
+                <div wire:ignore x-data="spectechRichEditor(@entangle('form.detail'))"
+                    class="spectech-editor overflow-hidden rounded-lg border border-zinc-200 bg-white focus-within:border-zinc-400">
+                    <div x-ref="editor" data-placeholder="Rincian spesifikasi lengkap — cth. RAM 16GB DDR5, SSD 512GB NVMe, Prosesor Intel i7..."></div>
+                </div>
+                <flux:description>Opsional. Bisa berupa daftar poin; tampil saat baris item diklik di tabel.</flux:description>
+                <flux:error name="form.detail" />
+            </flux:field>
+
+            <flux:field>
                 <flux:label>Catatan</flux:label>
                 <flux:textarea wire:model="form.notes" rows="3" placeholder="Catatan tambahan (opsional)" />
                 <flux:error name="form.notes" />
@@ -1081,6 +1151,16 @@ new class extends Component {
                     </flux:field>
                 </div>
             </div> --}}
+
+            <flux:field>
+                <flux:label>Detail Spesifikasi</flux:label>
+                <div wire:ignore x-data="spectechRichEditor(@entangle('form.detail'))"
+                    class="spectech-editor overflow-hidden rounded-lg border border-zinc-200 bg-white focus-within:border-zinc-400">
+                    <div x-ref="editor" data-placeholder="Rincian spesifikasi lengkap — cth. RAM 16GB DDR5, SSD 512GB NVMe, Prosesor Intel i7..."></div>
+                </div>
+                <flux:description>Opsional. Bisa berupa daftar poin; tampil saat baris item diklik di tabel.</flux:description>
+                <flux:error name="form.detail" />
+            </flux:field>
 
             <flux:field>
                 <flux:label>Catatan</flux:label>
@@ -1221,3 +1301,108 @@ new class extends Component {
 {{-- ============ KELOLA SPEKTEK (child component) ============ --}}
 <livewire:project.components.project-spectech-manage :id="(int) $id" />
 </div>
+
+@assets
+{{-- CKEditor di-bundle lewat resources/js/app.js (window.ClassicEditor), bukan CDN. --}}
+<style>
+    .spectech-editor .ck.ck-toolbar {
+        border: none;
+        border-bottom: 1px solid #e4e4e7;
+        background: #fafafa;
+    }
+
+    .spectech-editor .ck.ck-editor__editable_inline {
+        border: none !important;
+        box-shadow: none !important;
+        font-size: 0.875rem;
+        min-height: 110px;
+        max-height: 260px;
+        overflow-y: auto;
+    }
+
+    .spectech-editor .ck.ck-editor__editable_inline > :first-child {
+        margin-top: 0.5rem;
+    }
+
+    .spectech-editor .ck .ck-placeholder::before {
+        color: #a1a1aa;
+    }
+
+    .spectech-prose ul {
+        list-style: disc;
+        padding-left: 1.25rem;
+    }
+
+    .spectech-prose ol {
+        list-style: decimal;
+        padding-left: 1.25rem;
+    }
+
+    .spectech-prose li {
+        margin: 0.125rem 0;
+    }
+
+    .spectech-prose p + p {
+        margin-top: 0.25rem;
+    }
+</style>
+@endassets
+
+@script
+<script>
+    Alpine.data('spectechRichEditor', (model) => ({
+        value: model,
+        editor: null,
+
+        init() {
+            this.whenEditorReady(() => this.mountEditor());
+        },
+
+        destroy() {
+            this.editor?.destroy().catch(() => {});
+            this.editor = null;
+        },
+
+        whenEditorReady(callback, tries = 0) {
+            if (window.ClassicEditor) {
+                callback();
+                return;
+            }
+
+            if (tries > 200) {
+                console.error('Editor gagal dimuat.');
+                return;
+            }
+
+            setTimeout(() => this.whenEditorReady(callback, tries + 1), 50);
+        },
+
+        mountEditor() {
+            if (this.editor) {
+                return;
+            }
+
+            ClassicEditor
+                .create(this.$refs.editor, {
+                    toolbar: ['bulletedList', 'numberedList', 'bold', 'italic', 'undo', 'redo'],
+                    placeholder: this.$refs.editor.dataset.placeholder || '',
+                })
+                .then((editor) => {
+                    this.editor = editor;
+                    editor.setData(this.value || '');
+
+                    editor.model.document.on('change:data', () => {
+                        this.value = editor.getData();
+                    });
+
+                    this.$watch('value', (val) => {
+                        if (editor.getData() !== (val || '')) {
+                            editor.setData(val || '');
+                        }
+                    });
+                })
+                .catch((error) => console.error(error));
+        },
+    }));
+</script>
+@endscript

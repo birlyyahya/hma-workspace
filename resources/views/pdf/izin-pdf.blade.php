@@ -112,7 +112,7 @@ $tanggalTtd = $createdAt
                             </div>
 
                             <div class="signature-footer">
-                                {{ data_get($izin, 'superadmin_username', 'Manager') }}<br>
+                                {{ data_get($izin, 'manager_name', 'Manager') }}<br>
                                 {{ $tanggalTtd }}
                             </div>
                         </td>
@@ -127,7 +127,7 @@ $tanggalTtd = $createdAt
                             </div>
 
                             <div class="signature-footer">
-                                {{ data_get($izin, 'admin_username', 'Atasan Langsung') }}<br>
+                                {{ data_get($izin, 'asmen_name', 'Atasan Langsung') }}<br>
                                 {{ $tanggalTtd }}
                             </div>
                         </td>

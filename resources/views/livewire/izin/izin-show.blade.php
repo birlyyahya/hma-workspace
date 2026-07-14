@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\User;
 use App\Services\IzinCache;
 use App\Services\RemoteImageFetcher;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -38,6 +39,17 @@ class extends Component {
             return;
         }
         $izin = $this->data;
+
+        $manager = User::whereHas('role', function ($query) {
+            $query->where('slug', 'manager');
+        })->first();
+
+        $asmen = User::whereHas('role', function ($query) {
+            $query->where('slug', 'asmen');
+        })->first();
+
+        $izin['manager_name'] = $manager?->name;
+        $izin['asmen_name'] = $asmen?->name;
 
         $izin['admins_base64'] = $this->convertImageToBase64(data_get($izin, 'admins'));
         $izin['superadmins_base64'] = $this->convertImageToBase64(data_get($izin, 'superadmins'));
