@@ -41,6 +41,7 @@ return [
     'url_project' => env('URL_PROJECT'),
     'api_ca' => env('API_CA'),
     'aws_url' => env('AWS_URL'),
+    'aws_url_project' => env('AWS_URL').'workspace',
 
     'bepm' => [
         'base' => env('API_PROJECT'),
