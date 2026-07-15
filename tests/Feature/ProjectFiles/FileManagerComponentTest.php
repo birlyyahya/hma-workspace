@@ -78,6 +78,38 @@ test('opening a folder shows only the files under its path', function () {
         ->assertDontSee('laporan.pdf');
 });
 
+test('goBack navigates to the parent folder', function () {
+    $leader = User::factory()->create();
+    fakeBepmForFileManager(leaderId: $leader->id);
+    $parent = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Induk']);
+    $child = ProjectFolder::factory()->create(['project_id' => 5, 'parent_id' => $parent->id, 'name' => 'Anak']);
+
+    Volt::actingAs($leader)
+        ->test('project.components.file-manager', ['id' => 5])
+        ->call('openFolder', $child->id)
+        ->assertSet('currentFolderId', $child->id)
+        ->call('goBack')
+        ->assertSet('currentFolderId', $parent->id)
+        ->call('goBack')
+        ->assertSet('currentFolderId', null);
+});
+
+test('goBack refreshes the view to the parent folder (no stale computed)', function () {
+    $leader = User::factory()->create();
+    fakeBepmForFileManager(leaderId: $leader->id);
+    $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak']);
+
+    Volt::actingAs($leader)
+        ->test('project.components.file-manager', ['id' => 5])
+        ->call('openFolder', $folder->id)
+        ->assertSee('kontrak.pdf')
+        ->assertDontSee('laporan.pdf')
+        ->call('goBack')
+        ->assertSet('currentFolderId', null)
+        ->assertSee('laporan.pdf')
+        ->assertDontSee('kontrak.pdf');
+});
+
 test('search filters files by name', function () {
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id);

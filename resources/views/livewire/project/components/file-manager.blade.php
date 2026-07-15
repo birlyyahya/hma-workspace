@@ -256,6 +256,19 @@ new class extends Component
     {
         $this->currentFolderId = $folderId;
         $this->reset('selected', 'search');
+
+        // Buang memo computed yang bergantung pada folder aktif supaya render
+        // memakai folder baru — mencegah view basi saat aksi (mis. goBack)
+        // sempat mengakses computed sebelum currentFolderId berubah.
+        unset($this->currentFolder, $this->files, $this->folders, $this->breadcrumbs);
+    }
+
+    /**
+     * Naik satu tingkat ke folder induk (root bila sudah di folder teratas).
+     */
+    public function goBack(): void
+    {
+        $this->openFolder($this->currentFolder?->parent_id);
     }
 
     public function updatedSearch(): void
@@ -933,20 +946,25 @@ new class extends Component
     <div class="space-y-5" @if($this->hasBusyFolder) wire:poll.5s @endif>
 
         {{-- ============ BREADCRUMB ============ --}}
-        <flux:breadcrumbs>
-            @foreach($this->breadcrumbs as $crumb)
-                <flux:breadcrumbs.item wire:key="crumb-{{ $crumb['id'] ?? 'root' }}">
-                    @if($loop->last)
-                        {{ $crumb['name'] }}
-                    @else
-                        <button type="button" class="cursor-pointer hover:underline"
-                            wire:click="openFolder({{ $crumb['id'] !== null ? $crumb['id'] : 'null' }})">
+        <div class="flex items-center gap-3">
+            @if($this->currentFolder !== null)
+                <flux:button size="sm" variant="ghost" icon="arrow-left" wire:click="goBack">Kembali</flux:button>
+            @endif
+            <flux:breadcrumbs>
+                @foreach($this->breadcrumbs as $crumb)
+                    <flux:breadcrumbs.item wire:key="crumb-{{ $crumb['id'] ?? 'root' }}">
+                        @if($loop->last)
                             {{ $crumb['name'] }}
-                        </button>
-                    @endif
-                </flux:breadcrumbs.item>
-            @endforeach
-        </flux:breadcrumbs>
+                        @else
+                            <button type="button" class="cursor-pointer hover:underline"
+                                wire:click="openFolder({{ $crumb['id'] !== null ? $crumb['id'] : 'null' }})">
+                                {{ $crumb['name'] }}
+                            </button>
+                        @endif
+                    </flux:breadcrumbs.item>
+                @endforeach
+            </flux:breadcrumbs>
+        </div>
 
         {{-- ============ UPLOAD DROP AREA ============ --}}
         @if($this->currentFolder?->status === null || $this->currentFolder === null)
