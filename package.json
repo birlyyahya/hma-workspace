@@ -9,6 +9,8 @@
     "dependencies": {
         "@ckeditor/ckeditor5-build-classic": "^41.4.2",
         "@tailwindcss/vite": "^4.1.11",
+        "@uppy/aws-s3": "^5.1.0",
+        "@uppy/core": "^5.2.0",
         "autoprefixer": "^10.4.20",
         "axios": "^1.7.4",
         "concurrently": "^9.0.1",

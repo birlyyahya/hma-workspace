@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ProjectFileChunkUploadController;
+use App\Http\Controllers\ProjectFileUploadController;
 use App\Livewire\Events\EventShow;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
@@ -82,6 +83,19 @@ Route::middleware('auth')->group(function () {
     // Project files (chunk upload proxy for progress + shorter requests)
     Route::post('project-files/upload-chunk', [ProjectFileChunkUploadController::class, 'uploadChunk'])
         ->name('project-files.upload-chunk');
+
+    // Project files — direct multipart upload ke MinIO (control plane)
+    Route::prefix('projects/{project}/files')->whereNumber('project')->group(function () {
+        Route::post('uploads', [ProjectFileUploadController::class, 'initiate'])
+            ->name('project-files.uploads.initiate');
+        Route::post('uploads/{uploadId}/sign', [ProjectFileUploadController::class, 'sign'])
+            ->middleware('throttle:60,1')
+            ->name('project-files.uploads.sign');
+        Route::post('uploads/{uploadId}/complete', [ProjectFileUploadController::class, 'complete'])
+            ->name('project-files.uploads.complete');
+        Route::delete('uploads/{uploadId}', [ProjectFileUploadController::class, 'abort'])
+            ->name('project-files.uploads.abort');
+    });
 
 });
 
