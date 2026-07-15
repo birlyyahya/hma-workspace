@@ -159,7 +159,8 @@ test('renaming a file moves the object synchronously in MinIO', function () {
 
     Http::assertSent(fn ($request) => $request->method() === 'PATCH'
         && str_contains($request->url(), 'admin-docs/1')
-        && $request['file'] === 'projects_docs/2026/5/laporan-final.pdf');
+        && $request['file'] === 'projects_docs/2026/5/laporan-final.pdf'
+        && $request['title'] === 'laporan-final');
 });
 
 test('renaming an unknown document id is a no-op', function () {
@@ -364,7 +365,8 @@ test('a rename whose BEPM sync fails hands off to the background job without rol
         ->assertHasNoErrors();
 
     Queue::assertPushed(SyncProjectDocPathJob::class, fn (SyncProjectDocPathJob $job) => $job->docId === 1
-        && $job->newKey === 'projects_docs/2026/5/laporan-final.pdf');
+        && $job->newKey === 'projects_docs/2026/5/laporan-final.pdf'
+        && $job->extra['title'] === 'laporan-final');
 });
 
 test('a move whose object is already at the destination is treated as done and still syncs BEPM', function () {

@@ -548,7 +548,7 @@ new class extends Component
             return;
         }
 
-        $synced = $this->syncDocPath((int) $row['id'], $newKey);
+        $synced = $this->syncDocPath((int) $row['id'], $newKey, ['title' => trim($this->renameDocName)]);
 
         app(ProjectCache::class)->flushDocs((int) $this->id);
         unset($this->files);
@@ -717,17 +717,21 @@ new class extends Component
      * gagal — sebaliknya sinkronisasi dijamin selesai via SyncProjectDocPathJob
      * (idempotent, diretry queue) sehingga tahan refresh/crash. Mengembalikan
      * true bila BEPM langsung tersinkron, false bila diserahkan ke background.
+     *
+     * $extra untuk field lain yang ikut diperbarui (mis. `title` saat rename).
+     *
+     * @param  array<string, mixed>  $extra
      */
-    protected function syncDocPath(int $docId, string $newKey): bool
+    protected function syncDocPath(int $docId, string $newKey, array $extra = []): bool
     {
-        $result = app(ProjectWriter::class)->updateDoc($docId, ['file' => $newKey]);
+        $result = app(ProjectWriter::class)->updateDoc($docId, ['file' => $newKey, ...$extra]);
 
         if ($result['ok']) {
             return true;
         }
 
         Log::warning('file-manager: update path BEPM inline gagal, diserahkan ke background', ['doc_id' => $docId, 'to' => $newKey, 'status' => $result['status']]);
-        SyncProjectDocPathJob::dispatch((int) $this->id, $docId, $newKey);
+        SyncProjectDocPathJob::dispatch((int) $this->id, $docId, $newKey, $extra);
 
         return false;
     }

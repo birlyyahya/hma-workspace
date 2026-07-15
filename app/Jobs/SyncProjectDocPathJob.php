@@ -24,15 +24,19 @@ class SyncProjectDocPathJob implements ShouldQueue
 
     public int $backoff = 30;
 
+    /**
+     * @param  array<string, mixed>  $extra  field lain yang ikut diperbarui (mis. `title`)
+     */
     public function __construct(
         public readonly int $projectId,
         public readonly int $docId,
         public readonly string $newKey,
+        public readonly array $extra = [],
     ) {}
 
     public function handle(ProjectWriter $writer): void
     {
-        $result = $writer->updateDoc($this->docId, ['file' => $this->newKey], $this->projectId);
+        $result = $writer->updateDoc($this->docId, ['file' => $this->newKey, ...$this->extra], $this->projectId);
 
         if (! $result['ok']) {
             Log::warning('SyncProjectDocPathJob: update path BEPM belum sukses, dijadwalkan retry', [
