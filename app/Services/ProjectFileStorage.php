@@ -165,6 +165,20 @@ class ProjectFileStorage
     }
 
     /**
+     * Apakah sebuah objek ada di MinIO. Dipakai untuk membuat move/rename
+     * idempotent: bila move gagal karena sumber sudah tidak ada, objek mungkin
+     * sudah berada di key tujuan dari percobaan sebelumnya yang terputus.
+     */
+    public function exists(string $key): bool
+    {
+        try {
+            return Storage::disk((string) config('uploads.project_files.disk'))->exists($key);
+        } catch (\Throwable $e) {
+            throw $this->wrap('exists', $e, ['key' => $key]);
+        }
+    }
+
+    /**
      * Object key sebenarnya di MinIO di bawah sebuah prefix (rekursif).
      * Sumber otoritatif untuk operasi move — TIDAK bergantung pada cache BEPM.
      *

@@ -69,8 +69,8 @@ if (! function_exists('isImageFile')) {
 if (! function_exists('project_storage_year')) {
     /**
      * Tahun project untuk layout penyimpanan MinIO
-     * (projects/{tahun}/{id}/...). Diambil dari start_date; fallback berurutan
-     * ke contract_date lalu created_at. Satu sumber kebenaran dipakai oleh
+     * (projects_docs/{tahun}/{id}/...). Diambil dari start_date; fallback
+     * berurutan ke contract_date lalu created_at. Satu sumber kebenaran dipakai
      * controller upload maupun komponen file-manager agar path selalu sama.
      *
      * @param  array<string, mixed>  $project
@@ -80,6 +80,37 @@ if (! function_exists('project_storage_year')) {
         $date = $project['start_date'] ?? $project['contract_date'] ?? $project['created_at'] ?? null;
 
         return $date ? \Illuminate\Support\Carbon::parse($date)->format('Y') : 'tanpa-tahun';
+    }
+}
+
+if (! function_exists('project_doc_keywords')) {
+    /**
+     * Kata kunci otomatis dokumen (parameter wajib BEPM): nama & kode project
+     * bila tersedia, segmen folder tempat file disimpan, lalu nama file tanpa
+     * ekstensi. Selalu berisi minimal satu elemen (nama file). Dipakai bersama
+     * oleh endpoint upload dan command rekonsiliasi agar konsisten.
+     *
+     * @param  array<string, mixed>  $project
+     * @return array<int, string>
+     */
+    function project_doc_keywords(array $project, int $projectId, string $key): array
+    {
+        $year = project_storage_year($project);
+        $relative = \Illuminate\Support\Str::after($key, "projects_docs/{$year}/{$projectId}/");
+        $segments = explode('/', $relative);
+        $filename = array_pop($segments);
+
+        return collect([
+            data_get($project, 'name'),
+            data_get($project, 'code'),
+            ...$segments,
+            pathinfo((string) $filename, PATHINFO_FILENAME),
+        ])
+            ->filter(fn ($value) => filled($value))
+            ->map(fn ($value) => (string) $value)
+            ->unique()
+            ->values()
+            ->all();
     }
 }
 

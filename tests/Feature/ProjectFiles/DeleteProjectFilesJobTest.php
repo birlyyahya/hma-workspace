@@ -25,16 +25,16 @@ function fakeBepmForDeleteJob(int $deleteStatus = 200): void
     });
 }
 
-test('records are deleted from BEPM first and MinIO objects only for non-legacy keys', function () {
+test('records are deleted from BEPM first and MinIO objects only for managed projects_docs keys', function () {
     fakeBepmForDeleteJob();
 
     $storage = mock(ProjectFileStorage::class);
-    $storage->shouldReceive('deleteObject')->once()->with('projects/5/Kontrak/kontrak.pdf');
+    $storage->shouldReceive('deleteObject')->once()->with('projects_docs/2026/5/Kontrak/kontrak.pdf');
 
     $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak', 'status' => 'deleting']);
 
     runDeleteJob(new DeleteProjectFilesJob(5, [
-        ['doc_id' => 2, 'key' => 'projects/5/Kontrak/kontrak.pdf'],
+        ['doc_id' => 2, 'key' => 'projects_docs/2026/5/Kontrak/kontrak.pdf'],
         ['doc_id' => 3, 'key' => 'uploads/old-doc.pdf'],
     ], $folder->id));
 
@@ -52,7 +52,7 @@ test('when a BEPM delete fails the folder is kept and unlocked, and the object s
     $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak', 'status' => 'deleting']);
 
     runDeleteJob(new DeleteProjectFilesJob(5, [
-        ['doc_id' => 2, 'key' => 'projects/5/Kontrak/kontrak.pdf'],
+        ['doc_id' => 2, 'key' => 'projects_docs/2026/5/Kontrak/kontrak.pdf'],
     ], $folder->id));
 
     $folder->refresh();
@@ -63,12 +63,12 @@ test('a 404 from BEPM counts as already deleted so retries stay idempotent', fun
     fakeBepmForDeleteJob(deleteStatus: 404);
 
     $storage = mock(ProjectFileStorage::class);
-    $storage->shouldReceive('deleteObject')->once()->with('projects/5/Kontrak/kontrak.pdf');
+    $storage->shouldReceive('deleteObject')->once()->with('projects_docs/2026/5/Kontrak/kontrak.pdf');
 
     $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak', 'status' => 'deleting']);
 
     runDeleteJob(new DeleteProjectFilesJob(5, [
-        ['doc_id' => 2, 'key' => 'projects/5/Kontrak/kontrak.pdf'],
+        ['doc_id' => 2, 'key' => 'projects_docs/2026/5/Kontrak/kontrak.pdf'],
     ], $folder->id));
 
     expect(ProjectFolder::query()->whereKey($folder->id)->exists())->toBeFalse();

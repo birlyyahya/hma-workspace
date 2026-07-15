@@ -44,7 +44,7 @@ abstract class ProjectFileRequest extends FormRequest
             'max:1024',
             function (string $attribute, mixed $value, \Closure $fail) {
                 $year = project_storage_year(app(ProjectCache::class)->projectFor($this->projectId()));
-                $prefix = 'projects/'.$year.'/'.$this->projectId().'/';
+                $prefix = 'projects_docs/'.$year.'/'.$this->projectId().'/';
 
                 if (! str_starts_with((string) $value, $prefix) || str_contains((string) $value, '..')) {
                     $fail('Object key tidak valid untuk project ini.');

@@ -1,10 +1,12 @@
 <?php
 
+use App\Jobs\RegisterProjectDocJob;
 use App\Models\ProjectFolder;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\ProjectFileStorage;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 
 use function Pest\Laravel\mock;
 
@@ -83,7 +85,7 @@ test('the project leader can initiate and receives upload metadata', function ()
     mock(ProjectFileStorage::class)
         ->shouldReceive('initiateMultipart')
         ->once()
-        ->with('projects/2026/5/laporan.pdf', 'application/pdf')
+        ->with('projects_docs/2026/5/laporan.pdf', 'application/pdf')
         ->andReturn('upload-abc');
 
     $this->actingAs($leader)
@@ -95,7 +97,7 @@ test('the project leader can initiate and receives upload metadata', function ()
         ->assertCreated()
         ->assertJson([
             'upload_id' => 'upload-abc',
-            'key' => 'projects/2026/5/laporan.pdf',
+            'key' => 'projects_docs/2026/5/laporan.pdf',
             'part_size' => (int) config('uploads.project_files.part_size'),
         ]);
 });
@@ -155,7 +157,7 @@ test('the object key is derived from the folder tree server-side', function () {
     mock(ProjectFileStorage::class)
         ->shouldReceive('initiateMultipart')
         ->once()
-        ->with('projects/2026/5/Kontrak/Addendum/laporan.pdf', 'application/pdf')
+        ->with('projects_docs/2026/5/Kontrak/Addendum/laporan.pdf', 'application/pdf')
         ->andReturn('upload-abc');
 
     $this->actingAs($leader)
@@ -166,7 +168,7 @@ test('the object key is derived from the folder tree server-side', function () {
             'folder_id' => $child->id,
         ])
         ->assertCreated()
-        ->assertJsonPath('key', 'projects/2026/5/Kontrak/Addendum/laporan.pdf');
+        ->assertJsonPath('key', 'projects_docs/2026/5/Kontrak/Addendum/laporan.pdf');
 });
 
 test('path traversal characters in the filename are sanitized', function () {
@@ -188,7 +190,7 @@ test('path traversal characters in the filename are sanitized', function () {
 
     $key = $response->json('key');
 
-    expect($key)->toStartWith('projects/2026/5/')
+    expect($key)->toStartWith('projects_docs/2026/5/')
         ->and($key)->not->toContain('..')
         ->and($key)->toEndWith('.pdf');
 });
@@ -196,14 +198,14 @@ test('path traversal characters in the filename are sanitized', function () {
 test('a duplicate filename gets a numeric suffix', function () {
     $leader = User::factory()->create();
     fakeBepmForUpload(leaderId: $leader->id, docs: [
-        ['id' => 1, 'title' => 'laporan', 'files' => ['url' => 'projects/2026/5/laporan.pdf']],
-        ['id' => 2, 'title' => 'laporan (1)', 'files' => ['url' => 'projects/2026/5/laporan (1).pdf']],
+        ['id' => 1, 'title' => 'laporan', 'files' => ['url' => 'projects_docs/2026/5/laporan.pdf']],
+        ['id' => 2, 'title' => 'laporan (1)', 'files' => ['url' => 'projects_docs/2026/5/laporan (1).pdf']],
     ]);
 
     mock(ProjectFileStorage::class)
         ->shouldReceive('initiateMultipart')
         ->once()
-        ->with('projects/2026/5/laporan (2).pdf', 'application/pdf')
+        ->with('projects_docs/2026/5/laporan (2).pdf', 'application/pdf')
         ->andReturn('upload-abc');
 
     $this->actingAs($leader)
@@ -213,7 +215,7 @@ test('a duplicate filename gets a numeric suffix', function () {
             'mime' => 'application/pdf',
         ])
         ->assertCreated()
-        ->assertJsonPath('key', 'projects/2026/5/laporan (2).pdf');
+        ->assertJsonPath('key', 'projects_docs/2026/5/laporan (2).pdf');
 });
 
 // ----------------------------------------------------------------------- Sign
@@ -225,12 +227,12 @@ test('sign returns presigned urls per part number', function () {
     mock(ProjectFileStorage::class)
         ->shouldReceive('signParts')
         ->once()
-        ->with('projects/2026/5/laporan.pdf', 'upload-abc', [1, 2])
+        ->with('projects_docs/2026/5/laporan.pdf', 'upload-abc', [1, 2])
         ->andReturn([1 => 'https://minio/part-1', 2 => 'https://minio/part-2']);
 
     $this->actingAs($leader)
         ->postJson(route('project-files.uploads.sign', ['project' => 5, 'uploadId' => 'upload-abc']), [
-            'key' => 'projects/2026/5/laporan.pdf',
+            'key' => 'projects_docs/2026/5/laporan.pdf',
             'part_numbers' => [1, 2],
         ])
         ->assertOk()
@@ -259,7 +261,7 @@ test('sign rejects a batch larger than the limit', function () {
 
     $this->actingAs($leader)
         ->postJson(route('project-files.uploads.sign', ['project' => 5, 'uploadId' => 'upload-abc']), [
-            'key' => 'projects/2026/5/laporan.pdf',
+            'key' => 'projects_docs/2026/5/laporan.pdf',
             'part_numbers' => $tooMany,
         ])
         ->assertUnprocessable()
@@ -275,28 +277,29 @@ test('complete finishes the multipart upload and registers the document to BEPM'
     mock(ProjectFileStorage::class)
         ->shouldReceive('completeMultipart')
         ->once()
-        ->with('projects/2026/5/laporan.pdf', 'upload-abc', [
+        ->with('projects_docs/2026/5/laporan.pdf', 'upload-abc', [
             ['PartNumber' => 1, 'ETag' => '"etag-1"'],
             ['PartNumber' => 2, 'ETag' => '"etag-2"'],
         ]);
 
     $this->actingAs($leader)
         ->postJson(route('project-files.uploads.complete', ['project' => 5, 'uploadId' => 'upload-abc']), [
-            'key' => 'projects/2026/5/laporan.pdf',
+            'key' => 'projects_docs/2026/5/laporan.pdf',
             'parts' => [
                 ['part_number' => 1, 'etag' => '"etag-1"'],
                 ['part_number' => 2, 'etag' => '"etag-2"'],
             ],
         ])
         ->assertCreated()
-        ->assertJson(['name' => 'laporan.pdf', 'key' => 'projects/2026/5/laporan.pdf']);
+        ->assertJson(['name' => 'laporan.pdf', 'key' => 'projects_docs/2026/5/laporan.pdf']);
 
     Http::assertSent(function ($request) {
         return $request->method() === 'POST'
             && str_ends_with($request->url(), 'admin-docs')
-            && $request['filename'] === 'projects/2026/5/laporan.pdf'
+            && $request['filename'] === 'projects_docs/2026/5/laporan.pdf'
             && $request['project_id'] === 5
-            && $request['admin_doc_category_id'] === 7;
+            && $request['admin_doc_category_id'] === 7
+            && $request['keyword'] === ['laporan'];
     });
 });
 
@@ -306,17 +309,49 @@ test('the MinIO object is deleted when BEPM registration fails', function () {
 
     $storage = mock(ProjectFileStorage::class);
     $storage->shouldReceive('completeMultipart')->once();
-    $storage->shouldReceive('deleteObject')->once()->with('projects/2026/5/laporan.pdf');
+    $storage->shouldReceive('deleteObject')->once()->with('projects_docs/2026/5/laporan.pdf');
 
     $this->actingAs($leader)
         ->postJson(route('project-files.uploads.complete', ['project' => 5, 'uploadId' => 'upload-abc']), [
-            'key' => 'projects/2026/5/laporan.pdf',
+            'key' => 'projects_docs/2026/5/laporan.pdf',
             'parts' => [
                 ['part_number' => 1, 'etag' => '"etag-1"'],
             ],
         ])
         ->assertStatus(502)
         ->assertJsonPath('errors.file.0', 'File ditolak BEPM');
+});
+
+test('a transient BEPM failure keeps the object and registers in the background', function () {
+    Queue::fake();
+    $leader = User::factory()->create();
+
+    Http::fake([
+        '*projects/5' => Http::response(['status' => 200, 'data' => [[
+            'id' => 5, 'start_date' => '2026-01-01', 'project_leader_id' => $leader->id, 'support_team_internals' => [],
+        ]]], 200),
+        '*admin-docs/search*' => Http::response(['status' => 200, 'data' => []], 200),
+        '*admin-doc-categories*' => Http::response(['status' => 200, 'data' => [['id' => 7, 'name' => 'Umum']]], 200),
+        '*admin-docs' => Http::response(['message' => 'Gateway timeout'], 500),
+        '*' => Http::response(['status' => 200, 'data' => []], 200),
+    ]);
+
+    $storage = mock(ProjectFileStorage::class);
+    $storage->shouldReceive('completeMultipart')->once();
+    $storage->shouldNotReceive('deleteObject');
+
+    $this->actingAs($leader)
+        ->postJson(route('project-files.uploads.complete', ['project' => 5, 'uploadId' => 'upload-abc']), [
+            'key' => 'projects_docs/2026/5/laporan.pdf',
+            'parts' => [
+                ['part_number' => 1, 'etag' => '"etag-1"'],
+            ],
+        ])
+        ->assertStatus(202)
+        ->assertJsonPath('pending', true);
+
+    Queue::assertPushed(RegisterProjectDocJob::class, fn (RegisterProjectDocJob $job) => $job->projectId === 5
+        && $job->payload['filename'] === 'projects_docs/2026/5/laporan.pdf');
 });
 
 // ---------------------------------------------------------------------- Abort
@@ -328,11 +363,11 @@ test('abort cancels the multipart upload', function () {
     mock(ProjectFileStorage::class)
         ->shouldReceive('abortMultipart')
         ->once()
-        ->with('projects/2026/5/laporan.pdf', 'upload-abc');
+        ->with('projects_docs/2026/5/laporan.pdf', 'upload-abc');
 
     $this->actingAs($leader)
         ->deleteJson(route('project-files.uploads.abort', ['project' => 5, 'uploadId' => 'upload-abc']), [
-            'key' => 'projects/2026/5/laporan.pdf',
+            'key' => 'projects_docs/2026/5/laporan.pdf',
         ])
         ->assertNoContent();
 });

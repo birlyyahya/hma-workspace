@@ -496,7 +496,7 @@ class ProjectWriter
      * uploadDoc, tetapi `filename`/`file` berisi object key MinIO — BUKAN path
      * di storage BEPM. Sukses = body.status === 201.
      *
-     * @param  array{title: string, admin_doc_category_id: int, filename: string, original_name: string}  $payload
+     * @param  array{title: string, admin_doc_category_id: int, filename: string, original_name: string, keyword: array<int, string>}  $payload
      * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
      */
     public function registerDocument(int $projectId, array $payload): array
@@ -517,6 +517,32 @@ class ProjectWriter
             ]);
         } catch (\Throwable $e) {
             return $this->fail('registerDocument', $e, ['project_id' => $projectId]);
+        }
+    }
+
+    /**
+     * Perbarui dokumen admin — dipakai untuk menyinkronkan `file` (object key
+     * MinIO) setelah objek dipindah/rename di storage. Idempotent.
+     * Sukses = body.status === 200 atau HTTP 2xx.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function updateDoc(int $id, array $payload, ?int $projectId = null): array
+    {
+        try {
+            $response = $this->externalWrite(timeout: 30)->patch($this->apiBase.'/admin-docs/'.$id, $payload);
+            $body = (array) $response->json();
+            $ok = (int) ($body['status'] ?? 0) === 200 || $response->successful();
+
+            return $this->result($ok, $body, $response->status(), $projectId !== null ? fn () => $this->cache->flushDocs($projectId) : null, [
+                'name' => 'project',
+                'event' => 'updated',
+                'description' => "Memperbarui dokumen admin project #{$id}",
+                'properties' => ['id' => $id, 'payload' => $payload],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->fail('updateDoc', $e, ['id' => $id]);
         }
     }
 

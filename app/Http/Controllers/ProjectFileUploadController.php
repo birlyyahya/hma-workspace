@@ -6,6 +6,7 @@ use App\Http\Requests\ProjectFiles\AbortUploadRequest;
 use App\Http\Requests\ProjectFiles\CompleteUploadRequest;
 use App\Http\Requests\ProjectFiles\InitiateUploadRequest;
 use App\Http\Requests\ProjectFiles\SignUploadPartsRequest;
+use App\Jobs\RegisterProjectDocJob;
 use App\Models\ProjectFolder;
 use App\Services\ProjectCache;
 use App\Services\ProjectFileStorage;
@@ -43,7 +44,7 @@ class ProjectFileUploadController extends Controller
         }
 
         $year = project_storage_year($this->cache->projectFor($project));
-        $prefix = "projects/{$year}/{$project}/".($folderPath !== '' ? $folderPath.'/' : '');
+        $prefix = "projects_docs/{$year}/{$project}/".($folderPath !== '' ? $folderPath.'/' : '');
         $key = $this->uniqueKey($project, $prefix, $filename);
 
         $uploadId = $this->storage->initiateMultipart($key, (string) $request->validated('mime'));
@@ -97,18 +98,32 @@ class ProjectFileUploadController extends Controller
 
         $this->storage->completeMultipart($key, $uploadId, $parts);
 
-        $result = $this->writer->registerDocument($project, [
+        $payload = [
             'title' => (string) ($request->validated('title') ?? pathinfo($name, PATHINFO_FILENAME)),
             'admin_doc_category_id' => $categoryId,
             'filename' => $key,
             'original_name' => $name,
-        ]);
+            'keyword' => $this->keywordsFor($project, $key),
+        ];
+
+        $result = $this->writer->registerDocument($project, $payload);
 
         if (! $result['ok']) {
+            if ($this->isTransientFailure($result)) {
+                RegisterProjectDocJob::dispatch($project, $payload);
+
+                return response()->json([
+                    'name' => $name,
+                    'key' => $key,
+                    'pending' => true,
+                    'message' => 'File terupload; registrasi dokumen diproses di latar belakang.',
+                ], 202);
+            }
+
             $this->deleteOrphanedObject($key);
 
             return response()->json([
-                'message' => 'File terupload tetapi registrasi dokumen gagal — upload dibatalkan.',
+                'message' => 'File terupload tetapi registrasi dokumen ditolak BEPM — upload dibatalkan.',
                 'errors' => $result['body']['errors'] ?? [],
             ], 502);
         }
@@ -181,6 +196,17 @@ class ProjectFileUploadController extends Controller
     }
 
     /**
+     * Kata kunci otomatis untuk dokumen (parameter wajib BEPM). Lihat
+     * project_doc_keywords() untuk aturannya.
+     *
+     * @return array<int, string>
+     */
+    private function keywordsFor(int $project, string $key): array
+    {
+        return project_doc_keywords($this->cache->projectFor($project), $project, $key);
+    }
+
+    /**
      * Kategori default saat client tidak memilih: entri pertama daftar
      * kategori dokumen BEPM.
      */
@@ -189,6 +215,22 @@ class ProjectFileUploadController extends Controller
         $first = collect($this->cache->docCategories())->first();
 
         return isset($first['id']) ? (int) $first['id'] : null;
+    }
+
+    /**
+     * Kegagalan registrasi yang bersifat sementara (timeout/transport atau 5xx)
+     * — layak diselesaikan via retry di background. Penolakan definitif dari
+     * BEPM (mis. validasi 4xx) BUKAN transient: objek jadi yatim dan dibersihkan.
+     *
+     * @param  array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}  $result
+     */
+    private function isTransientFailure(array $result): bool
+    {
+        $bodyStatus = (int) ($result['body']['status'] ?? 0);
+
+        return $result['status'] === null
+            || $result['status'] >= 500
+            || $bodyStatus >= 500;
     }
 
     private function deleteOrphanedObject(string $key): void

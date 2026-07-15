@@ -2,6 +2,7 @@
 
 use App\Jobs\DeleteProjectFilesJob;
 use App\Jobs\MoveProjectFilesJob;
+use App\Jobs\SyncProjectDocPathJob;
 use App\Models\ProjectFolder;
 use App\Services\ProjectCache;
 use App\Services\ProjectFileStorage;
@@ -140,7 +141,7 @@ new class extends Component
 
     protected function rootPrefix(): string
     {
-        return 'projects/'.$this->projectYear.'/'.(int) $this->id.'/';
+        return 'projects_docs/'.$this->projectYear.'/'.(int) $this->id.'/';
     }
 
     protected function currentPrefix(): string
@@ -160,8 +161,8 @@ new class extends Component
 
     /**
      * Baris file di folder aktif, setelah search + filter kategori + sort.
-     * File legacy (byte di storage BEPM, url tidak berprefix projects/) hanya
-     * tampil di root dan tidak bisa di-rename/move.
+     * Seluruh file kini berada di MinIO di bawah prefix project — file hanya
+     * tampil bila key-nya persis di folder aktif (bukan subfolder).
      *
      * @return array<int, array<string, mixed>>
      */
@@ -171,19 +172,13 @@ new class extends Component
 
         $rows = collect($this->allDocs())
             ->map(function (array $doc) {
-                $url = (string) data_get($doc, 'files.url', '');
-                $path = Str::after($url, '/storage/');
-                $legacy = ! str_starts_with($path, $this->rootPrefix());
-                $name = $legacy
-                    ? (string) ($doc['title'] ?? basename($url))
-                    : basename($url);
-                $ext = strtolower(Str::afterLast($url, '.'));
+                $path = $this->keyFromUrl((string) data_get($doc, 'files.url', ''));
+                $ext = strtolower(Str::afterLast($path, '.'));
 
                 return [
                     'id' => $doc['id'],
-                    'name' => $name,
+                    'name' => basename($path),
                     'key' => $path,
-                    'legacy' => $legacy,
                     'ext' => $ext,
                     'category' => $this->categoryOf($ext),
                     'size' => (string) (data_get($doc, 'files.size') ?? ''),
@@ -194,10 +189,6 @@ new class extends Component
                 ];
             })
             ->filter(function (array $row) use ($prefix) {
-                if ($row['legacy']) {
-                    return $this->currentFolderId === null;
-                }
-
                 return str_starts_with($row['key'], $prefix)
                     && ! str_contains(substr($row['key'], strlen($prefix)), '/');
             });
@@ -471,11 +462,7 @@ new class extends Component
         $items = collect($this->docsUnderPrefix($this->rootPrefix().$folder->path().'/'))
             ->map(fn (array $doc) => [
                 'doc_id' => (int) $doc['id'],
-                'key' => ltrim(Str::after(
-                    parse_url((string) data_get($doc, 'files.url', ''), PHP_URL_PATH)
-                    ?: (string) data_get($doc, 'files.url', ''),
-                    '/storage/'
-                    ), '/'),
+                'key' => $this->keyFromUrl((string) data_get($doc, 'files.url', '')),
             ])
             ->values()
             ->all();
@@ -501,9 +488,8 @@ new class extends Component
         }
 
         try {
-            $this->previewUrl = $row['legacy']
-                ? rtrim((string) config('services.url_project'), '/').'/'.ltrim($row['key'], '/')
-                : app(ProjectFileStorage::class)->presignedGetUrl($row['key'], (int) config('uploads.project_files.presign_ttl'));
+            $this->previewUrl = app(ProjectFileStorage::class)
+                ->presignedGetUrl($row['key'], (int) config('uploads.project_files.presign_ttl'));
         } catch (\Throwable $e) {
             Toaster::error('Gagal menyiapkan preview');
 
@@ -519,7 +505,7 @@ new class extends Component
     {
         $row = collect($this->files)->firstWhere('id', $docId);
 
-        if ($row === null || $row['legacy']) {
+        if ($row === null) {
             return;
         }
 
@@ -532,7 +518,7 @@ new class extends Component
     {
         $row = collect($this->files)->firstWhere('id', $this->renamingDocId);
 
-        if ($row === null || $row['legacy'] || $this->forbidden) {
+        if ($row === null || $this->forbidden) {
             return;
         }
 
@@ -556,20 +542,22 @@ new class extends Component
             return;
         }
 
-        try {
-            app(ProjectFileStorage::class)->move($row['key'], $newKey);
-        } catch (\Throwable $e) {
-            Log::error('file-manager: rename objek gagal', ['from' => $row['key'], 'to' => $newKey, 'error' => $e->getMessage()]);
+        if (! $this->moveObject($row['key'], $newKey)) {
             Toaster::error('Rename gagal di storage');
 
             return;
         }
 
-        // TODO(BEPM): update path dokumen di admin-docs saat endpoint tersedia.
+        $synced = $this->syncDocPath((int) $row['id'], $newKey);
 
+        app(ProjectCache::class)->flushDocs((int) $this->id);
+        unset($this->files);
         $this->reset('renamingDocId', 'renameDocName');
         Flux::modal('rename-file-modal')->close();
-        Toaster::success('File di-rename');
+
+        $synced
+            ? Toaster::success('File di-rename')
+            : Toaster::warning('File di-rename — sinkronisasi metadata diproses di background');
     }
 
     public function confirmDeleteDoc(int $docId): void
@@ -603,13 +591,12 @@ new class extends Component
 
         if ($this->deleteOne($row)) {
             Toaster::success('File dihapus');
-            $this->dispatch('file-uploaded');
             app(ProjectCache::class)->flushDocs((int) $this->id);
+            unset($this->files);
+            $this->dispatch('file-uploaded');
         } else {
             Toaster::error('Hapus file gagal');
         }
-
-
     }
 
     // ------------------------------------------------------------------- bulk
@@ -630,6 +617,7 @@ new class extends Component
         }
 
         app(ProjectCache::class)->flushDocs((int) $this->id);
+        unset($this->files);
         $this->reset('selected');
 
         if ($failed === 0) {
@@ -656,46 +644,93 @@ new class extends Component
 
         $prefix = $this->rootPrefix().($target !== null ? $target->path().'/' : '');
         $rows = collect($this->files)->whereIn('id', array_map('intval', $this->selected));
-        $storage = app(ProjectFileStorage::class);
-        $skippedLegacy = 0;
         $failed = 0;
+        $queued = 0;
 
         foreach ($rows as $row) {
-            if ($row['legacy']) {
-                $skippedLegacy++;
-
-                continue;
-            }
-
             $newKey = $this->availableKey($prefix, $row['name']);
 
             if ($newKey === $row['key']) {
                 continue;
             }
 
-            try {
-                $storage->move($row['key'], $newKey);
-            } catch (\Throwable $e) {
-                Log::warning('file-manager: pindah objek gagal', ['from' => $row['key'], 'to' => $newKey, 'error' => $e->getMessage()]);
+            if (! $this->moveObject($row['key'], $newKey)) {
                 $failed++;
+
+                continue;
+            }
+
+            if (! $this->syncDocPath((int) $row['id'], $newKey)) {
+                $queued++;
             }
         }
 
-        // TODO(BEPM): update path dokumen di admin-docs saat endpoint tersedia.
-
+        app(ProjectCache::class)->flushDocs((int) $this->id);
+        unset($this->files);
         $this->reset('selected', 'moveSelectedTargetId');
         Flux::modal('move-selected-modal')->close();
 
         if ($failed > 0) {
             Toaster::error("{$failed} file gagal dipindahkan");
-        } elseif ($skippedLegacy > 0) {
-            Toaster::warning("{$skippedLegacy} file lama dilewati (tidak bisa dipindah), sisanya berhasil dipindah");
+        } elseif ($queued > 0) {
+            Toaster::warning('File dipindah — sinkronisasi metadata diproses di background');
         } else {
             Toaster::success('File berhasil dipindah');
         }
     }
 
     // ---------------------------------------------------------------- helpers
+
+    /**
+     * Pindahkan objek di MinIO secara idempotent. Bila move gagal karena sumber
+     * sudah tidak ada tetapi objek sudah berada di key tujuan (percobaan
+     * sebelumnya yang terputus), anggap sukses sehingga alur bisa lanjut
+     * menyinkronkan BEPM. Mengembalikan false hanya bila objek benar-benar hilang.
+     */
+    protected function moveObject(string $oldKey, string $newKey): bool
+    {
+        $storage = app(ProjectFileStorage::class);
+
+        try {
+            $storage->move($oldKey, $newKey);
+
+            return true;
+        } catch (\Throwable $e) {
+            try {
+                if ($storage->exists($newKey)) {
+                    return true;
+                }
+            } catch (\Throwable $ignored) {
+                // fallback: perlakukan sebagai kegagalan sebenarnya di bawah
+            }
+
+            Log::warning('file-manager: pindah objek gagal', ['from' => $oldKey, 'to' => $newKey, 'error' => $e->getMessage()]);
+
+            return false;
+        }
+    }
+
+    /**
+     * Sinkronkan path dokumen di BEPM setelah objek dipindah/rename di MinIO.
+     *
+     * MinIO adalah sumber kebenaran, jadi objek TIDAK di-rollback saat BEPM
+     * gagal — sebaliknya sinkronisasi dijamin selesai via SyncProjectDocPathJob
+     * (idempotent, diretry queue) sehingga tahan refresh/crash. Mengembalikan
+     * true bila BEPM langsung tersinkron, false bila diserahkan ke background.
+     */
+    protected function syncDocPath(int $docId, string $newKey): bool
+    {
+        $result = app(ProjectWriter::class)->updateDoc($docId, ['file' => $newKey]);
+
+        if ($result['ok']) {
+            return true;
+        }
+
+        Log::warning('file-manager: update path BEPM inline gagal, diserahkan ke background', ['doc_id' => $docId, 'to' => $newKey, 'status' => $result['status']]);
+        SyncProjectDocPathJob::dispatch((int) $this->id, $docId, $newKey);
+
+        return false;
+    }
 
     protected function ownFolder(?int $folderId): ?ProjectFolder
     {
@@ -740,21 +775,34 @@ new class extends Component
     protected function docsUnderPrefix(string $prefix): array
     {
         return collect($this->allDocs())
-            ->filter(function (array $doc) use ($prefix) {
-                $url = (string) data_get($doc, 'files.url', '');
-
-                $path = ltrim(Str::after(parse_url($url, PHP_URL_PATH) ?: $url, '/storage/'), '/');
-
-                return str_starts_with($path, $prefix);
-            })
+            ->filter(fn (array $doc) => str_starts_with(
+                $this->keyFromUrl((string) data_get($doc, 'files.url', '')),
+                $prefix
+            ))
             ->values()
             ->all();
+    }
+
+    /**
+     * Object key MinIO dari `files.url` BEPM. URL dikembalikan ter-encode
+     * (mis. %2F, %20) dan bisa berupa URL penuh — di-decode, dibuang bagian
+     * "/storage/" bila ada, lalu tanpa slash depan agar cocok dengan prefix.
+     */
+    protected function keyFromUrl(string $url): string
+    {
+        $decoded = rawurldecode($url);
+
+        if (str_contains($decoded, '/storage/')) {
+            $decoded = Str::after($decoded, '/storage/');
+        }
+
+        return ltrim($decoded, '/');
     }
 
     protected function keyExists(string $key): bool
     {
         return collect($this->allDocs())
-            ->contains(fn (array $doc) => (string) data_get($doc, 'files.url', '') === $key);
+            ->contains(fn (array $doc) => $this->keyFromUrl((string) data_get($doc, 'files.url', '')) === $key);
     }
 
     protected function availableKey(string $prefix, string $filename): string
@@ -836,12 +884,10 @@ new class extends Component
             return false;
         }
 
-        if (! $row['legacy']) {
-            try {
-                app(ProjectFileStorage::class)->deleteObject($row['key']);
-            } catch (\Throwable $e) {
-                Log::warning('file-manager: hapus objek gagal — objek yatim', ['key' => $row['key'], 'error' => $e->getMessage()]);
-            }
+        try {
+            app(ProjectFileStorage::class)->deleteObject($row['key']);
+        } catch (\Throwable $e) {
+            Log::warning('file-manager: hapus objek gagal — objek yatim', ['key' => $row['key'], 'error' => $e->getMessage()]);
         }
 
         return true;
@@ -1095,9 +1141,6 @@ new class extends Component
                                     <div class="flex items-center gap-2.5 font-medium text-zinc-900 dark:text-zinc-100">
                                         <flux:icon name="{{ $iconStyles['icon'] }}" class="h-5 w-5 shrink-0 {{ $iconStyles['class'] }}" />
                                         <span class="max-w-100 truncate" title="{{ $file['name'] }}">{{ $file['name'] }}</span>
-                                        @if($file['legacy'])
-                                            <flux:badge size="sm" color="zinc">lama</flux:badge>
-                                        @endif
                                     </div>
                                 </td>
                                 <td class="px-2 py-2.5 text-zinc-500 dark:text-zinc-400">
@@ -1112,9 +1155,7 @@ new class extends Component
                                         <flux:button variant="ghost" size="xs" icon="ellipsis-horizontal" />
                                         <flux:navmenu>
                                             <flux:navmenu.item icon="eye" wire:click="openPreview({{ $file['id'] }})">Preview</flux:navmenu.item>
-                                            @unless($file['legacy'])
-                                                <flux:navmenu.item icon="pencil-square" wire:click="startRenameDoc({{ $file['id'] }})">Rename</flux:navmenu.item>
-                                            @endunless
+                                            <flux:navmenu.item icon="pencil-square" wire:click="startRenameDoc({{ $file['id'] }})">Rename</flux:navmenu.item>
                                             <flux:navmenu.separator />
                                             <flux:navmenu.item icon="trash" variant="danger" wire:click="confirmDeleteDoc({{ $file['id'] }})">Hapus</flux:navmenu.item>
                                         </flux:navmenu>

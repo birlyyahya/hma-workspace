@@ -50,7 +50,7 @@ class DeleteProjectFilesJob implements ShouldQueue
                 continue;
             }
 
-            if (str_starts_with($item['key'], 'projects/')) {
+            if (str_starts_with($item['key'], 'projects_docs/')) {
                 try {
                     $storage->deleteObject($item['key']);
                 } catch (\Throwable $e) {

@@ -3,18 +3,22 @@
 namespace App\Jobs;
 
 use App\Models\ProjectFolder;
+use App\Services\ProjectCache;
 use App\Services\ProjectFileStorage;
+use App\Services\ProjectWriter;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Pindahkan seluruh objek MinIO sebuah folder saat folder di-rename/dipindah.
  *
  * Sumber daftar objek adalah MinIO sendiri (listUnder prefix lama) — BUKAN
- * cache BEPM — supaya rename beruntun tetap benar (BEPM di-hold, belum punya
- * endpoint update path). Di dalam satu bucket, tiap objek cukup Storage::move
- * (copy+delete server-side). Kegagalan satu objek di-log dan tidak
+ * cache BEPM — supaya rename beruntun tetap benar. Di dalam satu bucket, tiap
+ * objek cukup Storage::move (copy+delete server-side). Setelah objek pindah,
+ * path `file` dokumen di BEPM ikut di-PATCH agar daftar file (bersumber dari
+ * BEPM) mengikuti key baru. Kegagalan satu objek/dokumen di-log dan tidak
  * menghentikan sisanya; perubahan folder tetap diterapkan lalu kunci dilepas.
  */
 class MoveProjectFilesJob implements ShouldQueue
@@ -34,7 +38,7 @@ class MoveProjectFilesJob implements ShouldQueue
         public readonly ?array $folderUpdate = null,
     ) {}
 
-    public function handle(ProjectFileStorage $storage): void
+    public function handle(ProjectFileStorage $storage, ProjectCache $cache, ProjectWriter $writer): void
     {
         foreach ($storage->listUnder($this->oldPrefix) as $key) {
             $newKey = $this->newPrefix.substr($key, strlen($this->oldPrefix));
@@ -52,10 +56,50 @@ class MoveProjectFilesJob implements ShouldQueue
             }
         }
 
-        // TODO(BEPM): saat endpoint update path dokumen tersedia, perbarui
-        // admin-docs agar daftar file (bersumber dari BEPM) mengikuti key baru.
+        $this->syncBepmPaths($cache, $writer);
+        $cache->flushDocs($this->projectId);
 
         $this->finalizeFolder();
+    }
+
+    /**
+     * Sesuaikan path `file` dokumen BEPM mengikuti prefix baru. Daftar dokumen
+     * dibaca dari BEPM (key lama); tiap dokumen di bawah prefix lama di-PATCH
+     * ke key baru. Kegagalan satu dokumen di-log dan tidak menghentikan sisanya.
+     */
+    private function syncBepmPaths(ProjectCache $cache, ProjectWriter $writer): void
+    {
+        foreach ($cache->documentsFor($this->projectId) as $doc) {
+            $key = $this->keyFromUrl((string) data_get($doc, 'files.url', ''));
+
+            if (! str_starts_with($key, $this->oldPrefix)) {
+                continue;
+            }
+
+            $newKey = $this->newPrefix.substr($key, strlen($this->oldPrefix));
+            $result = $writer->updateDoc((int) $doc['id'], ['file' => $newKey]);
+
+            if (! $result['ok']) {
+                Log::warning('MoveProjectFilesJob: update path BEPM gagal, diserahkan ke background', [
+                    'doc_id' => $doc['id'] ?? null, 'to' => $newKey,
+                ]);
+                SyncProjectDocPathJob::dispatch($this->projectId, (int) $doc['id'], $newKey);
+            }
+        }
+    }
+
+    /**
+     * Object key MinIO dari `files.url` BEPM (ter-encode, bisa URL penuh).
+     */
+    private function keyFromUrl(string $url): string
+    {
+        $decoded = rawurldecode($url);
+
+        if (str_contains($decoded, '/storage/')) {
+            $decoded = Str::after($decoded, '/storage/');
+        }
+
+        return ltrim($decoded, '/');
     }
 
     public function failed(?\Throwable $exception): void
