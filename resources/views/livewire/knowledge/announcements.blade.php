@@ -1,9 +1,13 @@
 <?php
 
 use App\Models\SupportAnnouncement;
+use App\Models\User;
+use App\Notifications\AnnouncementPublished;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
@@ -129,12 +133,43 @@ new class extends Component {
             $item->update($payload);
             Toaster::success('Pengumuman berhasil diperbarui');
         } else {
-            SupportAnnouncement::create($payload);
+            $item = SupportAnnouncement::create($payload);
+            $this->notifyAllUsers($item);
             Toaster::success('Pengumuman berhasil dibuat');
         }
 
         $this->resetForm();
         Flux::modal('announcement-form-modal')->close();
+    }
+
+    /**
+     * Kirim notifikasi pengumuman baru ke seluruh user (kecuali pembuat).
+     * Best-effort: kegagalan notifikasi tidak boleh menggagalkan pembuatan.
+     */
+    protected function notifyAllUsers(SupportAnnouncement $announcement): void
+    {
+        try {
+            $author = Auth::user();
+
+            $notification = new AnnouncementPublished(
+                announcementId: (int) $announcement->id,
+                title: (string) $announcement->title,
+                priority: (string) $announcement->priority,
+                authorId: (int) $author->id,
+                authorName: (string) ($author->name ?? 'Unknown'),
+            );
+
+            User::query()
+                ->whereKeyNot($author->id)
+                ->chunkById(200, function ($recipients) use ($notification) {
+                    Notification::send($recipients, $notification);
+                });
+        } catch (\Throwable $e) {
+            Log::warning('Announcement notification failed', [
+                'announcement_id' => $announcement->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function confirmDelete(int $id): void
