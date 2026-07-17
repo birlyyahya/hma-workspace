@@ -48,6 +48,9 @@ new class extends Component
     /** @var array<int, string> id dokumen terpilih (bulk) */
     public array $selected = [];
 
+    /** @var array<int, int> id dokumen yang penghapusannya sedang diproses di background — disembunyikan dari daftar */
+    public array $pendingDeleteIds = [];
+
     public string $newFolderName = '';
 
     public ?int $renamingFolderId = null;
@@ -65,6 +68,11 @@ new class extends Component
     public ?int $renamingDocId = null;
 
     public string $renameDocName = '';
+
+    public ?int $keywordDocId = null;
+
+    /** @var array<int, string> tag keyword di modal edit keyword */
+    public array $keywordTags = [];
 
     public ?int $deletingDocId = null;
 
@@ -186,11 +194,13 @@ new class extends Component
                     'created_at' => (string) ($doc['created_at'] ?? ''),
                     'category_id' => data_get($doc, 'admin_doc_category_id'),
                     'title' => (string) ($doc['title'] ?? ''),
+                    'keyword' => array_values(array_filter(array_map(strval(...), (array) ($doc['keyword'] ?? [])))),
                 ];
             })
             ->filter(function (array $row) use ($prefix) {
                 return str_starts_with($row['key'], $prefix)
-                    && ! str_contains(substr($row['key'], strlen($prefix)), '/');
+                    && ! str_contains(substr($row['key'], strlen($prefix)), '/')
+                    && ! in_array((int) $row['id'], $this->pendingDeleteIds, true);
             });
 
         if ($this->categoryFilter !== 'all') {
@@ -573,6 +583,92 @@ new class extends Component
             : Toaster::warning('File di-rename — sinkronisasi metadata diproses di background');
     }
 
+    public function startEditKeyword(int $docId): void
+    {
+        $row = collect($this->files)->firstWhere('id', $docId);
+
+        if ($row === null) {
+            return;
+        }
+
+        $this->keywordDocId = $docId;
+        $this->keywordTags = $row['keyword'];
+        $this->resetErrorBag('keywordTags');
+        Flux::modal('keyword-file-modal')->show();
+    }
+
+    /**
+     * Saran keyword untuk modal edit: judul timeline project didahulukan
+     * (dokumen yang keyword-nya cocok dengan timeline akan bisa tampil di
+     * timeline progress), lalu keyword dokumen lain di project ini.
+     *
+     * @return array<int, string>
+     */
+    public function getKeywordSuggestionsProperty(): array
+    {
+        try {
+            $timelineTitles = collect(app(ProjectCache::class)->timelines((int) $this->id))
+                ->map(fn (array $timeline) => trim((string) ($timeline['title'] ?? '')));
+        } catch (\Throwable $e) {
+            $timelineTitles = collect();
+        }
+
+        $docKeywords = collect($this->allDocs())
+            ->flatMap(fn (array $doc) => (array) ($doc['keyword'] ?? []))
+            ->map(fn ($keyword) => trim((string) $keyword));
+
+        return $timelineTitles->merge($docKeywords)
+            ->filter()
+            ->unique(fn (string $keyword) => mb_strtolower($keyword))
+            ->take(15)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Perbarui HANYA field keyword dokumen di BEPM (keyword awal terisi
+     * otomatis saat upload — lihat project_doc_keywords()).
+     */
+    public function updateKeyword(): void
+    {
+        $row = collect($this->files)->firstWhere('id', $this->keywordDocId);
+
+        if ($row === null || $this->forbidden) {
+            return;
+        }
+
+        $this->validate(
+            ['keywordTags' => ['array'], 'keywordTags.*' => ['string', 'max:100']],
+            ['keywordTags.*.max' => 'Keyword maksimal 100 karakter.'],
+        );
+
+        $keywords = collect($this->keywordTags)
+            ->map(fn (string $keyword) => trim($keyword))
+            ->filter()
+            ->unique(fn (string $keyword) => mb_strtolower($keyword))
+            ->values()
+            ->all();
+
+        if ($keywords === []) {
+            $this->addError('keywordTags', 'Keyword tidak boleh kosong.');
+
+            return;
+        }
+
+        $result = app(ProjectWriter::class)->updateDoc((int) $row['id'], ['keyword' => $keywords], (int) $this->id);
+
+        if (! $result['ok']) {
+            Toaster::error('Update keyword gagal');
+
+            return;
+        }
+
+        unset($this->files);
+        $this->reset('keywordDocId', 'keywordTags');
+        Flux::modal('keyword-file-modal')->close();
+        Toaster::success('Keyword diperbarui');
+    }
+
     public function confirmDeleteDoc(int $docId): void
     {
         $row = collect($this->files)->firstWhere('id', $docId);
@@ -614,30 +710,37 @@ new class extends Component
 
     // ------------------------------------------------------------------- bulk
 
+    /**
+     * Hapus file terpilih di background via DeleteProjectFilesJob (per file =
+     * 1 request BEPM + 1 delete MinIO — terlalu lambat dikerjakan inline).
+     * Baris yang antre dihapus disembunyikan lewat $pendingDeleteIds supaya
+     * daftar langsung bersih tanpa menunggu job selesai.
+     */
     public function deleteSelected(): void
     {
         if ($this->forbidden || $this->selected === []) {
             return;
         }
 
-        $rows = collect($this->files)->whereIn('id', array_map('intval', $this->selected));
-        $failed = 0;
+        $ids = array_map('intval', $this->selected);
+        $items = collect($this->files)
+            ->whereIn('id', $ids)
+            ->map(fn (array $row) => ['doc_id' => (int) $row['id'], 'key' => $row['key']])
+            ->values()
+            ->all();
 
-        foreach ($rows as $row) {
-            if (! $this->deleteOne($row)) {
-                $failed++;
-            }
-        }
-
-        app(ProjectCache::class)->flushDocs((int) $this->id);
-        unset($this->files);
         $this->reset('selected');
+        Flux::modal('delete-selected-modal')->close();
 
-        if ($failed === 0) {
-            Toaster::success('File terpilih dihapus');
-        } else {
-            Toaster::error("{$failed} file gagal dihapus");
+        if ($items === []) {
+            return;
         }
+
+        DeleteProjectFilesJob::dispatch((int) $this->id, $items);
+
+        $this->pendingDeleteIds = [...$this->pendingDeleteIds, ...$ids];
+        unset($this->files);
+        Toaster::success(count($items).' file dihapus — diproses di background');
     }
 
     public function moveSelected(): void
@@ -1062,12 +1165,9 @@ new class extends Component
                         <flux:modal.trigger name="move-selected-modal">
                             <flux:button size="xs" icon="arrow-right-circle" variant="outline">Pindahkan</flux:button>
                         </flux:modal.trigger>
-                        <flux:button size="xs" icon="trash" variant="danger" wire:click="deleteSelected"
-                            wire:confirm="Hapus {{ count($selected) }} file terpilih? Tindakan ini permanen."
-                            wire:loading.attr="disabled" wire:target="deleteSelected">
-                            <span wire:loading.remove wire:target="deleteSelected">Hapus</span>
-                            <span wire:loading wire:target="deleteSelected">Menghapus…</span>
-                        </flux:button>
+                        <flux:modal.trigger name="delete-selected-modal">
+                            <flux:button size="xs" icon="trash" variant="danger">Hapus</flux:button>
+                        </flux:modal.trigger>
                     </div>
                 </div>
             @endif
@@ -1164,6 +1264,19 @@ new class extends Component
                                         <flux:icon name="{{ $iconStyles['icon'] }}" class="h-5 w-5 shrink-0 {{ $iconStyles['class'] }}" />
                                         <span class="max-w-100 truncate" title="{{ $file['name'] }}">{{ $file['name'] }}</span>
                                     </div>
+                                    @if($file['keyword'] !== [])
+                                        <div class="mt-1 flex flex-wrap items-center gap-1 ps-7.5" title="{{ implode(', ', $file['keyword']) }}">
+                                            @foreach(array_slice($file['keyword'], 0, 3) as $keyword)
+                                                <span class="inline-flex max-w-40 items-center gap-1 rounded-full bg-zinc-100 px-2 py-px text-[11px] text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                                                    <flux:icon name="tag" class="h-2.5 w-2.5 shrink-0" />
+                                                    <span class="truncate">{{ $keyword }}</span>
+                                                </span>
+                                            @endforeach
+                                            @if(count($file['keyword']) > 3)
+                                                <span class="text-[11px] text-zinc-400 dark:text-zinc-500">+{{ count($file['keyword']) - 3 }}</span>
+                                            @endif
+                                        </div>
+                                    @endif
                                 </td>
                                 <td class="px-2 py-2.5 text-zinc-500 dark:text-zinc-400">
                                     {{ $file['created_at'] !== '' ? \Carbon\Carbon::parse($file['created_at'])->locale('id')->translatedFormat('d M Y') : '—' }}
@@ -1178,6 +1291,7 @@ new class extends Component
                                         <flux:navmenu>
                                             <flux:navmenu.item icon="eye" wire:click="openPreview({{ $file['id'] }})">Preview</flux:navmenu.item>
                                             <flux:navmenu.item icon="pencil-square" wire:click="startRenameDoc({{ $file['id'] }})">Rename</flux:navmenu.item>
+                                            <flux:navmenu.item icon="tag" wire:click="startEditKeyword({{ $file['id'] }})">Keyword</flux:navmenu.item>
                                             <flux:navmenu.separator />
                                             <flux:navmenu.item icon="trash" variant="danger" wire:click="confirmDeleteDoc({{ $file['id'] }})">Hapus</flux:navmenu.item>
                                         </flux:navmenu>
@@ -1301,6 +1415,83 @@ new class extends Component
             </div>
         </form>
     </flux:modal>
+
+    <flux:modal name="keyword-file-modal" class="max-w-md">
+        <form wire:submit="updateKeyword" class="space-y-5"
+            x-data="{
+                tags: $wire.entangle('keywordTags'),
+                draft: '',
+                has(tag) { return this.tags.some((t) => t.toLowerCase() === tag.toLowerCase()); },
+                add(value = null) {
+                    const tag = (value ?? this.draft).trim();
+                    if (tag !== '' && ! this.has(tag)) this.tags.push(tag);
+                    this.draft = '';
+                },
+                remove(index) { this.tags.splice(index, 1); },
+            }">
+            <flux:heading size="lg">Update keyword</flux:heading>
+
+            <flux:callout icon="light-bulb" color="amber">
+                <flux:callout.text>
+                    Samakan keyword dengan nama timeline project agar dokumen ini
+                    nantinya bisa ikut tampil di timeline progress.
+                </flux:callout.text>
+            </flux:callout>
+
+            <flux:field>
+                <flux:label>Keyword</flux:label>
+                <div class="flex min-h-10 w-full flex-wrap items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 shadow-xs focus-within:border-zinc-400 dark:border-zinc-600 dark:bg-zinc-800 dark:focus-within:border-zinc-400"
+                    @click="$refs.draftInput.focus()">
+                    <template x-for="(tag, index) in tags" :key="tag">
+                        <span class="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200">
+                            <span x-text="tag"></span>
+                            <button type="button" @click.stop="remove(index)"
+                                class="text-zinc-400 transition hover:text-red-500" aria-label="Hapus keyword">
+                                &times;
+                            </button>
+                        </span>
+                    </template>
+                    <input type="text" x-ref="draftInput" x-model="draft"
+                        @keydown.enter.prevent="add()"
+                        @keydown="if ($event.key === ',') { $event.preventDefault(); add(); }"
+                        @keydown.backspace="if (draft === '' && tags.length > 0) remove(tags.length - 1)"
+                        @blur="add()"
+                        :placeholder="tags.length === 0 ? 'Ketik lalu Enter, mis. kontrak' : ''"
+                        class="min-w-24 flex-1 border-0 bg-transparent p-0.5 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-0 dark:text-zinc-100" />
+                </div>
+                <flux:description>Tekan Enter atau koma untuk menambah keyword.</flux:description>
+                @error('keywordTags')<flux:error message="{{ $message }}" />@enderror
+                @error('keywordTags.*')<flux:error message="{{ $message }}" />@enderror
+            </flux:field>
+
+            @if($this->keywordSuggestions !== [])
+                <div class="space-y-1.5">
+                    <flux:text class="text-xs font-medium text-zinc-500 dark:text-zinc-400">Rekomendasi (nama timeline & keyword lain):</flux:text>
+                    <div class="flex flex-wrap gap-1.5">
+                        @foreach($this->keywordSuggestions as $suggestion)
+                            <button type="button" x-show="! has(@js($suggestion))" @click="add(@js($suggestion))"
+                                class="rounded-md border border-dashed border-zinc-300 px-2 py-0.5 text-xs text-zinc-500 transition hover:border-zinc-400 hover:bg-zinc-50 hover:text-zinc-700 dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200">
+                                + {{ $suggestion }}
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
+            <div class="flex gap-2">
+                <flux:modal.close><flux:button type="button" variant="ghost" class="flex-1">Batal</flux:button></flux:modal.close>
+                <flux:button type="submit" variant="primary" class="flex-1" wire:loading.attr="disabled" wire:target="updateKeyword">
+                    <span wire:loading.remove wire:target="updateKeyword">Simpan</span>
+                    <span wire:loading wire:target="updateKeyword">Menyimpan…</span>
+                </flux:button>
+            </div>
+        </form>
+    </flux:modal>
+
+    <x-confirm-modal name="delete-selected-modal" confirm="deleteSelected" title="Hapus File Terpilih?">
+        <span class="font-medium text-zinc-800 dark:text-zinc-200">{{ count($selected) }} file terpilih</span>
+        akan dihapus permanen di background. Tindakan ini tidak dapat dibatalkan.
+    </x-confirm-modal>
 
     <x-confirm-modal name="delete-file-modal" confirm="deleteDoc" title="Hapus File?">
         File <span class="font-medium text-zinc-800 dark:text-zinc-200">"{{ $deletingDocName }}"</span>

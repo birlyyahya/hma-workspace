@@ -280,21 +280,91 @@ test('deleting a file removes the BEPM record first and then the MinIO object', 
         && str_contains($request->url(), 'admin-docs/1'));
 });
 
-test('bulk delete removes each selected file record and its MinIO object', function () {
+test('updating keywords prefills from the document and patches only keyword to BEPM', function () {
     $leader = User::factory()->create();
-    fakeBepmForFileManager(leaderId: $leader->id);
-
-    $storage = mock(ProjectFileStorage::class);
-    $storage->shouldReceive('deleteObject')->once()->with('projects_docs/2026/5/laporan.pdf');
-    $storage->shouldReceive('deleteObject')->once()->with('projects_docs/2026/5/foto.png');
+    fakeBepmForFileManager(leaderId: $leader->id, docs: [
+        ['id' => 1, 'title' => 'laporan', 'created_at' => '2026-06-01T00:00:00Z', 'admin_doc_category_id' => 7, 'keyword' => ['lama'], 'files' => ['url' => 'projects_docs/2026/5/laporan.pdf', 'size' => '2 MB']],
+    ]);
 
     Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
-        ->set('selected', ['1', '4'])
-        ->call('deleteSelected');
+        ->call('startEditKeyword', 1)
+        ->assertSet('keywordDocId', 1)
+        ->assertSet('keywordTags', ['lama'])
+        ->set('keywordTags', [' kontrak', 'addendum ', 'kontrak', '2026'])
+        ->call('updateKeyword')
+        ->assertHasNoErrors()
+        ->assertSet('keywordDocId', null)
+        ->assertSet('keywordTags', []);
 
-    Http::assertSent(fn ($request) => $request->method() === 'DELETE' && str_contains($request->url(), 'admin-docs/1'));
-    Http::assertSent(fn ($request) => $request->method() === 'DELETE' && str_contains($request->url(), 'admin-docs/4'));
+    Http::assertSent(fn ($request) => $request->method() === 'PATCH'
+        && str_contains($request->url(), 'admin-docs/1')
+        && $request['keyword'] === ['kontrak', 'addendum', '2026']
+        && ! array_key_exists('file', $request->data()));
+});
+
+test('blank keyword tags are rejected', function () {
+    $leader = User::factory()->create();
+    fakeBepmForFileManager(leaderId: $leader->id);
+
+    Volt::actingAs($leader)
+        ->test('project.components.file-manager', ['id' => 5])
+        ->call('startEditKeyword', 1)
+        ->set('keywordTags', [' ', ''])
+        ->call('updateKeyword')
+        ->assertHasErrors('keywordTags');
+
+    Http::assertNotSent(fn ($request) => $request->method() === 'PATCH'
+        && str_contains($request->url(), 'admin-docs/1'));
+});
+
+test('keyword suggestions merge timeline titles first with other document keywords', function () {
+    $leader = User::factory()->create();
+
+    Http::fake([
+        '*projects/5' => Http::response(['status' => 200, 'data' => [[
+            'id' => 5, 'start_date' => '2026-01-01', 'project_leader_id' => $leader->id, 'support_team_internals' => [],
+        ]]], 200),
+        '*timelines/search*' => Http::response(['status' => 200, 'data' => [
+            ['id' => 20, 'title' => 'PENGIRIMAN'],
+            ['id' => 21, 'title' => 'PEMERIKSAAN'],
+        ]], 200),
+        '*admin-docs/search*' => Http::response(['status' => 200, 'data' => [
+            ['id' => 1, 'title' => 'laporan', 'keyword' => ['kontrak', 'pengiriman'], 'files' => ['url' => 'projects_docs/2026/5/laporan.pdf', 'size' => '2 MB']],
+        ]], 200),
+        '*' => Http::response(['status' => 200, 'data' => []], 200),
+    ]);
+
+    $component = Volt::actingAs($leader)->test('project.components.file-manager', ['id' => 5]);
+
+    expect($component->get('keywordSuggestions'))
+        ->toBe(['PENGIRIMAN', 'PEMERIKSAAN', 'kontrak']);
+});
+
+test('bulk delete dispatches DeleteProjectFilesJob and hides the rows immediately', function () {
+    Queue::fake();
+    $leader = User::factory()->create();
+    fakeBepmForFileManager(leaderId: $leader->id);
+
+    $component = Volt::actingAs($leader)
+        ->test('project.components.file-manager', ['id' => 5])
+        ->set('selected', ['1', '4'])
+        ->call('deleteSelected')
+        ->assertSet('selected', [])
+        ->assertSet('pendingDeleteIds', [1, 4]);
+
+    expect(collect($component->get('files'))->pluck('id')->all())
+        ->not->toContain(1)
+        ->not->toContain(4);
+
+    Queue::assertPushed(DeleteProjectFilesJob::class, function (DeleteProjectFilesJob $job) {
+        return $job->projectId === 5
+            && $job->folderId === null
+            && collect($job->items)->sortBy('doc_id')->values()->all() === [
+                ['doc_id' => 1, 'key' => 'projects_docs/2026/5/laporan.pdf'],
+                ['doc_id' => 4, 'key' => 'projects_docs/2026/5/foto.png'],
+            ];
+    });
 });
 
 test('an empty folder is deleted immediately', function () {
