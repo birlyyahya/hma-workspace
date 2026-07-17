@@ -452,7 +452,7 @@ new class extends Component {
     </style>
 
     @php
-        $isSuperadmin = (int) (Auth::user()->level ?? 0) >= 100;
+        $isSuperadmin = Auth::user()->hasPermission('dar.view.all');
         $statusOptions = [
             'all' => ['label' => 'Semua', 'active' => 'bg-slate-900 text-white ring-slate-900'],
             '1' => ['label' => 'Open', 'active' => 'bg-blue-600 text-white ring-blue-600'],
