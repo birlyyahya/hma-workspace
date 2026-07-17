@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\ProjectFolderFile;
 use App\Services\ProjectCache;
 use App\Services\ProjectWriter;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -17,7 +18,8 @@ use Illuminate\Support\Str;
  * MinIO adalah sumber kebenaran — objek TIDAK dihapus. Idempotent: sebelum POST
  * dicek apakah object key sudah terdaftar (menangani kasus timeout padahal BEPM
  * sebenarnya sudah membuat dokumen) agar tidak terjadi duplikat. Melempar saat
- * belum sukses supaya queue menjadwalkan retry.
+ * belum sukses supaya queue menjadwalkan retry. Setelah doc id diketahui,
+ * penempatan folder ($folderId) dicatat ke project_folder_files.
  */
 class RegisterProjectDocJob implements ShouldQueue
 {
@@ -33,6 +35,7 @@ class RegisterProjectDocJob implements ShouldQueue
     public function __construct(
         public readonly int $projectId,
         public readonly array $payload,
+        public readonly ?int $folderId = null,
     ) {}
 
     public function handle(ProjectCache $cache, ProjectWriter $writer): void
@@ -43,6 +46,8 @@ class RegisterProjectDocJob implements ShouldQueue
 
         foreach ($cache->documentsFor($this->projectId) as $doc) {
             if ($this->keyFromUrl((string) data_get($doc, 'files.url', '')) === $key) {
+                $this->placeInFolder((int) ($doc['id'] ?? 0));
+
                 return;
             }
         }
@@ -56,6 +61,17 @@ class RegisterProjectDocJob implements ShouldQueue
 
             throw new \RuntimeException("Registrasi dokumen BEPM gagal untuk {$key}");
         }
+
+        $this->placeInFolder((int) data_get($result, 'body.data.id', 0));
+    }
+
+    private function placeInFolder(int $docId): void
+    {
+        if ($this->folderId === null || $docId <= 0) {
+            return;
+        }
+
+        ProjectFolderFile::place($this->projectId, $docId, $this->folderId);
     }
 
     public function failed(?\Throwable $exception): void

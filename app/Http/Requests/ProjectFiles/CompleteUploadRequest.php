@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\ProjectFiles;
 
+use Illuminate\Validation\Rule;
+
 class CompleteUploadRequest extends ProjectFileRequest
 {
     /**
@@ -18,6 +20,11 @@ class CompleteUploadRequest extends ProjectFileRequest
             'parts.*.etag' => ['required', 'string', 'max:255'],
             'title' => ['nullable', 'string', 'min:5', 'max:255'],
             'admin_doc_category_id' => ['nullable', 'integer'],
+            'folder_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('project_folders', 'id')->where('project_id', $this->projectId()),
+            ],
         ];
     }
 

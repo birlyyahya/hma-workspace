@@ -8,6 +8,7 @@ use App\Http\Requests\ProjectFiles\InitiateUploadRequest;
 use App\Http\Requests\ProjectFiles\SignUploadPartsRequest;
 use App\Jobs\RegisterProjectDocJob;
 use App\Models\ProjectFolder;
+use App\Models\ProjectFolderFile;
 use App\Services\ProjectCache;
 use App\Services\ProjectFileStorage;
 use App\Services\ProjectWriter;
@@ -29,22 +30,16 @@ class ProjectFileUploadController extends Controller
     ) {}
 
     /**
-     * Mulai multipart upload: bangun object key dari folder (server-side,
-     * tidak pernah menerima path mentah dari client) + nama file tersanitasi.
+     * Mulai multipart upload. Object key SELALU flat di root project
+     * (projects_docs/{tahun}/{project}/{nama}) — folder murni virtual, lokasi
+     * file dicatat di tabel project_folder_files saat complete, bukan di key.
      */
     public function initiate(InitiateUploadRequest $request, int $project): JsonResponse
     {
         $filename = $this->sanitizeFilename((string) $request->validated('filename'));
 
-        $folderPath = '';
-        if ($request->validated('folder_id') !== null) {
-            $folderPath = ProjectFolder::query()
-                ->findOrFail((int) $request->validated('folder_id'))
-                ->path();
-        }
-
         $year = project_storage_year($this->cache->projectFor($project));
-        $prefix = "projects_docs/{$year}/{$project}/".($folderPath !== '' ? $folderPath.'/' : '');
+        $prefix = "projects_docs/{$year}/{$project}/";
         $key = $this->uniqueKey($project, $prefix, $filename);
 
         $uploadId = $this->storage->initiateMultipart($key, (string) $request->validated('mime'));
@@ -73,11 +68,16 @@ class ProjectFileUploadController extends Controller
     /**
      * Selesaikan multipart lalu registrasikan dokumen ke BEPM. Jika registrasi
      * gagal, objek MinIO yang baru jadi dihapus supaya tidak ada file yatim.
+     * Penempatan folder dicatat di project_folder_files setelah doc id BEPM
+     * diketahui (key flat tidak memuat folder).
      */
     public function complete(CompleteUploadRequest $request, int $project, string $uploadId): JsonResponse
     {
         $key = (string) $request->validated('key');
         $name = basename($key);
+
+        $folderId = $request->validated('folder_id') !== null ? (int) $request->validated('folder_id') : null;
+        $folder = $folderId !== null ? ProjectFolder::query()->find($folderId) : null;
 
         $categoryId = $request->validated('admin_doc_category_id') !== null
             ? (int) $request->validated('admin_doc_category_id')
@@ -103,14 +103,14 @@ class ProjectFileUploadController extends Controller
             'admin_doc_category_id' => $categoryId,
             'filename' => $key,
             'original_name' => $name,
-            'keyword' => $this->keywordsFor($project, $key),
+            'keyword' => $this->keywordsFor($project, $key, $folder?->path()),
         ];
 
         $result = $this->writer->registerDocument($project, $payload);
 
         if (! $result['ok']) {
             if ($this->isTransientFailure($result)) {
-                RegisterProjectDocJob::dispatch($project, $payload);
+                RegisterProjectDocJob::dispatch($project, $payload, $folderId);
 
                 return response()->json([
                     'name' => $name,
@@ -129,6 +129,16 @@ class ProjectFileUploadController extends Controller
                 'message' => 'File terupload tetapi registrasi dokumen ditolak BEPM — upload dibatalkan.',
                 'errors' => $result['body']['errors'] ?? [],
             ], 422);
+        }
+
+        $docId = (int) data_get($result, 'body.data.id', 0);
+
+        if ($folderId !== null && $docId > 0) {
+            ProjectFolderFile::place($project, $docId, $folderId);
+        } elseif ($folderId !== null) {
+            Log::warning('Upload complete: BEPM tidak mengembalikan doc id — file jatuh ke root', [
+                'project_id' => $project, 'key' => $key, 'folder_id' => $folderId,
+            ]);
         }
 
         return response()->json([
@@ -208,13 +218,14 @@ class ProjectFileUploadController extends Controller
 
     /**
      * Kata kunci otomatis untuk dokumen (parameter wajib BEPM). Lihat
-     * project_doc_keywords() untuk aturannya.
+     * project_doc_keywords() untuk aturannya. $folderPath dipasok eksplisit
+     * karena key flat tidak lagi memuat segmen folder.
      *
      * @return array<int, string>
      */
-    private function keywordsFor(int $project, string $key): array
+    private function keywordsFor(int $project, string $key, ?string $folderPath = null): array
     {
-        return project_doc_keywords($this->cache->projectFor($project), $project, $key);
+        return project_doc_keywords($this->cache->projectFor($project), $project, $key, $folderPath ?? '');
     }
 
     /**

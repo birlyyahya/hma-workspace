@@ -2,6 +2,7 @@
 
 use App\Jobs\RegisterProjectDocJob;
 use App\Models\ProjectFolder;
+use App\Models\ProjectFolderFile;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\ProjectFileStorage;
@@ -147,7 +148,7 @@ test('a folder belonging to another project is rejected', function () {
         ->assertJsonValidationErrors('folder_id');
 });
 
-test('the object key is derived from the folder tree server-side', function () {
+test('the object key stays flat even when uploading into a folder', function () {
     $leader = User::factory()->create();
     fakeBepmForUpload(leaderId: $leader->id);
 
@@ -157,7 +158,7 @@ test('the object key is derived from the folder tree server-side', function () {
     mock(ProjectFileStorage::class)
         ->shouldReceive('initiateMultipart')
         ->once()
-        ->with('projects_docs/2026/5/Kontrak/Addendum/laporan.pdf', 'application/pdf')
+        ->with('projects_docs/2026/5/laporan.pdf', 'application/pdf')
         ->andReturn('upload-abc');
 
     $this->actingAs($leader)
@@ -168,7 +169,7 @@ test('the object key is derived from the folder tree server-side', function () {
             'folder_id' => $child->id,
         ])
         ->assertCreated()
-        ->assertJsonPath('key', 'projects_docs/2026/5/Kontrak/Addendum/laporan.pdf');
+        ->assertJsonPath('key', 'projects_docs/2026/5/laporan.pdf');
 });
 
 test('path traversal characters in the filename are sanitized', function () {
@@ -347,6 +348,68 @@ test('complete finishes the multipart upload and registers the document to BEPM'
     });
 });
 
+test('complete records the folder placement and folder keywords', function () {
+    $leader = User::factory()->create();
+    fakeBepmForUpload(leaderId: $leader->id);
+
+    $parent = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak']);
+    $child = ProjectFolder::factory()->create(['project_id' => 5, 'parent_id' => $parent->id, 'name' => 'Addendum']);
+
+    mock(ProjectFileStorage::class)->shouldReceive('completeMultipart')->once();
+
+    $this->actingAs($leader)
+        ->postJson(route('project-files.uploads.complete', ['project' => 5, 'uploadId' => 'upload-abc']), [
+            'key' => 'projects_docs/2026/5/laporan.pdf',
+            'folder_id' => $child->id,
+            'parts' => [
+                ['part_number' => 1, 'etag' => '"etag-1"'],
+            ],
+        ])
+        ->assertCreated();
+
+    expect(ProjectFolderFile::query()->where('doc_id', 99)->value('project_folder_id'))->toBe($child->id);
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && str_ends_with($request->url(), 'admin-docs')
+        && $request['keyword'] === ['Kontrak', 'Addendum', 'laporan']);
+});
+
+test('complete without a folder leaves the document in the root', function () {
+    $leader = User::factory()->create();
+    fakeBepmForUpload(leaderId: $leader->id);
+
+    mock(ProjectFileStorage::class)->shouldReceive('completeMultipart')->once();
+
+    $this->actingAs($leader)
+        ->postJson(route('project-files.uploads.complete', ['project' => 5, 'uploadId' => 'upload-abc']), [
+            'key' => 'projects_docs/2026/5/laporan.pdf',
+            'parts' => [
+                ['part_number' => 1, 'etag' => '"etag-1"'],
+            ],
+        ])
+        ->assertCreated();
+
+    expect(ProjectFolderFile::query()->where('doc_id', 99)->exists())->toBeFalse();
+});
+
+test('a folder from another project is rejected at complete', function () {
+    $leader = User::factory()->create();
+    fakeBepmForUpload(leaderId: $leader->id);
+
+    $foreignFolder = ProjectFolder::factory()->create(['project_id' => 6]);
+
+    $this->actingAs($leader)
+        ->postJson(route('project-files.uploads.complete', ['project' => 5, 'uploadId' => 'upload-abc']), [
+            'key' => 'projects_docs/2026/5/laporan.pdf',
+            'folder_id' => $foreignFolder->id,
+            'parts' => [
+                ['part_number' => 1, 'etag' => '"etag-1"'],
+            ],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('folder_id');
+});
+
 test('the MinIO object is deleted when BEPM registration fails', function () {
     $leader = User::factory()->create();
     fakeBepmForUpload(leaderId: $leader->id, registerStatus: 422);
@@ -369,6 +432,7 @@ test('the MinIO object is deleted when BEPM registration fails', function () {
 test('a transient BEPM failure keeps the object and registers in the background', function () {
     Queue::fake();
     $leader = User::factory()->create();
+    $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak']);
 
     Http::fake([
         '*projects/5' => Http::response(['status' => 200, 'data' => [[
@@ -387,6 +451,7 @@ test('a transient BEPM failure keeps the object and registers in the background'
     $this->actingAs($leader)
         ->postJson(route('project-files.uploads.complete', ['project' => 5, 'uploadId' => 'upload-abc']), [
             'key' => 'projects_docs/2026/5/laporan.pdf',
+            'folder_id' => $folder->id,
             'parts' => [
                 ['part_number' => 1, 'etag' => '"etag-1"'],
             ],
@@ -395,7 +460,8 @@ test('a transient BEPM failure keeps the object and registers in the background'
         ->assertJsonPath('pending', true);
 
     Queue::assertPushed(RegisterProjectDocJob::class, fn (RegisterProjectDocJob $job) => $job->projectId === 5
-        && $job->payload['filename'] === 'projects_docs/2026/5/laporan.pdf');
+        && $job->payload['filename'] === 'projects_docs/2026/5/laporan.pdf'
+        && $job->folderId === $folder->id);
 });
 
 // ---------------------------------------------------------------------- Abort

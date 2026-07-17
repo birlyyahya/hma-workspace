@@ -46,6 +46,10 @@ export function createProjectFileUploader({ projectId, partSize, getFolderId, on
     // Cache presigned URL per upload: `${uploadId}:${partNumber}` => url.
     const signedUrls = new Map();
 
+    // Folder tujuan per upload, ditangkap saat initiate — dikirim lagi saat
+    // complete (penempatan folder dicatat di server setelah doc id diketahui).
+    const folderIds = new Map();
+
     const uppy = new Uppy({
         autoProceed: true,
         allowMultipleUploadBatches: true,
@@ -57,12 +61,15 @@ export function createProjectFileUploader({ projectId, partSize, getFolderId, on
         getChunkSize: () => partSize,
 
         async createMultipartUpload(file) {
+            const folderId = getFolderId() ?? null;
             const json = await jsonRequest('POST', base, {
                 filename: file.name,
                 size: file.size,
                 mime: file.type || 'application/octet-stream',
-                folder_id: getFolderId() ?? null,
+                folder_id: folderId,
             });
+
+            folderIds.set(json.upload_id, folderId);
 
             return { uploadId: json.upload_id, key: json.key };
         },
@@ -98,11 +105,14 @@ export function createProjectFileUploader({ projectId, partSize, getFolderId, on
         async completeMultipartUpload(file, { uploadId, key, parts }) {
             const json = await jsonRequest('POST', `${base}/${encodeURIComponent(uploadId)}/complete`, {
                 key,
+                folder_id: folderIds.get(uploadId) ?? null,
                 parts: parts.map((part) => ({
                     part_number: part.PartNumber,
                     etag: part.ETag,
                 })),
             });
+
+            folderIds.delete(uploadId);
 
             for (const cacheKey of signedUrls.keys()) {
                 if (cacheKey.startsWith(`${uploadId}:`)) signedUrls.delete(cacheKey);

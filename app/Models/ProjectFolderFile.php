@@ -27,4 +27,22 @@ class ProjectFolderFile extends Model
     {
         return $this->belongsTo(ProjectFolder::class, 'project_folder_id');
     }
+
+    /**
+     * Tempatkan dokumen di sebuah folder (null = root). Idempotent — dipakai
+     * alur upload, pindah file, dan backfill.
+     */
+    public static function place(int $projectId, int $docId, ?int $folderId): void
+    {
+        if ($folderId === null) {
+            static::query()->where('doc_id', $docId)->delete();
+
+            return;
+        }
+
+        static::query()->updateOrCreate(
+            ['doc_id' => $docId],
+            ['project_id' => $projectId, 'project_folder_id' => $folderId],
+        );
+    }
 }

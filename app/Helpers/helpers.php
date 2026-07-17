@@ -90,15 +90,24 @@ if (! function_exists('project_doc_keywords')) {
      * ekstensi. Selalu berisi minimal satu elemen (nama file). Dipakai bersama
      * oleh endpoint upload dan command rekonsiliasi agar konsisten.
      *
+     * $folderPath (path folder virtual, mis. "Kontrak/Addendum") dipakai bila
+     * diberikan — key baru berbentuk flat sehingga segmen folder tidak lagi
+     * bisa diturunkan dari key; tanpa argumen ini segmen diambil dari key
+     * (perilaku lama untuk data legacy/rekonsiliasi).
+     *
      * @param  array<string, mixed>  $project
      * @return array<int, string>
      */
-    function project_doc_keywords(array $project, int $projectId, string $key): array
+    function project_doc_keywords(array $project, int $projectId, string $key, ?string $folderPath = null): array
     {
         $year = project_storage_year($project);
         $relative = \Illuminate\Support\Str::after($key, "projects_docs/{$year}/{$projectId}/");
         $segments = explode('/', $relative);
         $filename = array_pop($segments);
+
+        if ($folderPath !== null) {
+            $segments = $folderPath === '' ? [] : explode('/', $folderPath);
+        }
 
         return collect([
             data_get($project, 'name'),
