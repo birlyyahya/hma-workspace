@@ -13,7 +13,15 @@ use Livewire\Volt\Volt;
 
 use function Pest\Laravel\mock;
 
-beforeEach(fn () => Livewire::withoutLazyLoading());
+beforeEach(function () {
+    Livewire::withoutLazyLoading();
+
+    // Ukuran file diambil dari MinIO saat render — default kosong supaya test
+    // tidak menyentuh jaringan. Test yang me-mock ProjectFileStorage sendiri
+    // menimpa binding ini; panggilan sizesUnder yang tak diharapkan di mock
+    // strict tertangkap oleh fallback getObjectSizesProperty.
+    mock(ProjectFileStorage::class, fn ($mock) => $mock->shouldReceive('sizesUnder')->andReturn([])->byDefault());
+});
 
 /**
  * @param  array<int, array<string, mixed>>  $docs
@@ -64,6 +72,52 @@ test('the root shows folders plus root-level files only', function () {
         ->assertSee('laporan.pdf')
         ->assertSee('foto.png')
         ->assertDontSee('kontrak.pdf');
+});
+
+test('searching reaches files inside subfolders and exposes their location', function () {
+    $leader = User::factory()->create();
+    fakeBepmForFileManager(leaderId: $leader->id);
+    ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak']);
+
+    $component = Volt::actingAs($leader)
+        ->test('project.components.file-manager', ['id' => 5])
+        ->set('search', 'kontrak')
+        ->assertSee('kontrak.pdf');
+
+    $row = collect($component->get('files'))->firstWhere('id', 2);
+
+    expect($row['dir'])->toBe('Kontrak');
+});
+
+test('searching hides folders whose name does not match', function () {
+    $leader = User::factory()->create();
+    fakeBepmForFileManager(leaderId: $leader->id);
+    ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak']);
+    ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Laporan Bulanan']);
+
+    $component = Volt::actingAs($leader)
+        ->test('project.components.file-manager', ['id' => 5])
+        ->set('search', 'laporan');
+
+    expect(collect($component->get('folders'))->pluck('name')->all())->toBe(['Laporan Bulanan']);
+});
+
+test('file sizes come from MinIO, not the zero size BEPM reports', function () {
+    $leader = User::factory()->create();
+    fakeBepmForFileManager(leaderId: $leader->id, docs: [
+        ['id' => 1, 'title' => 'laporan', 'created_at' => '2026-06-01T00:00:00Z', 'admin_doc_category_id' => 7, 'files' => ['url' => 'projects_docs/2026/5/laporan.pdf', 'size' => '0 KB']],
+    ]);
+
+    mock(ProjectFileStorage::class, fn ($mock) => $mock->shouldReceive('sizesUnder')
+        ->with('projects_docs/2026/5/')
+        ->andReturn(['projects_docs/2026/5/laporan.pdf' => 3 * 1024 * 1024]));
+
+    $component = Volt::actingAs($leader)->test('project.components.file-manager', ['id' => 5]);
+
+    $row = collect($component->get('files'))->firstWhere('id', 1);
+
+    expect($row['size'])->toBe('3.00 MB')
+        ->and($row['size_bytes'])->toBe(3.0 * 1024 * 1024);
 });
 
 test('opening a folder shows only the files under its path', function () {

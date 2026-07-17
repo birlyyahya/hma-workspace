@@ -202,6 +202,35 @@ class ProjectFileStorage
     }
 
     /**
+     * Ukuran objek (bytes) per key di bawah prefix. BEPM tidak pernah tahu
+     * ukuran file (byte diupload langsung browser → MinIO dan selalu
+     * melaporkan "0 KB"), jadi ukuran diambil dari MinIO lewat sini.
+     *
+     * @return array<string, int> map object key => bytes
+     */
+    public function sizesUnder(string $prefix): array
+    {
+        try {
+            $sizes = [];
+            $params = ['Bucket' => $this->bucket(), 'Prefix' => rtrim($prefix, '/').'/'];
+
+            do {
+                $result = $this->client()->listObjectsV2($params);
+
+                foreach ($result['Contents'] ?? [] as $object) {
+                    $sizes[(string) $object['Key']] = (int) $object['Size'];
+                }
+
+                $params['ContinuationToken'] = $result['NextContinuationToken'] ?? null;
+            } while (($result['IsTruncated'] ?? false) && $params['ContinuationToken'] !== null);
+
+            return $sizes;
+        } catch (\Throwable $e) {
+            throw $this->wrap('sizesUnder', $e, ['prefix' => $prefix]);
+        }
+    }
+
+    /**
      * Multipart upload menggantung yang lebih tua dari N jam.
      *
      * @return array<int, array{Key: string, UploadId: string, Initiated: \DateTimeInterface}>

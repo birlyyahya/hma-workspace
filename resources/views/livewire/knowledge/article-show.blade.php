@@ -35,7 +35,7 @@ class extends Component {
 
     <article class="max-w-3xl mx-auto rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 overflow-hidden">
         @if ($article->featured_image)
-            <img src="{{ Storage::url($article->featured_image) }}" alt="{{ $article->title }}"
+            <img src="{{ Storage::disk('s3')->temporaryUrl($article->featured_image, now()->addMinutes(60)) }}" alt="{{ $article->title }}"
                 class="w-full h-72 object-cover" />
         @endif
 

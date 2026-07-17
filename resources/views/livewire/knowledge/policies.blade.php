@@ -260,7 +260,7 @@ new class extends Component {
                             <div class="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">{{ $item->content }}</div>
 
                             @if ($item->file)
-                                <a href="{{ Storage::url($item->file) }}" target="_blank"
+                                <a href="{{ Storage::disk('s3')->temporaryUrl($item->file, now()->addMinutes(60)) }}" target="_blank"
                                     class="inline-flex items-center gap-2 text-sm text-blue-600 hover:underline">
                                     <flux:icon name="paper-clip" class="w-4 h-4" /> Buka lampiran
                                 </a>
@@ -299,7 +299,7 @@ new class extends Component {
                 @if ($existingFile)
                     <div class="mt-2 flex items-center gap-2 text-xs">
                         <flux:icon name="paper-clip" class="w-3.5 h-3.5 text-zinc-400" />
-                        <a href="{{ Storage::url($existingFile) }}" target="_blank" class="text-blue-600 hover:underline truncate">{{ basename($existingFile) }}</a>
+                        <a href="{{ Storage::disk('s3')->temporaryUrl($existingFile, now()->addMinutes(60)) }}" target="_blank" class="text-blue-600 hover:underline truncate">{{ basename($existingFile) }}</a>
                         <button wire:click="removeExistingFile" type="button" class="text-red-600 hover:underline">Hapus</button>
                     </div>
                 @endif

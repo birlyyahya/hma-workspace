@@ -130,7 +130,7 @@ class extends Component {
                     @if ($image)
                         <img src="{{ $image->temporaryUrl() }}" class="w-full h-full object-cover" />
                     @elseif ($existingImage)
-                        <img src="{{ Storage::url($existingImage) }}" class="w-full h-full object-cover" />
+                        <img src="{{ Storage::disk('s3')->temporaryUrl($existingImage, now()->addMinutes(60)) }}" class="w-full h-full object-cover" />
                     @else
                         <div class="flex flex-col items-center text-zinc-400">
                             <flux:icon.photo class="w-8 h-8 mb-2" />
@@ -167,7 +167,7 @@ class extends Component {
             </div>
 
             @if ($image || $existingImage)
-                <img src="{{ $image ? $image->temporaryUrl() : Storage::url($existingImage) }}"
+                <img src="{{ $image ? $image->temporaryUrl() : Storage::disk('s3')->temporaryUrl($existingImage, now()->addMinutes(60)) }}"
                     class="w-full h-48 object-cover rounded-xl" />
             @endif
 

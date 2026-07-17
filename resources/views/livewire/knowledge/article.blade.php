@@ -153,7 +153,7 @@ new class extends Component {
                         class="group rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 overflow-hidden hover:shadow-md transition flex flex-col">
                         <a href="{{ route('knowledge.articles-show', $article->slug) }}" wire:navigate>
                             @if ($article->featured_image)
-                                <img src="{{ Storage::url($article->featured_image) }}" alt="{{ $article->title }}"
+                                <img src="{{ Storage::disk('s3')->temporaryUrl($article->featured_image, now()->addMinutes(60)) }}" alt="{{ $article->title }}"
                                     class="w-full h-40 object-cover" />
                             @else
                                 <div class="w-full h-40 bg-linear-to-br from-blue-100 to-indigo-100 dark:from-blue-500/10 dark:to-indigo-500/10 flex items-center justify-center">

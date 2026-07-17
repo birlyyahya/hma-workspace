@@ -61,6 +61,20 @@ return [
             'throw' => false,
             'report' => false,
         ],
+        's3_izindar' => [
+            'driver' => 's3',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION'),
+            'bucket' => env('AWS_BUCKET_IZINDAR'),
+            'url' => env('AWS_URL')
+                    ? rtrim(env('AWS_URL'), '/').'/'.env('AWS_BUCKET')
+                    : null,
+            'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'throw' => false,
+            'report' => false,
+        ],
 
         'project-files' => [
             'driver' => 's3',

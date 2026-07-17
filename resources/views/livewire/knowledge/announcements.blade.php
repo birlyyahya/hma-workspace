@@ -312,7 +312,7 @@ new class extends Component {
                                     @endif
                                     @if ($item->file)
                                         <span>•</span>
-                                        <a href="{{ Storage::url($item->file) }}" target="_blank" class="text-blue-600 hover:underline inline-flex items-center gap-1">
+                                        <a href="{{ Storage::disk('s3')->temporaryUrl($item->file, now()->addMinutes(60)) }}" target="_blank" class="text-blue-600 hover:underline inline-flex items-center gap-1">
                                             <flux:icon name="paper-clip" class="w-3 h-3" /> Lampiran
                                         </a>
                                     @endif
@@ -378,7 +378,7 @@ new class extends Component {
                 @if ($existingFile)
                     <div class="mt-2 flex items-center gap-2 text-xs">
                         <flux:icon name="paper-clip" class="w-3.5 h-3.5 text-zinc-400" />
-                        <a href="{{ Storage::url($existingFile) }}" target="_blank" class="text-blue-600 hover:underline truncate">{{ basename($existingFile) }}</a>
+                        <a href="{{ Storage::disk('s3')->temporaryUrl($existingFile, now()->addMinutes(60)) }}" target="_blank" class="text-blue-600 hover:underline truncate">{{ basename($existingFile) }}</a>
                         <button wire:click="removeExistingFile" type="button" class="text-red-600 hover:underline">Hapus</button>
                     </div>
                 @endif
@@ -432,7 +432,7 @@ new class extends Component {
                 {{-- Tampilan Instagram: mobile vertikal (gambar atas, konten bawah), desktop horizontal --}}
                 <div class="flex flex-col md:flex-row md:-m-6 md:max-h-[80vh]">
                     <div class="md:w-2/5 bg-zinc-950 flex items-center justify-center md:rounded-l-xl overflow-hidden">
-                        <img src="{{ Storage::url($this->viewing->file) }}" alt="{{ $this->viewing->title }}"
+                        <img src="{{ Storage::disk('s3')->temporaryUrl($this->viewing->file, now()->addMinutes(60)) }}" alt="{{ $this->viewing->title }}"
                             class="w-full max-h-72 md:max-h-none md:h-full object-contain" />
                     </div>
                     <div class="md:w-3/5 p-6 space-y-4 overflow-y-auto">
@@ -456,7 +456,7 @@ new class extends Component {
 
                         <div class="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">{{ $this->viewing->content }}</div>
 
-                        <a href="{{ Storage::url($this->viewing->file) }}" target="_blank"
+                        <a href="{{ Storage::disk('s3')->temporaryUrl($this->viewing->file, now()->addMinutes(60)) }}" target="_blank"
                             class="inline-flex items-center gap-2 text-sm text-blue-600 hover:underline">
                             <flux:icon name="arrow-top-right-on-square" class="w-4 h-4" /> Buka gambar ukuran penuh
                         </a>
@@ -485,7 +485,7 @@ new class extends Component {
                     <div class="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">{{ $this->viewing->content }}</div>
 
                     @if ($this->viewing->file)
-                        <a href="{{ Storage::url($this->viewing->file) }}" target="_blank"
+                        <a href="{{ Storage::disk('s3')->temporaryUrl($this->viewing->file, now()->addMinutes(60)) }}" target="_blank"
                             class="inline-flex items-center gap-2 text-sm text-blue-600 hover:underline">
                             <flux:icon name="paper-clip" class="w-4 h-4" /> Buka lampiran
                         </a>

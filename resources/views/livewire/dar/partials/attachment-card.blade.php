@@ -8,7 +8,8 @@
     $file = $file ?? [];
     $variant = $variant ?? 'card';
     $filename = $file['filename'] ?? 'untitled';
-    $url = config('services.aws_url').'izindar/'.$file['path'] ?? '#';
+    // $url = config('services.aws_url').'izindar/'.$file['path'] ?? '#';
+    $url = Storage::disk('s3_izindar')->temporaryUrl($file['path'], now()->addMinutes(60));
     $size = $file['size'] ?? null;
     $mime = $file['type'] ?? null;
     $isImage = isImageFile($filename, $mime);

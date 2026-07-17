@@ -116,6 +116,10 @@ new class extends Component
     }
 
     /**
+     * Folder anak di level aktif. Saat mencari, hanya folder yang namanya
+     * cocok dengan kata kunci yang tampil — hasil pencarian file sudah
+     * menjangkau subfolder, jadi folder yang tak relevan cuma menumpuk.
+     *
      * @return array<int, ProjectFolder>
      */
     public function getFoldersProperty(): array
@@ -123,6 +127,7 @@ new class extends Component
         return ProjectFolder::query()
             ->where('project_id', (int) $this->id)
             ->where('parent_id', $this->currentFolderId)
+            ->when($this->search !== '', fn ($query) => $query->where('name', 'like', '%'.$this->search.'%'))
             ->orderBy('name')
             ->get()
             ->all();
@@ -168,20 +173,40 @@ new class extends Component
     }
 
     /**
+     * Ukuran objek per key dari MinIO (BEPM selalu melaporkan "0 KB" karena
+     * byte tidak pernah lewat BEPM). Computed → satu panggilan list per
+     * request; bila MinIO tak terjangkau, fallback ke angka BEPM.
+     *
+     * @return array<string, int>
+     */
+    public function getObjectSizesProperty(): array
+    {
+        try {
+            return app(ProjectFileStorage::class)->sizesUnder($this->rootPrefix());
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
      * Baris file di folder aktif, setelah search + filter kategori + sort.
      * Seluruh file kini berada di MinIO di bawah prefix project — file hanya
-     * tampil bila key-nya persis di folder aktif (bukan subfolder).
+     * tampil bila key-nya persis di folder aktif (bukan subfolder), KECUALI
+     * saat mencari: pencarian menjangkau seluruh subfolder folder aktif dan
+     * baris hasilnya membawa `dir` (lokasi relatif) untuk ditampilkan.
      *
      * @return array<int, array<string, mixed>>
      */
     public function getFilesProperty(): array
     {
         $prefix = $this->currentPrefix();
+        $sizes = $this->objectSizes;
 
         $rows = collect($this->allDocs())
-            ->map(function (array $doc) {
+            ->map(function (array $doc) use ($sizes) {
                 $path = $this->keyFromUrl((string) data_get($doc, 'files.url', ''));
                 $ext = strtolower(Str::afterLast($path, '.'));
+                $bytes = (float) ($sizes[$path] ?? $this->sizeToBytes((string) (data_get($doc, 'files.size') ?? '')));
 
                 return [
                     'id' => $doc['id'],
@@ -189,8 +214,8 @@ new class extends Component
                     'key' => $path,
                     'ext' => $ext,
                     'category' => $this->categoryOf($ext),
-                    'size' => (string) (data_get($doc, 'files.size') ?? ''),
-                    'size_bytes' => $this->sizeToBytes((string) (data_get($doc, 'files.size') ?? '')),
+                    'size' => $this->formatBytes($bytes),
+                    'size_bytes' => $bytes,
                     'created_at' => (string) ($doc['created_at'] ?? ''),
                     'category_id' => data_get($doc, 'admin_doc_category_id'),
                     'title' => (string) ($doc['title'] ?? ''),
@@ -198,9 +223,17 @@ new class extends Component
                 ];
             })
             ->filter(function (array $row) use ($prefix) {
-                return str_starts_with($row['key'], $prefix)
-                    && ! str_contains(substr($row['key'], strlen($prefix)), '/')
-                    && ! in_array((int) $row['id'], $this->pendingDeleteIds, true);
+                if (! str_starts_with($row['key'], $prefix) || in_array((int) $row['id'], $this->pendingDeleteIds, true)) {
+                    return false;
+                }
+
+                return $this->search !== '' || ! str_contains(substr($row['key'], strlen($prefix)), '/');
+            })
+            ->map(function (array $row) use ($prefix) {
+                $relative = substr($row['key'], strlen($prefix));
+                $row['dir'] = str_contains($relative, '/') ? Str::beforeLast($relative, '/') : '';
+
+                return $row;
             });
 
         if ($this->categoryFilter !== 'all') {
@@ -209,7 +242,7 @@ new class extends Component
 
         if ($this->search !== '') {
             $needle = mb_strtolower($this->search);
-            $rows = $rows->filter(fn (array $row) => str_contains(mb_strtolower($row['name']), $needle));
+            $rows = $rows->filter(fn (array $row) => str_contains(mb_strtolower($row['name'].' '.$row['dir']), $needle));
         }
 
         $rows = match ($this->sortBy) {
@@ -1024,6 +1057,17 @@ new class extends Component
         return 'lainnya';
     }
 
+    protected function formatBytes(float $bytes): string
+    {
+        return match (true) {
+            $bytes >= 1024 ** 3 => number_format($bytes / 1024 ** 3, 2).' GB',
+            $bytes >= 1024 ** 2 => number_format($bytes / 1024 ** 2, 2).' MB',
+            $bytes >= 1024 => number_format($bytes / 1024, 2).' KB',
+            $bytes > 0 => number_format($bytes).' B',
+            default => '',
+        };
+    }
+
     protected function sizeToBytes(string $size): float
     {
         preg_match('/([\d\.]+)\s*(KB|MB|GB|B)/i', $size, $match);
@@ -1264,6 +1308,12 @@ new class extends Component
                                         <flux:icon name="{{ $iconStyles['icon'] }}" class="h-5 w-5 shrink-0 {{ $iconStyles['class'] }}" />
                                         <span class="max-w-100 truncate" title="{{ $file['name'] }}">{{ $file['name'] }}</span>
                                     </div>
+                                    @if($file['dir'] !== '')
+                                        <div class="mt-0.5 flex items-center gap-1 ps-7.5 text-[11px] text-zinc-400 dark:text-zinc-500">
+                                            <flux:icon name="folder" class="h-3 w-3 shrink-0" />
+                                            <span class="truncate">{{ $file['dir'] }}</span>
+                                        </div>
+                                    @endif
                                     @if($file['keyword'] !== [])
                                         <div class="mt-1 flex flex-wrap items-center gap-1 ps-7.5" title="{{ implode(', ', $file['keyword']) }}">
                                             @foreach(array_slice($file['keyword'], 0, 3) as $keyword)
@@ -1395,7 +1445,7 @@ new class extends Component
         </form>
     </flux:modal>
 
-    <flux:modal name="rename-file-modal" class="max-w-md">
+    <flux:modal name="rename-file-modal" class="max-w-xl w-xs sm:w-sm md:w-md lg:w-lg">
         <form wire:submit="renameDoc" class="space-y-5">
             <flux:heading size="lg">Rename file</flux:heading>
             <flux:text class="text-sm text-zinc-500 dark:text-zinc-400">
@@ -1416,7 +1466,7 @@ new class extends Component
         </form>
     </flux:modal>
 
-    <flux:modal name="keyword-file-modal" class="max-w-md">
+    <flux:modal name="keyword-file-modal" class="max-w-xl">
         <form wire:submit="updateKeyword" class="space-y-5"
             x-data="{
                 tags: $wire.entangle('keywordTags'),

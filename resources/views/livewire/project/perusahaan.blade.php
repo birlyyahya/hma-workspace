@@ -252,8 +252,8 @@ new #[Lazy]  class extends Component {
                         <td class="px-5 py-4 align-top">
                             @if(!empty($item['letter_head']))
 
-                            <a href="{{ Storage::url($item['letter_head']) }}" target="_blank" class="inline-block w-20 h-12 rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 overflow-hidden hover:ring-2 hover:ring-blue-400 transition">
-                                <img src="{{ Storage::url($item['letter_head']) }}" alt="ttd" class="w-full h-full object-contain" />
+                            <a href="{{ Storage::disk('s3')->temporaryUrl($item['letter_head'],now()->addMinutes(60)) }}" target="_blank" class="inline-block w-20 h-12 rounded-md border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 overflow-hidden hover:ring-2 hover:ring-blue-400 transition">
+                                <img src="{{ Storage::disk('s3')->temporaryUrl($item['letter_head'],now()->addMinutes(60)) }}" alt="ttd" class="w-full h-full object-contain" />
                             </a>
                             @else
                             <span class="text-xs text-zinc-400">—</span>
@@ -304,7 +304,7 @@ new #[Lazy]  class extends Component {
             <div class="flex items-start gap-3">
                 <div class="w-12 h-12 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0">
                     @if(!empty($item['letter_head']))
-                    <img src="{{ Storage::url($item['letter_head']) }}" class="w-full h-full object-contain rounded-lg" />
+                    <img src="{{ Storage::disk('s3')->temporaryUrl($item['letter_head'],now()->addMinutes(60))  }}" class="w-full h-full object-contain rounded-lg" />
                     @else
                     <flux:icon name="building-office-2" class="w-5 h-5 text-zinc-400" />
                     @endif
@@ -408,7 +408,7 @@ new #[Lazy]  class extends Component {
                                 @if($letter_head)
                                 <img src="{{ $letter_head->temporaryUrl() }}" class="w-full h-full object-contain" />
                                 @elseif($existing_signature)
-                                <img src="{{ Storage::url($existing_signature) }}" class="w-full h-full object-contain" />
+                                <img src="{{ Storage::disk('s3')->temporaryUrl($existing_signature, now()->addMinutes(60)) }}" class="w-full h-full object-contain" />
                                 @else
                                 <flux:icon name="photo" class="w-6 h-6 text-zinc-400" />
                                 @endif
