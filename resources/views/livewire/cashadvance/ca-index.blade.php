@@ -1,40 +1,16 @@
 <?php
 
 use App\Services\CaCache;
-use App\Services\CaWriter;
-use Flux\Flux;
+use Livewire\Attributes\On;
 use Livewire\Volt\Component;
-use Livewire\WithFileUploads;
-use Masmerise\Toaster\Toaster;
 
 new class extends Component {
-    use WithFileUploads;
-
     public array $caPlBalance = [];
     public array $chart = [];
     public array $caKegiatanBalance = [];
 
     /** @var array<int, string> */
     public array $categories = [];
-
-    // Form Catat / Edit Pengeluaran
-    public ?int $editingId = null;
-    public $jumlah;
-    public $kategori;
-    public $deskripsi;
-    public $tanggal;
-    public $bukti;
-
-    public $deleteTransactionId = null;
-
-    // Form Top Up Pertama (aktivasi CA)
-    public $topupJumlah;
-    public $topupBukti;
-    public $topupCatatan;
-
-    // dompet Kegiatan
-    public int $rab;
-
 
     public function mount(): void
     {
@@ -51,111 +27,46 @@ new class extends Component {
     }
 
     /**
-     * Ajukan top up pertama untuk membuka dompet CA PL.
-     * Endpoint writer belum tersedia — validasi & alur UI sudah siap,
-     * tinggal delegasikan payload ke CaWriter saat API-nya ada.
-     */
-    public function submitInitialTopup(): void
-    {
-        $this->validate([
-            'topupJumlah' => ['required', 'integer', 'min:1'],
-            'topupBukti' => ['required', 'file', 'mimes:jpg,png,pdf', 'max:2048'],
-            'topupCatatan' => ['nullable', 'string'],
-        ]);
-
-        Flux::modal('topup-pertama')->close();
-        Toaster::info('Pengajuan top up terkirim — menunggu integrasi API CA.');
-    }
-
-    public function transaksiCaPl(): array
-    {
-        return app(CaCache::class)->transaksiCaPlActive($this->caPlBalance['kode_ca'] ?? '') ?? [];
-    }
-
-    /**
-     * Aturan validasi. Bukti wajib saat mencatat baru, opsional saat mengedit
-     * (agar pengguna tak perlu unggah ulang bila hanya mengubah nominal/kategori).
+     * Transaksi periode aktif; setiap baris diberi bukti_url dari MinIO
+     * (aws_url + bucket cashadvance + path), mengikuti pola attachment-card.
      *
      * @return array<string, mixed>
      */
-    protected function rules(): array
+    public function transaksiCaPl(): array
     {
-        return [
-            'jumlah' => ['required', 'integer', 'min:1'],
-            'kategori' => ['required', 'string'],
-            'deskripsi' => ['nullable', 'string'],
-            'tanggal' => ['required', 'date'],
-            'bukti' => [$this->editingId ? 'nullable' : 'required', 'file', 'mimes:jpg,png,pdf', 'max:2048'],
-        ];
-    }
+        $result = app(CaCache::class)->transaksiCaPlActive($this->caPlBalance['kode_ca'] ?? '') ?? [];
 
-    public function saveExpense(): void
-    {
-        $this->validate();
+        $result['data'] = array_map(function (array $trx): array {
+            $trx['bukti_url'] = $this->buktiUrl($trx['bukti'] ?? null);
 
-        $payload = [
-            'jumlah' => (int) $this->jumlah,
-            'kategori' => $this->kategori,
-            'deskripsi' => $this->deskripsi,
-            'tanggal' => $this->tanggal,
-            'jenis' => 'pengeluaran',
-            'user_id' => Auth::id(),
-        ];
+            return $trx;
+        }, $result['data'] ?? []);
 
-        if ($this->bukti) {
-            $payload['bukti'] = [
-                'contents' => $this->bukti->get(),
-                'name' => $this->bukti->getClientOriginalName(),
-            ];
-        }
-
-        $kode = $this->caPlBalance['kode_ca'] ?? '';
-        $isEdit = $this->editingId !== null;
-
-        $result = $isEdit
-            ? app(CaWriter::class)->updateTransactionCaPl($kode, $this->editingId, $payload)
-            : app(CaWriter::class)->createTransactionCaPl($kode, $payload);
-
-        if (! $result['ok']) {
-            Toaster::error($result['error'] ?? ($result['body']['message'] ?? 'Gagal menyimpan pengeluaran.'));
-
-            return;
-        }
-
-        $this->refreshDashboard();
-        $this->resetForm();
-        Flux::modal('catat-pengeluaran')->close();
-        Toaster::success($isEdit ? 'Pengeluaran diperbarui.' : 'Pengeluaran tersimpan.');
-    }
-
-    public function resetForm(): void
-    {
-        $this->reset(['editingId', 'jumlah', 'kategori', 'deskripsi', 'tanggal', 'bukti']);
-        $this->resetValidation();
+        return $result;
     }
 
     /**
-     * Isi form dari transaksi terpilih untuk diedit. Dilakukan di server
-     * (bukan @js di atribut komponen) karena kutip ter-escape pada atribut
-     * component tag membuat precompiler Livewire salah membaca tanda kurung.
+     * URL publik MinIO untuk path bukti dari API CA (bucket: cashadvance).
      */
-    public function startEdit(int $id): void
+    private function buktiUrl(?string $path): ?string
     {
-        $trx = collect($this->transaksiCaPl()['data'] ?? [])->firstWhere('id_transaksi', $id);
-
-        if (! $trx) {
-            return;
+        if (blank($path)) {
+            return null;
         }
 
-        $this->editingId = $id;
-        $this->jumlah = (int) $trx['jumlah'];
-        $this->kategori = $trx['kategori'] ?? '';
-        $this->deskripsi = $trx['deskripsi'] ?? '';
-        $this->tanggal = \Carbon\Carbon::parse($trx['created_at'])->toDateString();
-        $this->bukti = null;
+        if (str_starts_with($path, 'http')) {
+            return $path;
+        }
+
+        return config('services.aws_url').'cashadvance/'.$path;
     }
 
-    private function refreshDashboard(): void
+    /**
+     * Muat ulang dashboard setelah modal anak mengubah data (catat/edit/hapus).
+     * Cache CA sudah di-flush oleh CaWriter, jadi pemanggilan ini mengambil data segar.
+     */
+    #[On('ca-updated')]
+    public function refreshDashboard(): void
     {
         $response = app(CaCache::class)->dashboard(Auth::id());
         $this->caPlBalance = $response['card_left'] ?? [];
@@ -163,37 +74,14 @@ new class extends Component {
         $this->caKegiatanBalance = $response['card_right'] ?? [];
         $this->categories = $response['categories'] ?? ['Transport', 'Akomodasi', 'Konsumsi', 'ATK', 'Komunikasi', 'Lain-lain'];
     }
-
-    public function deleteTransactionCaPL(){
-        if (! $this->deleteTransactionId) {
-            Toaster::error('ID transaksi tidak valid.');
-            return;
-        }
-
-        $kode = $this->caPlBalance['kode_ca'] ?? '';
-        $result = app(CaWriter::class)->deleteTransactionCaPl($kode, $this->deleteTransactionId);
-
-        if (! $result['ok']) {
-            Toaster::error($result['error'] ?? ($result['body']['message'] ?? 'Gagal menghapus pengeluaran.'));
-            return;
-        }
-
-        $this->refreshDashboard();
-        $this->resetForm();
-        Flux::modal('hapus-pengeluaran')->close();
-        Toaster::success('Pengeluaran berhasil dihapus.');
-    }
-
-    public function riwayatDompetCaPl(){
-        return app(CaCache::class)->riwayatDompetCaPl(Auth::id()) ?? [];
-    }
 }; ?>
 
 <div class="space-y-4">
 
     @if (! $this->hasCa())
     {{-- ================= ONBOARDING: BELUM MEMILIKI CA ================= --}}
-    <div class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+    <div class="relative rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+
         <div class="mx-auto flex max-w-lg flex-col items-center gap-5 px-6 py-20 text-center">
             <div class="flex size-16 items-center justify-center rounded-full bg-blue-500/10 dark:bg-blue-500/20">
                 <flux:icon.wallet class="size-8 text-blue-500" />
@@ -231,33 +119,7 @@ new class extends Component {
         </div>
     </div>
 
-    {{-- ================= MODAL: TOP UP PERTAMA ================= --}}
-    <flux:modal name="topup-pertama" class="w-lg">
-        <form wire:submit.prevent="submitInitialTopup" class="space-y-6">
-            <div>
-                <flux:heading size="lg">Top up Pertama</flux:heading>
-                <flux:text class="mt-1">Dana ini menjadi saldo awal (float) dompet CA PL Anda.</flux:text>
-            </div>
-
-            <flux:input wire:model="topupJumlah" type="number" label="Nominal" prefix="Rp" placeholder="0" />
-            <flux:textarea wire:model="topupCatatan" label="Catatan (opsional)" placeholder="Keterangan pengajuan" rows="2" />
-
-            <div>
-                <flux:input wire:model="topupBukti" type="file" accept=".jpg,.jpeg,.png,.pdf"
-                    label="Bukti transfer (jpg, png, pdf &mdash; maks 2MB)" />
-                <span wire:loading wire:target="topupBukti" class="mt-1 block text-xs text-zinc-500 animate-pulse">
-                    Mengunggah bukti&hellip;
-                </span>
-            </div>
-
-            <flux:button type="submit" variant="primary" class="w-full"
-                wire:loading.attr="disabled" wire:target="topupBukti,submitInitialTopup">
-                <span wire:loading.remove wire:target="topupBukti,submitInitialTopup">Ajukan Top up</span>
-                <span wire:loading wire:target="topupBukti" class="animate-pulse">Menunggu unggahan&hellip;</span>
-                <span wire:loading wire:target="submitInitialTopup" class="animate-pulse">Mengirim&hellip;</span>
-            </flux:button>
-        </form>
-    </flux:modal>
+    <livewire:cashadvance.modals.topup-pertama />
     @else
     {{-- ================= TOP GRID ================= --}}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -285,12 +147,10 @@ new class extends Component {
                     </div>
 
                     <div class="flex gap-2">
-                         <flux:modal.trigger name="catat-pengeluaran">
-                             <flux:button size="sm" variant="primary" icon="minus-circle"
-                                 x-on:click="$wire.editingId = null; $wire.jumlah = null; $wire.kategori = ''; $wire.deskripsi = ''; $wire.tanggal = ''; $wire.bukti = null;">
-                                 Catat Pengeluaran
-                             </flux:button>
-                         </flux:modal.trigger>
+                        <flux:button size="sm" variant="primary" icon="minus-circle"
+                            x-on:click="$flux.modal('catat-pengeluaran').show(); $wire.dispatch('ca-new-expense')">
+                            Catat Pengeluaran
+                        </flux:button>
 
                         <flux:modal.trigger name="topup-laporan">
                             <flux:button size="sm" variant="outline" icon="arrow-up-tray">Top up</flux:button>
@@ -405,7 +265,7 @@ new class extends Component {
                 <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-zinc-500 dark:text-zinc-400">
                     @foreach ($this->caKegiatanBalance['kategori_pengeluaran'] as $i => $row)
                     <p class="border-l-2 ps-2 {{ $palette[$i % count($palette)]['border'] }}" wire:key="legend-{{ $row['nama'] }}">
-                        {{ $row['nama'] ? 'Lainnya' : $row['nama'] }} • {{ $row['persentase'] }}%
+                        {{ $row['nama'] }} • {{ $row['persentase'] }}%
                     </p>
                     @endforeach
                 </div>
@@ -478,21 +338,19 @@ new class extends Component {
                             Rp {{ number_format($trx['saldo_setelah'], 0, ',', '.') }}
                         </td>
                         <td class="px-3 py-3 md:px-6 text-center whitespace-nowrap">
-                            @if ($trx['bukti'] ?? false)
-                            <flux:button size="sm" variant="ghost" icon="paper-clip" />
+                            @if ($trx['bukti_url'] ?? false)
+                            <flux:button size="sm" variant="ghost" icon="paper-clip" type="button"
+                                x-on:click="$dispatch('preview-bukti', { url: '{{ $trx['bukti_url'] }}', title: '{{ addslashes($trx['deskripsi'] ?? 'Bukti Transaksi') }}' }); $flux.modal('bukti-preview').show()" />
                             @else
                             <span class="text-zinc-300">-</span>
                             @endif
                         </td>
                         <td class="px-3 py-3 md:px-6 text-center whitespace-nowrap">
                             <div class="flex items-center justify-center gap-1">
-                                <flux:modal.trigger name="catat-pengeluaran">
-                                    <flux:button size="sm" variant="ghost" icon="pencil-square" type="button"
-                                        wire:click="startEdit({{ $trx['id_transaksi'] }})" />
-                                </flux:modal.trigger>
-                                <flux:modal.trigger name="hapus-pengeluaran">
-                                    <flux:button size="sm" variant="ghost" icon="trash" class="text-red-600" x-on:click="$wire.set('deleteTransactionId', {{ $trx['id_transaksi'] }})" />
-                                </flux:modal.trigger>
+                                <flux:button size="sm" variant="ghost" icon="pencil-square" type="button"
+                                    x-on:click="$flux.modal('catat-pengeluaran').show(); $wire.dispatch('ca-edit-expense', { id: {{ $trx['id_transaksi'] }} })" />
+                                <flux:button size="sm" variant="ghost" icon="trash" class="text-red-600" type="button"
+                                    x-on:click="$flux.modal('hapus-pengeluaran').show(); $wire.dispatch('ca-confirm-delete', { id: {{ $trx['id_transaksi'] }} })" />
                             </div>
                         </td>
                     </tr>
@@ -506,177 +364,44 @@ new class extends Component {
         </div>
     </div>
 
-    {{-- ================= MODAL: CATAT / EDIT PENGELUARAN ================= --}}
-    <flux:modal name="catat-pengeluaran" class="w-lg" @close="$wire.resetForm()">
-        <form wire:submit.prevent="saveExpense" class="space-y-6">
+    {{-- ================= MODAL COMPONENTS ================= --}}
+    <livewire:cashadvance.modals.catat-pengeluaran :kode-ca="$this->caPlBalance['kode_ca'] ?? ''" :categories="$categories" />
+    <livewire:cashadvance.modals.hapus-pengeluaran :kode-ca="$this->caPlBalance['kode_ca'] ?? ''" />
+    <livewire:cashadvance.modals.topup-laporan :balance="$caPlBalance" />
+    <livewire:cashadvance.modals.buat-kegiatan :kode-ca="$this->caPlBalance['kode_ca'] ?? ''" />
+    <livewire:cashadvance.modals.riwayat-periode />
+
+    {{-- ================= MODAL: PREVIEW BUKTI ================= --}}
+    {{-- Satu modal dipakai bersama semua baris; url & judul diisi lewat event Alpine dari tombol paper-clip. --}}
+    <flux:modal name="bukti-preview" class="w-2xl"
+        x-data="{
+            url: '',
+            title: 'Bukti Transaksi',
+            get isPdf() { return this.url.split('?')[0].toLowerCase().endsWith('.pdf'); },
+        }"
+        x-on:preview-bukti.window="url = $event.detail.url; title = $event.detail.title">
+        <div class="space-y-4">
             <div>
-                <flux:heading size="lg">
-                    <span x-show="! $wire.editingId">Catat Pengeluaran</span>
-                    <span x-show="$wire.editingId" x-cloak>Edit Pengeluaran</span>
-                </flux:heading>
-                <flux:text class="mt-1">Arah transaksi terkunci sebagai pengeluaran (keluar).</flux:text>
+                <flux:heading size="lg">Bukti Transaksi</flux:heading>
+                <flux:text class="mt-1 truncate" x-text="title"></flux:text>
             </div>
 
-            <flux:field>
-                <flux:label>Jumlah</flux:label>
-                <x-rupiah-input model="jumlah" placeholder="8.000.000.000" />
-                <flux:error name="jumlah" />
-            </flux:field>
-
-            <flux:select wire:model="kategori" label="Kategori" placeholder="Pilih kategori">
-                @foreach ($categories as $cat)
-                    <flux:select.option value="{{ $cat }}">{{ $cat }}</flux:select.option>
-                @endforeach
-            </flux:select>
-
-            <flux:textarea wire:model="deskripsi" label="Deskripsi" placeholder="Keterangan pengeluaran" rows="2" />
-            <div x-data="{ tanggal: new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
-            .toISOString()
-            .slice(0,16) }">
-                <flux:input
-                    x-model="tanggal"
-                    x-init="$wire.set('tanggal', tanggal)"
-                    type="datetime-local"
-                    label="Tanggal"
-                />
-            </div>
-
-            <div>
-                <flux:input wire:model="bukti" type="file" accept=".jpg,.jpeg,.png,.pdf"
-                    label="Bukti (jpg, png, pdf &mdash; maks 2MB)" />
-                <span wire:loading wire:target="bukti" class="mt-1 block text-xs text-zinc-500 animate-pulse">
-                    Mengunggah bukti&hellip;
-                </span>
-                <flux:text x-show="$wire.editingId" x-cloak class="mt-1 text-xs">
-                    Kosongkan bila tidak mengganti bukti.
-                </flux:text>
-            </div>
-
-            <flux:button type="submit" variant="primary" class="w-full"
-                wire:loading.attr="disabled" wire:target="bukti,saveExpense">
-                <span wire:loading.remove wire:target="bukti,saveExpense">Simpan Pengeluaran</span>
-                <span wire:loading wire:target="bukti" class="animate-pulse">Menunggu unggahan&hellip;</span>
-                <span wire:loading wire:target="saveExpense" class="animate-pulse">Menyimpan&hellip;</span>
-            </flux:button>
-        </form>
-    </flux:modal>
-
-    {{-- ================= MODAL: TOP UP / LAPORAN PERIODE ================= --}}
-    <flux:modal name="topup-laporan" class="w-xl">
-        <div class="space-y-6">
-            <div>
-                <flux:heading size="lg">Laporan Periode #1</flux:heading>
-                <flux:text class="mt-1">Rekap pertanggungjawaban sebelum top up. Saldo akan direstore ke Rp 0.</flux:text>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-                <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
-                    <p class="text-xs text-zinc-500">Total Pengeluaran</p>
-                    <p class="text-lg font-semibold tabular-nums text-red-600">Rp {{ $this->caPlBalance['sisa_saldo'] ?? 0 }}</p>
-                </div>
-                <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
-                    <p class="text-xs text-zinc-500">Closing Balance</p>
-                    <p class="text-lg font-semibold tabular-nums text-zinc-900 dark:text-white">Rp {{ $this->caPlBalance['expense'] ?? 0 }}</p>
-                </div>
-            </div>
-
-            <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 flex items-center justify-between">
-                <span class="text-sm text-zinc-500">Top up untuk restore ke float</span>
-                <span class="text-lg font-semibold tabular-nums text-green-600">Rp 2.000.000</span>
-            </div>
-
-            <div class="flex justify-between gap-2">
-                <flux:button :href="route('cashadvance.laporan.capl')" target="_blank" variant="ghost" icon="document-arrow-down">
-                    Lihat Laporan PDF
-                </flux:button>
-                <div class="flex gap-2">
-                    <flux:modal.close>
-                        <flux:button variant="ghost">Batal</flux:button>
-                    </flux:modal.close>
-                    <flux:button variant="primary" icon="check">Verifikasi &amp; Eksekusi Top up</flux:button>
-                </div>
-            </div>
-        </div>
-    </flux:modal>
-
-    {{-- ================= MODAL: RIWAYAT PERIODE ================= --}}
-    <flux:modal name="riwayat-periode" class="w-xl" flyout>
-        <div class="space-y-6">
-            <div>
-                <flux:heading size="lg">Riwayat Periode CA PL</flux:heading>
-                <flux:text class="mt-1">Periode yang sudah disegel (read-only). Buka laporan untuk cetak/simpan PDF.</flux:text>
-            </div>
-
-            <div class="space-y-2">
-                @forelse ($this->riwayatDompetCaPl()['data'] ?? [] as $dompet)
-                    <div wire:key="seal-{{ $dompet['id'] }}"
-                        class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <p class="font-medium text-zinc-900 dark:text-white">Periode #{{ $dompet['kode_ca'] }}</p>
-                                <flux:badge size="sm" color="zinc">Closed</flux:badge>
-                            </div>
-                            <p class="text-xs text-zinc-500 mt-0.5">
-                                {{ \Carbon\Carbon::parse($dompet['tanggal_mulai'])->translatedFormat('d M Y') }}
-                                – {{ \Carbon\Carbon::parse($dompet['created_at'])->translatedFormat('d M Y') }}
-                            </p>
-                            <p class="text-xs text-zinc-500 mt-0.5">
-                                • Keluar Rp {{ number_format($dompet['total_pengeluaran'], 0, ',', '.') }}
-                            </p>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <span class="text-sm font-medium tabular-nums {{ $dompet['saldo_akhir'] < 0 ? 'text-red-600' : 'text-zinc-900 dark:text-white' }}">
-                                Rp {{ number_format($dompet['saldo_akhir'], 0, ',', '.') }}
-                            </span>
-                            <flux:button :href="route('cashadvance.laporan.capl', $dompet['id'])" target="_blank"
-                                size="sm" variant="outline" icon="document-arrow-down">Laporan</flux:button>
-                        </div>
-                    </div>
-                @empty
-                <p class="text-sm text-zinc-400 text-center py-4">Belum ada periode tersegel.</p>
-                @endforelse
-            </div>
-        </div>
-    </flux:modal>
-
-    {{-- ================= MODAL: BUAT DOMPET KEGIATAN ================= --}}
-    <flux:modal name="buat-kegiatan" class="w-lg">
-        <form class="space-y-6">
-            <div>
-                <flux:heading size="lg">Buat Dompet Kegiatan</flux:heading>
-                <flux:text class="mt-1">Dana cair dicatat sebagai transaksi masuk pertama.</flux:text>
-            </div>
-
-            <flux:input label="Nama Kegiatan" placeholder="mis. Survei Lokasi Bandung" />
-            <flux:field>
-                <flux:label>RAB (Opsional)</flux:label>
-                <x-rupiah-input model="rab" placeholder="8.000.000.000" />
-                <flux:error name="rab" />
-            </flux:field>
-
-            <flux:field>
-                <flux:label>Dana Cair</flux:label>
-                <x-rupiah-input model="dana_cair" placeholder="8.000.000.000" />
-                <flux:error name="dana_cair" />
-            </flux:field>
-            <flux:input type="file" label="Bukti pencairan (wajib &mdash; jpg, png, pdf)" />
-
-            <flux:button type="submit" variant="primary" class="w-full">Buat Dompet</flux:button>
-        </form>
-    </flux:modal>
-
-    <flux:modal name="hapus-pengeluaran" class="w-md">
-        <div class="space-y-6">
-            <div>
-                <flux:heading size="lg">Hapus Pengeluaran</flux:heading>
-                <flux:text class="mt-1">Apakah Anda yakin ingin menghapus pengeluaran ini? Tindakan ini tidak dapat dibatalkan.</flux:text>
+            <div class="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800">
+                <template x-if="isPdf">
+                    <iframe :src="url" class="h-[70vh] w-full" title="Bukti PDF"></iframe>
+                </template>
+                <template x-if="! isPdf">
+                    <img :src="url" alt="Bukti transaksi" class="max-h-[70vh] w-full object-contain" />
+                </template>
             </div>
 
             <div class="flex justify-end gap-2">
+                <flux:button href="#" x-bind:href="url" target="_blank" variant="ghost" icon="arrow-top-right-on-square">
+                    Buka di tab baru
+                </flux:button>
                 <flux:modal.close>
-                    <flux:button variant="ghost">Batal</flux:button>
+                    <flux:button variant="ghost">Tutup</flux:button>
                 </flux:modal.close>
-                <flux:button variant="danger" icon="trash" wire:click='deleteTransactionCaPL'>Hapus</flux:button>
             </div>
         </div>
     </flux:modal>

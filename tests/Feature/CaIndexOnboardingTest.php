@@ -1,9 +1,11 @@
 <?php
 
 use App\Models\User;
-use Illuminate\Http\UploadedFile;
+use App\Services\CaWriter;
 use Illuminate\Support\Facades\Http;
 use Livewire\Volt\Volt;
+
+use function Pest\Laravel\mock;
 
 beforeEach(function () {
     config(['services.api_ca' => 'http://api.test']);
@@ -46,24 +48,58 @@ test('shows the dashboard instead of the onboarding UI when the user has a CA', 
         ->assertDontSee('Anda belum memiliki Cash Advance');
 });
 
-test('submitInitialTopup requires a nominal and a bukti transfer', function () {
-    fakeCaDashboard([]);
+test('a transaction with a bukti renders a MinIO preview URL', function () {
+    config(['services.aws_url' => 'https://storage.test/']);
+
+    Http::fake([
+        '*/cashadvance*' => Http::response([
+            'card_left' => ['kode_ca' => 'CA-PL-01', 'sisa_saldo' => 1_000_000],
+            'card_right' => ['data' => []],
+            'chart' => ['series' => []],
+            'categories' => ['Transport'],
+        ], 200),
+        '*/transaksi-wallet-pl/*' => Http::response(['data' => [[
+            'id_transaksi' => 9,
+            'dompet_id' => 1,
+            'deskripsi' => 'Taksi bandara',
+            'kategori' => 'Transport',
+            'created_at' => '2026-07-01 10:00:00',
+            'jenis' => 'pengeluaran',
+            'jumlah' => 75_000,
+            'saldo_setelah' => 925_000,
+            'bukti' => 'bukti-transaksi-capl/2026/CA-2026-003-25/contoh.pdf',
+        ]]], 200),
+        '*/riwayat-wallet-kegiatan*' => Http::response(['data' => []], 200),
+    ]);
 
     $this->actingAs(User::factory()->create());
 
     Volt::test('cashadvance.ca-index')
-        ->call('submitInitialTopup')
-        ->assertHasErrors(['topupJumlah' => 'required', 'topupBukti' => 'required']);
+        ->assertSee('https://storage.test/cashadvance/bukti-transaksi-capl/2026/CA-2026-003-25/contoh.pdf', false);
 });
 
-test('submitInitialTopup passes validation with a nominal and a valid bukti', function () {
-    fakeCaDashboard([]);
-
+test('submitInitialTopup delegates to the writer and notifies the dashboard to open', function () {
     $this->actingAs(User::factory()->create());
 
-    Volt::test('cashadvance.ca-index')
-        ->set('topupJumlah', 2_000_000)
-        ->set('topupBukti', UploadedFile::fake()->create('bukti.pdf', 100, 'application/pdf'))
+    mock(CaWriter::class)
+        ->shouldReceive('topupCaPL')
+        ->once()
+        ->andReturn(['ok' => true, 'body' => [], 'status' => 200, 'error' => null]);
+
+    Volt::test('cashadvance.modals.topup-pertama')
         ->call('submitInitialTopup')
-        ->assertHasNoErrors();
+        ->assertDispatched('ca-updated');
+});
+
+test('submitInitialTopup does not open the dashboard when the writer fails', function () {
+    $this->actingAs(User::factory()->create());
+
+    mock(CaWriter::class)
+        ->shouldReceive('topupCaPL')
+        ->once()
+        ->andReturn(['ok' => false, 'body' => [], 'status' => 500, 'error' => 'boom']);
+
+    Volt::test('cashadvance.modals.topup-pertama')
+        ->call('submitInitialTopup')
+        ->assertNotDispatched('ca-updated');
 });

@@ -35,10 +35,18 @@ beforeEach(function () {
     ]);
 });
 
+function catatPengeluaran()
+{
+    return Volt::test('cashadvance.modals.catat-pengeluaran', [
+        'kodeCa' => 'CA-PL-01',
+        'categories' => ['Transport', 'Konsumsi'],
+    ]);
+}
+
 test('saveExpense validates that a bukti is required when creating a new expense', function () {
     $this->actingAs(User::factory()->create());
 
-    Volt::test('cashadvance.ca-index')
+    catatPengeluaran()
         ->set('jumlah', 50_000)
         ->set('kategori', 'Transport')
         ->set('tanggal', '2026-07-01')
@@ -60,7 +68,7 @@ test('saveExpense delegates a valid new expense to the writer and resets the for
 
     $bukti = UploadedFile::fake()->create('nota.pdf', 100, 'application/pdf');
 
-    Volt::test('cashadvance.ca-index')
+    catatPengeluaran()
         ->set('jumlah', 50_000)
         ->set('kategori', 'Transport')
         ->set('deskripsi', 'Taksi')
@@ -69,13 +77,14 @@ test('saveExpense delegates a valid new expense to the writer and resets the for
         ->call('saveExpense')
         ->assertHasNoErrors()
         ->assertSet('jumlah', null)
-        ->assertSet('editingId', null);
+        ->assertSet('editingId', null)
+        ->assertDispatched('ca-updated');
 });
 
 test('startEdit fills the form from the selected transaction', function () {
     $this->actingAs(User::factory()->create());
 
-    Volt::test('cashadvance.ca-index')
+    catatPengeluaran()
         ->call('startEdit', 9)
         ->assertSet('editingId', 9)
         ->assertSet('jumlah', 75_000)
@@ -88,7 +97,7 @@ test('startEdit fills the form from the selected transaction', function () {
 test('startEdit ignores an unknown transaction id', function () {
     $this->actingAs(User::factory()->create());
 
-    Volt::test('cashadvance.ca-index')
+    catatPengeluaran()
         ->call('startEdit', 999)
         ->assertSet('editingId', null);
 });
@@ -96,7 +105,7 @@ test('startEdit ignores an unknown transaction id', function () {
 test('saveExpense allows editing without re-uploading a bukti and calls the update endpoint', function () {
     $this->actingAs(User::factory()->create());
 
-    Volt::test('cashadvance.ca-index')
+    catatPengeluaran()
         ->set('editingId', 9)
         ->set('jumlah', 20_000)
         ->set('kategori', 'Konsumsi')

@@ -34,11 +34,36 @@ class CaWriter
      * @param  array<string, mixed>  $payload
      * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
      */
+    public function topupCaPL(array $payload)
+    {
+        try {
+            $response = $this->sendTransaction($this->apiBase.'/esekusi-topup-wallet-pl', $payload);
+
+            $body = (array) $response->json();
+            $ok = $response->successful() || (bool) ($body['success'] ?? false);
+
+            return $this->result($ok, $body, $response->status(), [
+                'name' => 'ca',
+                'event' => 'created',
+                'description' => "Topup CA PL {$body['data']['kode_ca']}",
+                'properties' => ['total_penerimaan' => $body['data']['total_penerimaan']],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->fail('topupCaPL', $e, ['user_id' => $payload['user_id']]);
+        }
+    }
+
+    /**
+     * Catat transaksi pengeluaran pada dompet CA PL.
+     * NON-idempotent — multipart upload bukti, timeout diperpanjang.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
     public function createTransactionCaPl(string $kode, array $payload): array
     {
         try {
             $response = $this->sendTransaction($this->apiBase."/ca/{$kode}/transaksi", $payload);
-
             $body = (array) $response->json();
             $ok = $response->successful() || (bool) ($body['success'] ?? false);
 
@@ -102,7 +127,6 @@ class CaWriter
 
         return $request->post($url, $payload);
     }
-
 
     public function deleteTransactionCaPL(string $kode, int $id)
     {
