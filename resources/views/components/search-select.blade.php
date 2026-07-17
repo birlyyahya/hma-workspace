@@ -5,6 +5,7 @@
     'placeholder' => 'Pilih...',
     'searchPlaceholder' => 'Cari...',
     'avatar' => false,
+    'live' => false,
 ])
 
 {{--
@@ -36,7 +37,11 @@
         query: '',
         multiple: {{ $multiple ? 'true' : 'false' }},
         options: @js($jsOptions),
+        @if($live)
+        selected: @entangle($model).live,
+        @else
         selected: @entangle($model),
+        @endif
         labelFor(value) {
             const o = this.options.find((o) => o.value == value);
             return o ? o.label : '';

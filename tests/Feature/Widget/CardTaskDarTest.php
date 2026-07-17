@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Role;
 use App\Models\User;
 use App\Services\DarCache;
 use Illuminate\Support\Facades\Http;
@@ -199,6 +200,44 @@ test('the all status filter omits the status param and toggling updates the stat
 
     $component->call('setStatus', 'all');
     expect($component->get('statusFilter'))->toBe('all');
+});
+
+test('a view-all user scoping to own activity pins team_user to themselves', function () {
+    Http::fake(['*global/dar/list*' => Http::response(['data' => []])]);
+
+    $admin = User::factory()->create(['role_id' => Role::factory()->superAdmin()]);
+
+    Volt::actingAs($admin)
+        ->test('dar.widget.card-task-dar')
+        ->call('setScope', 'mine')
+        ->assertSet('scope', 'mine');
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'global/dar/list')
+        && ($request->data()['team_user'] ?? null) === $admin->id);
+});
+
+test('a view-all user in the default scope does not pin team_user', function () {
+    Http::fake(['*global/dar/list*' => Http::response(['data' => []])]);
+
+    $admin = User::factory()->create(['role_id' => Role::factory()->superAdmin()]);
+
+    Volt::actingAs($admin)->test('dar.widget.card-task-dar');
+
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'global/dar/list')
+        && array_key_exists('team_user', $request->data()));
+});
+
+test('switching to own activity clears the manual user filter', function () {
+    Http::fake(['*global/dar/list*' => Http::response(['data' => []])]);
+
+    $admin = User::factory()->create(['role_id' => Role::factory()->superAdmin()]);
+
+    Volt::actingAs($admin)
+        ->test('dar.widget.card-task-dar')
+        ->set('userFilter', '5')
+        ->call('setScope', 'mine')
+        ->assertSet('userFilter', '')
+        ->assertSet('scope', 'mine');
 });
 
 test('fetchTasks forwards the current search term to the API', function () {

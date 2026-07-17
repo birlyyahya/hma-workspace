@@ -32,6 +32,7 @@ new class extends Component {
     public string $statusFilter = 'all';
     public string $projectFilter = '';
     public string $userFilter = '';
+    public string $scope = 'all';
 
     public bool $loading = true;
 
@@ -51,7 +52,7 @@ new class extends Component {
 
         try {
             $cache = app(ProjectCache::class);
-            $source = Auth::user()->viewScopeFor('project') === 'all'
+            $source = Auth::user()->hasPermission('dar.view.all')
                 ? $cache->allProjects()
                 : $cache->involvedProjects(Auth::id());
 
@@ -136,6 +137,22 @@ new class extends Component {
         $this->fetchTasks();
     }
 
+    /**
+     * Cakupan daftar untuk user yang bisa melihat semua DAR: 'all' (semua tim)
+     * atau 'mine' (hanya aktivitas sendiri). Saat 'mine', filter user manual
+     * dikosongkan karena team_user dipatok ke diri sendiri (lihat taskParams).
+     */
+    public function setScope(string $scope): void
+    {
+        $this->scope = $scope === 'mine' ? 'mine' : 'all';
+
+        if ($this->scope === 'mine') {
+            $this->userFilter = '';
+        }
+
+        $this->fetchTasks();
+    }
+
     public function updatedProjectSelected(): void
     {
         $this->timelines = app(ProjectCache::class)->timelines((int) $this->projectSelected);
@@ -174,10 +191,9 @@ new class extends Component {
         }
 
         if (Auth::user()->viewScopeFor('dar') === 'all') {
-
-            // $params['role'] = Auth::user()->role->name ?? null;
-
-            if ($this->userFilter !== '') {
+            if ($this->scope === 'mine') {
+                $params['team_user'] = Auth::id();
+            } elseif ($this->userFilter !== '') {
                 $params['team_user'] = $this->userFilter;
             }
         } else {
@@ -453,6 +469,7 @@ new class extends Component {
 
     @php
         $isSuperadmin = Auth::user()->hasPermission('dar.view.all');
+        $canViewAllDar = Auth::user()->viewScopeFor('dar') === 'all';
         $statusOptions = [
             'all' => ['label' => 'Semua', 'active' => 'bg-slate-900 text-white ring-slate-900'],
             '1' => ['label' => 'Open', 'active' => 'bg-blue-600 text-white ring-blue-600'],
@@ -505,6 +522,23 @@ new class extends Component {
                 <flux:input x-on:keydown.enter="$wire.fetchTasks()" wire:model="search" icon="magnifying-glass" placeholder="Search task..." class="w-full md:w-64" />
             </div>
 
+            {{-- Scope: pisahkan aktivitas sendiri dari seluruh tim (hanya untuk yang bisa lihat semua) --}}
+            @if ($canViewAllDar)
+                <div class="flex w-full items-center rounded-xl bg-slate-100 p-1 sm:w-auto sm:inline-flex"
+                    wire:target="setScope" wire:loading.class="opacity-60 pointer-events-none">
+                    @foreach (['all' => 'Semua Tim', 'mine' => 'Aktivitas Saya'] as $key => $label)
+                        <button type="button" wire:click="setScope('{{ $key }}')"
+                            @class([
+                                'flex-1 rounded-lg px-3 py-1.5 text-center text-sm font-medium transition sm:flex-none',
+                                'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' => $scope === $key,
+                                'text-slate-600 hover:text-slate-900' => $scope !== $key,
+                            ])>
+                            {{ $label }}
+                        </button>
+                    @endforeach
+                </div>
+            @endif
+
             {{-- Tabs tipe + filter project/user --}}
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="flex w-full items-center rounded-xl bg-slate-100 p-1 sm:w-auto sm:inline-flex">
@@ -523,7 +557,7 @@ new class extends Component {
                             ? $allProjects
                             : collect($allProjects)->whereIn('id', $accessibleProjectIds)->values()->toArray();
                         $projectLabel = $projectFilter !== ''
-                            ? (collect($allProjects)->firstWhere('id', (int) $projectFilter)['name'] ?? 'Semua project')
+                            ? (collect($allProjects)->firstWhere('id', (int) $projectFilter) ?? 'Semua project')
                             : 'Semua project';
                     @endphp
                     <div x-show="tab === 'project'" x-cloak class="relative w-full sm:w-56" x-data="{ open: false, query: '' }" @click.away="open = false" @keydown.escape.window="open = false">
@@ -545,17 +579,17 @@ new class extends Component {
                                     </button>
                                     @foreach ($filterProjects as $p)
                                         <button wire:key="filter-project-{{ $p['id'] }}" type="button"
-                                            x-show="query === '' || '{{ addslashes(strtolower($p['name'] ?? '')) }}'.includes(query.toLowerCase())"
+                                            x-show="query === '' ||'{{ addslashes(strtolower(($p['name'] ?? '') . ' ' . ($p['code'] ?? ''))) }}'.includes(query.toLowerCase())"
                                             wire:click="$set('projectFilter', '{{ $p['id'] }}')" @click="open = false; query = ''"
                                             class="block w-full rounded-lg px-2.5 py-2 text-left text-sm hover:bg-zinc-50 {{ (string) $projectFilter === (string) $p['id'] ? 'bg-zinc-50 font-semibold text-zinc-900' : 'text-zinc-700' }}">
-                                            {{ $p['name'] ?? 'Untitled' }}
+                                            {{ $p['code'] .' - '. $p['name'] ?? 'Untitled' }}
                                         </button>
                                     @endforeach
                                 </div>
                             </div>
                         </div>
 
-                    @if ($isSuperadmin)
+                    @if ($isSuperadmin && $scope === 'all')
                         @php
                             $userLabel = $userFilter !== ''
                                 ? (collect($allUsers)->firstWhere('id', (int) $userFilter)['name'] ?? 'Semua user')
@@ -874,7 +908,7 @@ new class extends Component {
     <x-confirm-modal name="delete-task" confirm="deleteTask" title="Hapus aktivitas ini?"
         description="Aktivitas DAR akan dihapus secara permanen. Tindakan ini tidak dapat dibatalkan." />
 
-    <flux:modal name="create-task" class="w-xs sm:w-sm overflow-auto max-sm:max-h-[85dvh] md:min-w-3xl lg:min-w-5xl xl:min-w-6xl">
+    <flux:modal name="create-task" class="w-xs sm:w-sm max-sm:max-h-[85dvh] md:min-w-3xl lg:min-w-5xl xl:min-w-6xl overflow-visible">
         <form wire:submit="createActivity" class="space-y-4 sm:space-y-5">
             {{-- ── Header ── --}}
             <div class="flex items-start gap-3 border-b border-zinc-100 pb-4">
@@ -925,12 +959,12 @@ new class extends Component {
                         <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
                                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Project</label>
-                                <flux:select wire:model.live="projectSelected" placeholder="Pilih project...">
-                                    <flux:select.option selected>Pilih Project...</flux:select.option>
-                                    @foreach ($this->projectData() as $item)
-                                    <flux:select.option value="{{ $item['id'] }}">{{ $item['code'] }} - {{ $item['name'] }}</flux:select.option>
-                                    @endforeach
-                                </flux:select>
+                                <x-search-select
+                                    model="projectSelected"
+                                    :live="true"
+                                    :options="collect($this->projectData())->map(fn ($item) => ['value' => $item['id'], 'label' => $item['code'].' - '.$item['name']])->all()"
+                                    placeholder="Pilih project..."
+                                    searchPlaceholder="Cari project..." />
                                 @error('form.project_id')
                                 <flux:error message="{{ $message }}" /> @enderror
                             </div>

@@ -769,13 +769,12 @@ class extends Component
                                         <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                                             <div>
                                                 <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-zinc-500">Project</label>
-                                                <select wire:model.live="editProjectId"
-                                                    class="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-800 focus:border-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-200">
-                                                    <option value="">— Pilih project —</option>
-                                                    @foreach ($projectData as $proj)
-                                                        <option value="{{ $proj['id'] }}">{{ $proj['name'] }}</option>
-                                                    @endforeach
-                                                </select>
+                                                <x-search-select
+                                                    model="editProjectId"
+                                                    :live="true"
+                                                    :options="collect($projectData)->map(fn ($proj) => ['value' => $proj['id'], 'label' => trim((data_get($proj, 'code') ? data_get($proj, 'code').' - ' : '').($proj['name'] ?? ''))])->all()"
+                                                    placeholder="Pilih project..."
+                                                    searchPlaceholder="Cari project..." />
                                                 @error('editProjectId')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                                             </div>
                                             <div>
