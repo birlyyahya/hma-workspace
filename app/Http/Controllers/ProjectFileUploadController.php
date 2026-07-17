@@ -122,10 +122,13 @@ class ProjectFileUploadController extends Controller
 
             $this->deleteOrphanedObject($key);
 
+            // 422, BUKAN 5xx: respons 5xx dari origin diganti halaman error
+            // oleh Cloudflare sehingga pesan penolakan BEPM tidak pernah
+            // sampai ke browser di production.
             return response()->json([
                 'message' => 'File terupload tetapi registrasi dokumen ditolak BEPM — upload dibatalkan.',
                 'errors' => $result['body']['errors'] ?? [],
-            ], 502);
+            ], 422);
         }
 
         return response()->json([
@@ -169,30 +172,38 @@ class ProjectFileUploadController extends Controller
     /**
      * Hindari tabrakan nama dengan dokumen yang sudah terdaftar di BEPM
      * dengan suffix " (n)" ala file manager.
+     *
+     * BEPM menolak duplikat berdasarkan TITLE (nama tanpa ekstensi, lintas
+     * folder & ekstensi — "bengkulu.pdf" vs "bengkulu.png" tabrakan), bukan
+     * object key. Karena itu yang dibandingkan adalah basename tanpa ekstensi
+     * terhadap seluruh title & nama file dokumen project. `files.url` dari
+     * BEPM berbentuk URL-encoded, jadi harus di-decode dulu.
      */
     private function uniqueKey(int $project, string $prefix, string $filename): string
     {
-        $existing = collect($this->cache->documentsFor($project))
-            ->map(fn (array $doc) => (string) data_get($doc, 'files.url', ''))
+        $taken = collect($this->cache->documentsFor($project))
+            ->flatMap(fn (array $doc) => [
+                mb_strtolower(pathinfo(rawurldecode((string) data_get($doc, 'files.url', '')), PATHINFO_FILENAME)),
+                mb_strtolower((string) data_get($doc, 'title', '')),
+            ])
             ->filter()
             ->flip();
 
-        $key = $prefix.$filename;
-
-        if (! isset($existing[$key])) {
-            return $key;
-        }
-
         $extension = pathinfo($filename, PATHINFO_EXTENSION);
         $base = pathinfo($filename, PATHINFO_FILENAME);
+
+        if (! isset($taken[mb_strtolower($base)])) {
+            return $prefix.$filename;
+        }
+
         $suffix = 1;
 
         do {
-            $candidate = $prefix.$base." ({$suffix})".($extension !== '' ? ".{$extension}" : '');
+            $candidate = $base." ({$suffix})";
             $suffix++;
-        } while (isset($existing[$candidate]));
+        } while (isset($taken[mb_strtolower($candidate)]));
 
-        return $candidate;
+        return $prefix.$candidate.($extension !== '' ? ".{$extension}" : '');
     }
 
     /**

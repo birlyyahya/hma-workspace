@@ -152,27 +152,35 @@ class ProjectFileStorage
     }
 
     /**
-     * Pindahkan objek dalam bucket yang sama (copy + delete di sisi server,
-     * satu panggilan Flysystem). Melempar bila sumber tidak ada / gagal.
+     * Pindahkan objek dalam bucket yang sama (CopyObject + DeleteObject via
+     * S3Client). Sengaja TIDAK memakai Flysystem move: Flysystem melakukan
+     * HeadObject dulu, dan HEAD bertanda tangan ditolak 403 oleh reverse proxy
+     * publik MinIO (storage.hanatekindo.com) — copy langsung tidak. Melempar
+     * bila sumber tidak ada / gagal.
      */
     public function move(string $fromKey, string $toKey): void
     {
-        try {
-            Storage::disk((string) config('uploads.project_files.disk'))->move($fromKey, $toKey);
-        } catch (\Throwable $e) {
-            throw $this->wrap('move', $e, ['from' => $fromKey, 'to' => $toKey]);
-        }
+        $this->copyObject($fromKey, $toKey);
+        $this->deleteObject($fromKey);
     }
 
     /**
      * Apakah sebuah objek ada di MinIO. Dipakai untuk membuat move/rename
      * idempotent: bila move gagal karena sumber sudah tidak ada, objek mungkin
      * sudah berada di key tujuan dari percobaan sebelumnya yang terputus.
+     * Memakai ListObjectsV2, bukan HeadObject — HEAD bertanda tangan ditolak
+     * 403 oleh reverse proxy publik MinIO (lihat move()).
      */
     public function exists(string $key): bool
     {
         try {
-            return Storage::disk((string) config('uploads.project_files.disk'))->exists($key);
+            $result = $this->client()->listObjectsV2([
+                'Bucket' => $this->bucket(),
+                'Prefix' => $key,
+                'MaxKeys' => 1,
+            ]);
+
+            return (string) data_get($result, 'Contents.0.Key') === $key;
         } catch (\Throwable $e) {
             throw $this->wrap('exists', $e, ['key' => $key]);
         }

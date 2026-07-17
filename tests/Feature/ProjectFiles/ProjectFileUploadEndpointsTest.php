@@ -218,6 +218,50 @@ test('a duplicate filename gets a numeric suffix', function () {
         ->assertJsonPath('key', 'projects_docs/2026/5/laporan (2).pdf');
 });
 
+test('a duplicate basename with a different extension gets a numeric suffix', function () {
+    $leader = User::factory()->create();
+    fakeBepmForUpload(leaderId: $leader->id, docs: [
+        ['id' => 1, 'title' => 'bengkulu', 'files' => ['url' => 'projects_docs%2F2026%2F5%2Fbengkulu.pdf']],
+    ]);
+
+    mock(ProjectFileStorage::class)
+        ->shouldReceive('initiateMultipart')
+        ->once()
+        ->with('projects_docs/2026/5/bengkulu (1).png', 'image/png')
+        ->andReturn('upload-abc');
+
+    $this->actingAs($leader)
+        ->postJson(route('project-files.uploads.initiate', ['project' => 5]), [
+            'filename' => 'bengkulu.png',
+            'size' => 1000,
+            'mime' => 'image/png',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('key', 'projects_docs/2026/5/bengkulu (1).png');
+});
+
+test('a filename colliding with an existing BEPM document title gets a numeric suffix', function () {
+    $leader = User::factory()->create();
+    fakeBepmForUpload(leaderId: $leader->id, docs: [
+        ['id' => 1, 'title' => 'Laporan Akhir', 'files' => ['url' => 'projects_docs%2F2026%2F5%2Fdok-lain.pdf']],
+    ]);
+
+    mock(ProjectFileStorage::class)
+        ->shouldReceive('initiateMultipart')
+        ->once()
+        ->with('projects_docs/2026/5/Laporan Akhir (1).pdf', 'application/pdf')
+        ->andReturn('upload-abc');
+
+    $this->actingAs($leader)
+        ->postJson(route('project-files.uploads.initiate', ['project' => 5]), [
+            'filename' => 'Laporan Akhir.pdf',
+            'size' => 1000,
+            'mime' => 'application/pdf',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('key', 'projects_docs/2026/5/Laporan Akhir (1).pdf');
+});
+
 // ----------------------------------------------------------------------- Sign
 
 test('sign returns presigned urls per part number', function () {
@@ -318,7 +362,7 @@ test('the MinIO object is deleted when BEPM registration fails', function () {
                 ['part_number' => 1, 'etag' => '"etag-1"'],
             ],
         ])
-        ->assertStatus(502)
+        ->assertUnprocessable()
         ->assertJsonPath('errors.file.0', 'File ditolak BEPM');
 });
 
