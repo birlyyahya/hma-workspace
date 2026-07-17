@@ -2,6 +2,7 @@
 
 use App\Jobs\DeleteProjectFilesJob;
 use App\Models\ProjectFolder;
+use App\Models\ProjectFolderFile;
 use App\Services\ProjectCache;
 use App\Services\ProjectFileStorage;
 use App\Services\ProjectWriter;
@@ -32,6 +33,7 @@ test('records are deleted from BEPM first and MinIO objects only for managed pro
     $storage->shouldReceive('deleteObject')->once()->with('projects_docs/2026/5/Kontrak/kontrak.pdf');
 
     $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak', 'status' => 'deleting']);
+    ProjectFolderFile::place(5, 2, $folder->id);
 
     runDeleteJob(new DeleteProjectFilesJob(5, [
         ['doc_id' => 2, 'key' => 'projects_docs/2026/5/Kontrak/kontrak.pdf'],
@@ -41,7 +43,8 @@ test('records are deleted from BEPM first and MinIO objects only for managed pro
     Http::assertSent(fn ($request) => $request->method() === 'DELETE' && str_contains($request->url(), 'admin-docs/2'));
     Http::assertSent(fn ($request) => $request->method() === 'DELETE' && str_contains($request->url(), 'admin-docs/3'));
 
-    expect(ProjectFolder::query()->whereKey($folder->id)->exists())->toBeFalse();
+    expect(ProjectFolder::query()->whereKey($folder->id)->exists())->toBeFalse()
+        ->and(ProjectFolderFile::query()->where('doc_id', 2)->exists())->toBeFalse();
 });
 
 test('when a BEPM delete fails the folder is kept and unlocked, and the object stays', function () {

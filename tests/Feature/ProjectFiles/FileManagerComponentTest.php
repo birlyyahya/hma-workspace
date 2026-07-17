@@ -4,6 +4,7 @@ use App\Jobs\DeleteProjectFilesJob;
 use App\Jobs\MoveProjectFilesJob;
 use App\Jobs\SyncProjectDocPathJob;
 use App\Models\ProjectFolder;
+use App\Models\ProjectFolderFile;
 use App\Models\User;
 use App\Services\ProjectFileStorage;
 use Illuminate\Support\Facades\Http;
@@ -30,7 +31,7 @@ function fakeBepmForFileManager(int $leaderId, ?array $docs = null): void
 {
     $docs ??= [
         ['id' => 1, 'title' => 'laporan', 'created_at' => '2026-06-01T00:00:00Z', 'admin_doc_category_id' => 7, 'files' => ['url' => 'projects_docs/2026/5/laporan.pdf', 'size' => '2 MB']],
-        ['id' => 2, 'title' => 'kontrak', 'created_at' => '2026-06-02T00:00:00Z', 'admin_doc_category_id' => 7, 'files' => ['url' => 'projects_docs/2026/5/Kontrak/kontrak.pdf', 'size' => '1 MB']],
+        ['id' => 2, 'title' => 'kontrak', 'created_at' => '2026-06-02T00:00:00Z', 'admin_doc_category_id' => 7, 'files' => ['url' => 'projects_docs/2026/5/kontrak.pdf', 'size' => '1 MB']],
         ['id' => 4, 'title' => 'foto', 'created_at' => '2026-06-03T00:00:00Z', 'admin_doc_category_id' => 7, 'files' => ['url' => 'projects_docs/2026/5/foto.png', 'size' => '500 KB']],
     ];
 
@@ -64,7 +65,8 @@ test('a user without project access sees the forbidden state', function () {
 test('the root shows folders plus root-level files only', function () {
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id);
-    ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak']);
+    $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak']);
+    ProjectFolderFile::place(5, 2, $folder->id);
 
     Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
@@ -77,7 +79,8 @@ test('the root shows folders plus root-level files only', function () {
 test('searching reaches files inside subfolders and exposes their location', function () {
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id);
-    ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak']);
+    $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak']);
+    ProjectFolderFile::place(5, 2, $folder->id);
 
     $component = Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
@@ -120,10 +123,11 @@ test('file sizes come from MinIO, not the zero size BEPM reports', function () {
         ->and($row['size_bytes'])->toBe(3.0 * 1024 * 1024);
 });
 
-test('opening a folder shows only the files under its path', function () {
+test('opening a folder shows only the files mapped to it', function () {
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id);
     $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak']);
+    ProjectFolderFile::place(5, 2, $folder->id);
 
     Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
@@ -152,6 +156,7 @@ test('goBack refreshes the view to the parent folder (no stale computed)', funct
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id);
     $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak']);
+    ProjectFolderFile::place(5, 2, $folder->id);
 
     Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
@@ -438,6 +443,7 @@ test('deleting a folder with files locks it and dispatches DeleteProjectFilesJob
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id);
     $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak']);
+    ProjectFolderFile::place(5, 2, $folder->id);
 
     Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
@@ -449,31 +455,42 @@ test('deleting a folder with files locks it and dispatches DeleteProjectFilesJob
 
     Queue::assertPushed(DeleteProjectFilesJob::class, function (DeleteProjectFilesJob $job) use ($folder) {
         return $job->folderId === $folder->id
-            && $job->items === [['doc_id' => 2, 'key' => 'projects_docs/2026/5/Kontrak/kontrak.pdf']];
+            && $job->items === [['doc_id' => 2, 'key' => 'projects_docs/2026/5/kontrak.pdf']];
     });
 });
 
-test('bulk move moves each selected file synchronously', function () {
+test('bulk move only updates the folder mapping — no MinIO move, no BEPM patch', function () {
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id);
     $target = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Arsip']);
-
-    $storage = mock(ProjectFileStorage::class);
-    $storage->shouldReceive('move')->once()->with('projects_docs/2026/5/laporan.pdf', 'projects_docs/2026/5/Arsip/laporan.pdf');
-    $storage->shouldReceive('move')->once()->with('projects_docs/2026/5/foto.png', 'projects_docs/2026/5/Arsip/foto.png');
 
     Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
         ->set('selected', ['1', '4'])
         ->set('moveSelectedTargetId', $target->id)
+        ->call('moveSelected')
+        ->assertSet('selected', []);
+
+    expect(ProjectFolderFile::query()->where('doc_id', 1)->value('project_folder_id'))->toBe($target->id)
+        ->and(ProjectFolderFile::query()->where('doc_id', 4)->value('project_folder_id'))->toBe($target->id);
+
+    Http::assertNotSent(fn ($request) => $request->method() === 'PATCH');
+});
+
+test('moving a file back to the root removes its mapping row', function () {
+    $leader = User::factory()->create();
+    fakeBepmForFileManager(leaderId: $leader->id);
+    $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Arsip']);
+    ProjectFolderFile::place(5, 2, $folder->id);
+
+    Volt::actingAs($leader)
+        ->test('project.components.file-manager', ['id' => 5])
+        ->call('openFolder', $folder->id)
+        ->set('selected', ['2'])
+        ->set('moveSelectedTargetId', null)
         ->call('moveSelected');
 
-    Http::assertSent(fn ($request) => $request->method() === 'PATCH'
-        && str_contains($request->url(), 'admin-docs/1')
-        && $request['file'] === 'projects_docs/2026/5/Arsip/laporan.pdf');
-    Http::assertSent(fn ($request) => $request->method() === 'PATCH'
-        && str_contains($request->url(), 'admin-docs/4')
-        && $request['file'] === 'projects_docs/2026/5/Arsip/foto.png');
+    expect(ProjectFolderFile::query()->where('doc_id', 2)->exists())->toBeFalse();
 });
 
 test('preview uses a presigned url for MinIO files', function () {
@@ -525,27 +542,27 @@ test('a rename whose BEPM sync fails hands off to the background job without rol
         && $job->extra['title'] === 'laporan-final');
 });
 
-test('a move whose object is already at the destination is treated as done and still syncs BEPM', function () {
+test('a rename whose object is already at the destination is treated as done and still syncs BEPM', function () {
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id);
-    $target = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Arsip']);
 
     $storage = mock(ProjectFileStorage::class);
     $storage->shouldReceive('move')->once()
-        ->with('projects_docs/2026/5/laporan.pdf', 'projects_docs/2026/5/Arsip/laporan.pdf')
+        ->with('projects_docs/2026/5/laporan.pdf', 'projects_docs/2026/5/laporan-final.pdf')
         ->andThrow(new RuntimeException('source missing'));
     $storage->shouldReceive('exists')->once()
-        ->with('projects_docs/2026/5/Arsip/laporan.pdf')->andReturn(true);
+        ->with('projects_docs/2026/5/laporan-final.pdf')->andReturn(true);
 
     Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
-        ->set('selected', ['1'])
-        ->set('moveSelectedTargetId', $target->id)
-        ->call('moveSelected');
+        ->call('startRenameDoc', 1)
+        ->set('renameDocName', 'laporan-final')
+        ->call('renameDoc')
+        ->assertHasNoErrors();
 
     Http::assertSent(fn ($request) => $request->method() === 'PATCH'
         && str_contains($request->url(), 'admin-docs/1')
-        && $request['file'] === 'projects_docs/2026/5/Arsip/laporan.pdf');
+        && $request['file'] === 'projects_docs/2026/5/laporan-final.pdf');
 });
 
 test('a percent-encoded BEPM url is decoded to the real object key', function () {

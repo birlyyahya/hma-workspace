@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\ProjectFolder;
+use App\Models\ProjectFolderFile;
 use App\Services\ProjectCache;
 use App\Services\ProjectFileStorage;
 use App\Services\ProjectWriter;
@@ -49,6 +50,8 @@ class DeleteProjectFilesJob implements ShouldQueue
 
                 continue;
             }
+
+            ProjectFolderFile::query()->where('doc_id', (int) $item['doc_id'])->delete();
 
             if (str_starts_with($item['key'], 'projects_docs/')) {
                 try {

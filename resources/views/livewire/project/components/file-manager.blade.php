@@ -4,6 +4,7 @@ use App\Jobs\DeleteProjectFilesJob;
 use App\Jobs\MoveProjectFilesJob;
 use App\Jobs\SyncProjectDocPathJob;
 use App\Models\ProjectFolder;
+use App\Models\ProjectFolderFile;
 use App\Services\ProjectCache;
 use App\Services\ProjectFileStorage;
 use App\Services\ProjectWriter;
@@ -157,11 +158,31 @@ new class extends Component
         return 'projects_docs/'.$this->projectYear.'/'.(int) $this->id.'/';
     }
 
-    protected function currentPrefix(): string
+    /**
+     * Path relatif seluruh folder DI BAWAH folder aktif (tidak termasuk folder
+     * aktif sendiri) — dipakai pencarian lintas subfolder dan label lokasi
+     * hasil pencarian.
+     *
+     * @return array<int, string> map folder id => path relatif dari folder aktif
+     */
+    protected function subtreeRelativePaths(): array
     {
-        $folder = $this->currentFolder;
+        $byParent = ProjectFolder::query()
+            ->where('project_id', (int) $this->id)
+            ->get(['id', 'parent_id', 'name'])
+            ->groupBy('parent_id');
 
-        return $this->rootPrefix().($folder !== null ? $folder->path().'/' : '');
+        $paths = [];
+
+        $walk = function (?int $parentId, string $prefix) use (&$walk, &$paths, $byParent): void {
+            foreach ($byParent->get($parentId, collect()) as $folder) {
+                $paths[$folder->id] = $prefix.$folder->name;
+                $walk($folder->id, $prefix.$folder->name.'/');
+            }
+        };
+        $walk($this->currentFolderId, '');
+
+        return $paths;
     }
 
     /**
@@ -190,23 +211,30 @@ new class extends Component
 
     /**
      * Baris file di folder aktif, setelah search + filter kategori + sort.
-     * Seluruh file kini berada di MinIO di bawah prefix project — file hanya
-     * tampil bila key-nya persis di folder aktif (bukan subfolder), KECUALI
-     * saat mencari: pencarian menjangkau seluruh subfolder folder aktif dan
+     * Lokasi file dibaca dari mapping project_folder_files (folder virtual) —
+     * BUKAN dari object key; dokumen tanpa baris mapping berada di root.
+     * Saat mencari, pencarian menjangkau seluruh subfolder folder aktif dan
      * baris hasilnya membawa `dir` (lokasi relatif) untuk ditampilkan.
      *
      * @return array<int, array<string, mixed>>
      */
     public function getFilesProperty(): array
     {
-        $prefix = $this->currentPrefix();
+        $rootPrefix = $this->rootPrefix();
         $sizes = $this->objectSizes;
+        $currentId = $this->currentFolderId !== null ? (int) $this->currentFolderId : null;
+        $subtreePaths = $this->subtreeRelativePaths();
+
+        $placements = ProjectFolderFile::query()
+            ->where('project_id', (int) $this->id)
+            ->pluck('project_folder_id', 'doc_id');
 
         $rows = collect($this->allDocs())
-            ->map(function (array $doc) use ($sizes) {
+            ->map(function (array $doc) use ($sizes, $placements) {
                 $path = $this->keyFromUrl((string) data_get($doc, 'files.url', ''));
                 $ext = strtolower(Str::afterLast($path, '.'));
                 $bytes = (float) ($sizes[$path] ?? $this->sizeToBytes((string) (data_get($doc, 'files.size') ?? '')));
+                $docId = (int) ($doc['id'] ?? 0);
 
                 return [
                     'id' => $doc['id'],
@@ -220,21 +248,26 @@ new class extends Component
                     'category_id' => data_get($doc, 'admin_doc_category_id'),
                     'title' => (string) ($doc['title'] ?? ''),
                     'keyword' => array_values(array_filter(array_map(strval(...), (array) ($doc['keyword'] ?? [])))),
+                    'folder_id' => isset($placements[$docId]) ? (int) $placements[$docId] : null,
                 ];
             })
-            ->filter(function (array $row) use ($prefix) {
-                if (! str_starts_with($row['key'], $prefix) || in_array((int) $row['id'], $this->pendingDeleteIds, true)) {
+            ->filter(function (array $row) use ($rootPrefix, $currentId, $subtreePaths) {
+                if (! str_starts_with($row['key'], $rootPrefix) || in_array((int) $row['id'], $this->pendingDeleteIds, true)) {
                     return false;
                 }
 
-                return $this->search !== '' || ! str_contains(substr($row['key'], strlen($prefix)), '/');
-            })
-            ->map(function (array $row) use ($prefix) {
-                $relative = substr($row['key'], strlen($prefix));
-                $row['dir'] = str_contains($relative, '/') ? Str::beforeLast($relative, '/') : '';
+                if ($row['folder_id'] === $currentId) {
+                    return true;
+                }
 
-                return $row;
-            });
+                return $this->search !== ''
+                    && $row['folder_id'] !== null
+                    && isset($subtreePaths[$row['folder_id']]);
+            })
+            ->map(fn (array $row) => [
+                ...$row,
+                'dir' => $row['folder_id'] !== null ? ($subtreePaths[$row['folder_id']] ?? '') : '',
+            ]);
 
         if ($this->categoryFilter !== 'all') {
             $rows = $rows->filter(fn (array $row) => $row['category'] === $this->categoryFilter);
@@ -495,7 +528,7 @@ new class extends Component
             return;
         }
 
-        $docs = $this->docsUnderPrefix($this->rootPrefix().$folder->path().'/');
+        $docs = $this->docsInFolders($this->subtreeIds($folder));
         if ($docs === [] && ! $folder->children()->exists()) {
             $folder->delete();
             Toaster::success('Folder dihapus');
@@ -515,7 +548,7 @@ new class extends Component
         if ($folder === null || $folder->status !== null) {
             return;
         }
-        $items = collect($this->docsUnderPrefix($this->rootPrefix().$folder->path().'/'))
+        $items = collect($this->docsInFolders($this->subtreeIds($folder)))
             ->map(fn (array $doc) => [
                 'doc_id' => (int) $doc['id'],
                 'key' => $this->keyFromUrl((string) data_get($doc, 'files.url', '')),
@@ -583,8 +616,8 @@ new class extends Component
             ['renameDocName.regex' => 'Nama file hanya boleh huruf, angka, spasi, dan karakter - _ . ( ).'],
         );
 
-        $prefix = Str::beforeLast($row['key'], '/').'/';
-        $newKey = $prefix.trim($this->renameDocName).'.'.$row['ext'];
+        $newName = trim($this->renameDocName);
+        $newKey = $this->rootPrefix().$newName.'.'.$row['ext'];
 
         if ($newKey === $row['key']) {
             Flux::modal('rename-file-modal')->close();
@@ -592,8 +625,10 @@ new class extends Component
             return;
         }
 
-        if ($this->keyExists($newKey)) {
-            $this->addError('renameDocName', 'File dengan nama itu sudah ada di folder ini.');
+        // BEPM menolak duplikat title lintas folder & ekstensi — cegah di sini
+        // supaya tidak terjadi rename MinIO yang sinkronisasinya pasti ditolak.
+        if ($this->nameTaken($newName, (int) $row['id'])) {
+            $this->addError('renameDocName', 'Nama itu sudah dipakai dokumen lain di project ini.');
 
             return;
         }
@@ -776,6 +811,11 @@ new class extends Component
         Toaster::success(count($items).' file dihapus — diproses di background');
     }
 
+    /**
+     * Pindahkan file terpilih ke folder tujuan — murni update mapping
+     * project_folder_files. Objek MinIO dan BEPM tidak disentuh: key flat,
+     * lokasi hanyalah konsep folder virtual di workspace.
+     */
     public function moveSelected(): void
     {
         if ($this->forbidden || $this->selected === []) {
@@ -783,49 +823,23 @@ new class extends Component
         }
 
         $targetId = $this->moveSelectedTargetId ? (int) $this->moveSelectedTargetId : null;
-        $target = $targetId !== null ? $this->ownFolder($targetId) : null;
 
-        if ($targetId !== null && $target === null) {
+        if ($targetId !== null && $this->ownFolder($targetId) === null) {
             Toaster::error('Folder tujuan tidak ditemukan');
 
             return;
         }
 
-        $prefix = $this->rootPrefix().($target !== null ? $target->path().'/' : '');
         $rows = collect($this->files)->whereIn('id', array_map('intval', $this->selected));
-        $failed = 0;
-        $queued = 0;
 
         foreach ($rows as $row) {
-            $newKey = $this->availableKey($prefix, $row['name']);
-
-            if ($newKey === $row['key']) {
-                continue;
-            }
-
-            if (! $this->moveObject($row['key'], $newKey)) {
-                $failed++;
-
-                continue;
-            }
-
-            if (! $this->syncDocPath((int) $row['id'], $newKey)) {
-                $queued++;
-            }
+            ProjectFolderFile::place((int) $this->id, (int) $row['id'], $targetId);
         }
 
-        app(ProjectCache::class)->flushDocs((int) $this->id);
         unset($this->files);
         $this->reset('selected', 'moveSelectedTargetId');
         Flux::modal('move-selected-modal')->close();
-
-        if ($failed > 0) {
-            Toaster::error("{$failed} file gagal dipindahkan");
-        } elseif ($queued > 0) {
-            Toaster::warning('File dipindah — sinkronisasi metadata diproses di background');
-        } else {
-            Toaster::success('File berhasil dipindah');
-        }
+        Toaster::success('File berhasil dipindah');
     }
 
     // ---------------------------------------------------------------- helpers
@@ -923,15 +937,21 @@ new class extends Component
     }
 
     /**
+     * Dokumen BEPM yang berada di folder-folder tertentu menurut mapping
+     * project_folder_files.
+     *
+     * @param  array<int, int>  $folderIds
      * @return array<int, array<string, mixed>>
      */
-    protected function docsUnderPrefix(string $prefix): array
+    protected function docsInFolders(array $folderIds): array
     {
+        $docIds = ProjectFolderFile::query()
+            ->whereIn('project_folder_id', $folderIds)
+            ->pluck('doc_id')
+            ->flip();
+
         return collect($this->allDocs())
-            ->filter(fn (array $doc) => str_starts_with(
-                $this->keyFromUrl((string) data_get($doc, 'files.url', '')),
-                $prefix
-            ))
+            ->filter(fn (array $doc) => isset($docIds[(int) ($doc['id'] ?? 0)]))
             ->values()
             ->all();
     }
@@ -952,30 +972,23 @@ new class extends Component
         return ltrim($decoded, '/');
     }
 
-    protected function keyExists(string $key): bool
+    /**
+     * Apakah sebuah nama (tanpa ekstensi) sudah dipakai dokumen lain di
+     * project ini — dibandingkan terhadap basename file maupun title BEPM,
+     * case-insensitive.
+     */
+    protected function nameTaken(string $name, int $exceptDocId): bool
     {
+        $needle = mb_strtolower($name);
+
         return collect($this->allDocs())
-            ->contains(fn (array $doc) => $this->keyFromUrl((string) data_get($doc, 'files.url', '')) === $key);
-    }
+            ->reject(fn (array $doc) => (int) ($doc['id'] ?? 0) === $exceptDocId)
+            ->contains(function (array $doc) use ($needle) {
+                $base = pathinfo($this->keyFromUrl((string) data_get($doc, 'files.url', '')), PATHINFO_FILENAME);
 
-    protected function availableKey(string $prefix, string $filename): string
-    {
-        $key = $prefix.$filename;
-
-        if (! $this->keyExists($key)) {
-            return $key;
-        }
-
-        $ext = pathinfo($filename, PATHINFO_EXTENSION);
-        $base = pathinfo($filename, PATHINFO_FILENAME);
-        $suffix = 1;
-
-        do {
-            $key = $prefix.$base." ({$suffix})".($ext !== '' ? ".{$ext}" : '');
-            $suffix++;
-        } while ($this->keyExists($key));
-
-        return $key;
+                return mb_strtolower($base) === $needle
+                    || mb_strtolower((string) ($doc['title'] ?? '')) === $needle;
+            });
     }
 
     /**
@@ -1036,6 +1049,8 @@ new class extends Component
 
             return false;
         }
+
+        ProjectFolderFile::query()->where('doc_id', (int) $row['id'])->delete();
 
         try {
             app(ProjectFileStorage::class)->deleteObject($row['key']);
