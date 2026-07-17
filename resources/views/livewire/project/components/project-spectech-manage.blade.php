@@ -418,7 +418,7 @@ new class extends Component {
                                                 <td class="px-3 py-2.5 align-top text-right text-zinc-700 font-medium">
                                                     {{ $draft['quantity'] }}
                                                 </td>
-                                                <td class="px-4 py-2.5 align-top text-right text-zinc-900 font-medium">
+                                                <td class="px-4 py-2.5 align-top text-right text-zinc-900 font-medium whitespace-nowrap">
                                                     Rp {{ number_format($draft['price'], 0, ',', '.') }}
                                                 </td>
                                                 <td class="px-3 py-2.5 align-top text-right">
@@ -434,7 +434,7 @@ new class extends Component {
                                             <td colspan="3" class="px-4 py-2.5 text-xs font-medium text-zinc-500 uppercase tracking-wide">
                                                 Total Nominal
                                             </td>
-                                            <td class="px-4 py-2.5 text-right text-sm font-semibold text-red-600">
+                                            <td class="px-4 py-2.5 text-right text-sm font-semibold text-red-600 whitespace-nowrap">
                                                 Rp {{ number_format($this->draftTotal, 0, ',', '.') }}
                                             </td>
                                             <td></td>

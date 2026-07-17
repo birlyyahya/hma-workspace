@@ -1041,10 +1041,10 @@ new class extends Component {
                                     <td class="px-3 py-3 align-top text-right text-zinc-700 font-medium">
                                         {{ $qtyTotal }}
                                     </td>
-                                    <td class="px-3 py-3 align-top text-right text-zinc-600">
+                                    <td class="px-3 py-3 align-top text-right text-zinc-600 whitespace-nowrap">
                                         Rp {{ number_format($data['qty_nominal'] ?? 0, 0, ',', '.') }}
                                     </td>
-                                    <td class="px-3 py-3 align-top text-right font-semibold text-zinc-900">
+                                    <td class="px-3 py-3 align-top text-right font-semibold text-zinc-900 whitespace-nowrap">
                                         Rp {{ number_format($data['total_nominal'] ?? 0, 0, ',', '.') }}
                                     </td>
                                     @unless($bulkMode)
@@ -1101,7 +1101,7 @@ new class extends Component {
                                                                     <span class="text-xs text-zinc-500 whitespace-nowrap">/ {{ $sub['qty_total'] }} diterima</span>
                                                                 </div>
                                                                 @if($sub['total_nominal'] > 0)
-                                                                <p class="w-28 text-right text-sm font-semibold text-zinc-900 shrink-0">
+                                                                <p class="w-28 text-right text-sm font-semibold text-zinc-900 shrink-0 whitespace-nowrap">
                                                                     Rp {{ number_format($sub['total_nominal'], 0, ',', '.') }}
                                                                 </p>
                                                                 @endif
@@ -1137,7 +1137,7 @@ new class extends Component {
                                                                 <flux:input wire:model="subQuantity" type="number" min="1" size="sm" placeholder="Qty" />
                                                             </div>
                                                             <div class="col-span-2">
-                                                                <flux:input wire:model="subPrice" type="number" min="0" size="sm" placeholder="Total harga" />
+                                                                 <x-rupiah-input model="subPrice" placeholder="0 (Opsional)" />
                                                             </div>
                                                             <div class="col-span-2 flex items-start gap-1">
                                                                 <flux:button type="submit" variant="primary" size="sm" class="flex-1"
