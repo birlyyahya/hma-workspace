@@ -1,7 +1,6 @@
 <?php
 
 use App\Jobs\DeleteProjectFilesJob;
-use App\Jobs\MoveProjectFilesJob;
 use App\Jobs\SyncProjectDocPathJob;
 use App\Models\ProjectFolder;
 use App\Models\ProjectFolderFile;
@@ -266,17 +265,12 @@ test('renaming an unknown document id is a no-op', function () {
         ->assertSet('renamingDocId', null);
 });
 
-test('renaming a non-empty folder locks it and dispatches the move job with prefixes', function () {
+test('renaming a folder with files applies instantly without touching storage or BEPM', function () {
     Queue::fake();
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id);
     $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak']);
-
-    mock(ProjectFileStorage::class)
-        ->shouldReceive('listUnder')
-        ->once()
-        ->with('projects_docs/2026/5/Kontrak/')
-        ->andReturn(['projects_docs/2026/5/Kontrak/kontrak.pdf']);
+    ProjectFolderFile::place(5, 2, $folder->id);
 
     Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
@@ -285,38 +279,33 @@ test('renaming a non-empty folder locks it and dispatches the move job with pref
         ->call('renameFolder')
         ->assertHasNoErrors();
 
-    expect($folder->refresh()->status)->toBe('moving');
+    $folder->refresh();
+    expect($folder->name)->toBe('Kontrak 2026')
+        ->and($folder->status)->toBeNull()
+        ->and(ProjectFolderFile::query()->where('doc_id', 2)->value('project_folder_id'))->toBe($folder->id);
 
-    Queue::assertPushed(MoveProjectFilesJob::class, function (MoveProjectFilesJob $job) use ($folder) {
-        return $job->folderId === $folder->id
-            && $job->oldPrefix === 'projects_docs/2026/5/Kontrak/'
-            && $job->newPrefix === 'projects_docs/2026/5/Kontrak 2026/'
-            && $job->folderUpdate === ['name' => 'Kontrak 2026'];
-    });
+    Queue::assertNothingPushed();
+    Http::assertNotSent(fn ($request) => $request->method() === 'PATCH');
 });
 
-test('renaming an empty folder updates it directly without dispatching a job', function () {
+test('moving a folder to another parent applies instantly and keeps its files mapped', function () {
     Queue::fake();
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id);
-    $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kosong']);
-
-    mock(ProjectFileStorage::class)
-        ->shouldReceive('listUnder')
-        ->once()
-        ->with('projects_docs/2026/5/Kosong/')
-        ->andReturn([]);
+    $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak']);
+    $target = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Arsip']);
+    ProjectFolderFile::place(5, 2, $folder->id);
 
     Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
-        ->call('startRenameFolder', $folder->id)
-        ->set('renameFolderName', 'Kosong Baru')
-        ->call('renameFolder')
-        ->assertHasNoErrors();
+        ->call('startMoveFolder', $folder->id)
+        ->set('moveFolderTargetId', $target->id)
+        ->call('moveFolder');
 
     $folder->refresh();
-    expect($folder->name)->toBe('Kosong Baru')
-        ->and($folder->status)->toBeNull();
+    expect($folder->parent_id)->toBe($target->id)
+        ->and($folder->status)->toBeNull()
+        ->and(ProjectFolderFile::query()->where('doc_id', 2)->value('project_folder_id'))->toBe($folder->id);
 
     Queue::assertNothingPushed();
 });

@@ -1,7 +1,6 @@
 <?php
 
 use App\Jobs\DeleteProjectFilesJob;
-use App\Jobs\MoveProjectFilesJob;
 use App\Jobs\SyncProjectDocPathJob;
 use App\Models\ProjectFolder;
 use App\Models\ProjectFolderFile;
@@ -453,9 +452,10 @@ new class extends Component
             return;
         }
 
-        $this->applyFolderChange($folder, ['name' => $newName], $this->replacedPrefixFor($folder, name: $newName));
+        $folder->update(['name' => $newName]);
         $this->reset('renamingFolderId', 'renameFolderName');
         Flux::modal('rename-folder-modal')->close();
+        Toaster::success('Folder diperbarui');
     }
 
     public function startMoveFolder(int $folderId): void
@@ -514,10 +514,10 @@ new class extends Component
             return;
         }
 
-        $newParentPath = $target !== null ? $target->path().'/' : '';
-        $this->applyFolderChange($folder, ['parent_id' => $targetId], $this->rootPrefix().$newParentPath.$folder->name.'/');
+        $folder->update(['parent_id' => $targetId]);
         $this->reset('movingFolderId', 'moveFolderTargetId');
         Flux::modal('move-folder-modal')->close();
+        Toaster::success('Folder diperbarui');
     }
 
     public function confirmDeleteFolder(int $folderId): void
@@ -989,49 +989,6 @@ new class extends Component
                 return mb_strtolower($base) === $needle
                     || mb_strtolower((string) ($doc['title'] ?? '')) === $needle;
             });
-    }
-
-    /**
-     * Prefix baru subtree folder setelah rename (nama diganti, parent tetap).
-     */
-    protected function replacedPrefixFor(ProjectFolder $folder, string $name): string
-    {
-        $parentPath = $folder->parent !== null ? $folder->parent->path().'/' : '';
-
-        return $this->rootPrefix().$parentPath.$name.'/';
-    }
-
-    /**
-     * Terapkan rename/pindah folder.
-     *
-     * Folder tanpa file fisik → cukup perbarui record folder (path anak
-     * dihitung dari parent, jadi tak ada objek S3 yang perlu dipindah).
-     * Folder berisi file → kunci folder lalu pindahkan objek S3 di background
-     * (Storage::move per file). Sinkronisasi path ke BEPM DITAHAN sampai
-     * endpoint update path dokumen tersedia — lihat MoveProjectFilesJob.
-     *
-     * @param  array{name?: string, parent_id?: ?int}  $folderUpdate
-     */
-    protected function applyFolderChange(ProjectFolder $folder, array $folderUpdate, string $newPrefix): void
-    {
-        $oldPrefix = $this->rootPrefix().$folder->path().'/';
-
-        // Daftar objek diambil langsung dari MinIO (bukan cache BEPM) agar
-        // rename beruntun tetap benar. Folder tanpa objek fisik cukup update
-        // record; path anak dihitung dari parent jadi tak ada yang dipindah.
-        $hasObjects = app(ProjectFileStorage::class)->listUnder($oldPrefix) !== [];
-
-        if (! $hasObjects) {
-            $folder->update($folderUpdate);
-            Toaster::success('Folder diperbarui');
-
-            return;
-        }
-
-        $folder->update(['status' => 'moving']);
-
-        MoveProjectFilesJob::dispatch((int) $this->id, $oldPrefix, $newPrefix, $folder->id, $folderUpdate);
-        Toaster::success('Perubahan folder diproses di background');
     }
 
     /**
