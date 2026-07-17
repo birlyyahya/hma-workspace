@@ -234,10 +234,14 @@ new class extends Component
                 $ext = strtolower(Str::afterLast($path, '.'));
                 $bytes = (float) ($sizes[$path] ?? $this->sizeToBytes((string) (data_get($doc, 'files.size') ?? '')));
                 $docId = (int) ($doc['id'] ?? 0);
+                $title = trim((string) ($doc['title'] ?? ''));
 
                 return [
                     'id' => $doc['id'],
-                    'name' => basename($path),
+                    // Nama tampilan = TITLE BEPM — suffix " (n)" anti-tabrakan
+                    // hanya ada di key fisik. Fallback basename key bila title
+                    // kosong.
+                    'name' => $title !== '' ? $title.($ext !== '' ? ".{$ext}" : '') : basename($path),
                     'key' => $path,
                     'ext' => $ext,
                     'category' => $this->categoryOf($ext),
@@ -617,29 +621,24 @@ new class extends Component
         );
 
         $newName = trim($this->renameDocName);
-        $newKey = $this->rootPrefix().$newName.'.'.$row['ext'];
 
-        if ($newKey === $row['key']) {
+        if ($newName === pathinfo($row['name'], PATHINFO_FILENAME)) {
             Flux::modal('rename-file-modal')->close();
 
             return;
         }
 
-        // BEPM menolak duplikat title lintas folder & ekstensi — cegah di sini
-        // supaya tidak terjadi rename MinIO yang sinkronisasinya pasti ditolak.
-        if ($this->nameTaken($newName, (int) $row['id'])) {
-            $this->addError('renameDocName', 'Nama itu sudah dipakai dokumen lain di project ini.');
+        // Nama duplikat diperbolehkan (PM tidak memvalidasi title lagi) —
+        // hanya KEY fisik yang diberi suffix bila tabrakan di MinIO.
+        $newKey = $this->uniqueFlatKey($newName.($row['ext'] !== '' ? '.'.$row['ext'] : ''), (int) $row['id']);
 
-            return;
-        }
-
-        if (! $this->moveObject($row['key'], $newKey)) {
+        if ($newKey !== $row['key'] && ! $this->moveObject($row['key'], $newKey)) {
             Toaster::error('Rename gagal di storage');
 
             return;
         }
 
-        $synced = $this->syncDocPath((int) $row['id'], $newKey, ['title' => trim($this->renameDocName)]);
+        $synced = $this->syncDocPath((int) $row['id'], $newKey, ['title' => $newName]);
 
         app(ProjectCache::class)->flushDocs((int) $this->id);
         unset($this->files);
@@ -973,22 +972,33 @@ new class extends Component
     }
 
     /**
-     * Apakah sebuah nama (tanpa ekstensi) sudah dipakai dokumen lain di
-     * project ini — dibandingkan terhadap basename file maupun title BEPM,
-     * case-insensitive.
+     * Object key flat yang belum dipakai dokumen lain di project — beri
+     * suffix " (n)" bila nama fisiknya tabrakan di MinIO.
      */
-    protected function nameTaken(string $name, int $exceptDocId): bool
+    protected function uniqueFlatKey(string $filename, int $exceptDocId): string
     {
-        $needle = mb_strtolower($name);
-
-        return collect($this->allDocs())
+        $existing = collect($this->allDocs())
             ->reject(fn (array $doc) => (int) ($doc['id'] ?? 0) === $exceptDocId)
-            ->contains(function (array $doc) use ($needle) {
-                $base = pathinfo($this->keyFromUrl((string) data_get($doc, 'files.url', '')), PATHINFO_FILENAME);
+            ->map(fn (array $doc) => $this->keyFromUrl((string) data_get($doc, 'files.url', '')))
+            ->filter()
+            ->flip();
 
-                return mb_strtolower($base) === $needle
-                    || mb_strtolower((string) ($doc['title'] ?? '')) === $needle;
-            });
+        $key = $this->rootPrefix().$filename;
+
+        if (! isset($existing[$key])) {
+            return $key;
+        }
+
+        $ext = pathinfo($filename, PATHINFO_EXTENSION);
+        $base = pathinfo($filename, PATHINFO_FILENAME);
+        $suffix = 1;
+
+        do {
+            $key = $this->rootPrefix().$base." ({$suffix})".($ext !== '' ? ".{$ext}" : '');
+            $suffix++;
+        } while (isset($existing[$key]));
+
+        return $key;
     }
 
     /**

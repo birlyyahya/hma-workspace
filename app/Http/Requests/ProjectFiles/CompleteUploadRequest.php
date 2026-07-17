@@ -19,6 +19,7 @@ class CompleteUploadRequest extends ProjectFileRequest
             'parts.*.part_number' => ['required', 'integer', 'min:1', "max:{$maxParts}"],
             'parts.*.etag' => ['required', 'string', 'max:255'],
             'title' => ['nullable', 'string', 'min:5', 'max:255'],
+            'filename' => ['nullable', 'string', 'max:255'],
             'admin_doc_category_id' => ['nullable', 'integer'],
             'folder_id' => [
                 'nullable',

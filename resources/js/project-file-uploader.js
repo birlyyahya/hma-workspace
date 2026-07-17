@@ -105,6 +105,7 @@ export function createProjectFileUploader({ projectId, partSize, getFolderId, on
         async completeMultipartUpload(file, { uploadId, key, parts }) {
             const json = await jsonRequest('POST', `${base}/${encodeURIComponent(uploadId)}/complete`, {
                 key,
+                filename: file.name,
                 folder_id: folderIds.get(uploadId) ?? null,
                 parts: parts.map((part) => ({
                     part_number: part.PartNumber,

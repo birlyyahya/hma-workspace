@@ -15,6 +15,7 @@ use App\Services\ProjectWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Control plane direct multipart upload project files (browser → MinIO).
@@ -98,11 +99,17 @@ class ProjectFileUploadController extends Controller
 
         $this->storage->completeMultipart($key, $uploadId, $parts);
 
+        // Nama asli dari client dipakai untuk title/original_name supaya
+        // suffix " (n)" pada key (anti-tabrakan MinIO) tidak bocor ke tampilan.
+        $original = $request->validated('filename') !== null
+            ? $this->sanitizeFilename((string) $request->validated('filename'))
+            : $name;
+
         $payload = [
-            'title' => (string) ($request->validated('title') ?? pathinfo($name, PATHINFO_FILENAME)),
+            'title' => (string) ($request->validated('title') ?? pathinfo($original, PATHINFO_FILENAME)),
             'admin_doc_category_id' => $categoryId,
             'filename' => $key,
-            'original_name' => $name,
+            'original_name' => $original,
             'keyword' => $this->keywordsFor($project, $key, $folder?->path()),
         ];
 
@@ -180,40 +187,48 @@ class ProjectFileUploadController extends Controller
     }
 
     /**
-     * Hindari tabrakan nama dengan dokumen yang sudah terdaftar di BEPM
-     * dengan suffix " (n)" ala file manager.
-     *
-     * BEPM menolak duplikat berdasarkan TITLE (nama tanpa ekstensi, lintas
-     * folder & ekstensi — "bengkulu.pdf" vs "bengkulu.png" tabrakan), bukan
-     * object key. Karena itu yang dibandingkan adalah basename tanpa ekstensi
-     * terhadap seluruh title & nama file dokumen project. `files.url` dari
-     * BEPM berbentuk URL-encoded, jadi harus di-decode dulu.
+     * Hindari tabrakan OBJECT KEY (namespace flat per project) dengan suffix
+     * " (n)". Title sengaja TIDAK ikut di-suffix — BEPM sudah tidak
+     * memvalidasi duplikat title, jadi dua file boleh tampil bernama sama di
+     * folder berbeda; suffix hanya urusan alamat fisik di MinIO.
      */
     private function uniqueKey(int $project, string $prefix, string $filename): string
     {
-        $taken = collect($this->cache->documentsFor($project))
-            ->flatMap(fn (array $doc) => [
-                mb_strtolower(pathinfo(rawurldecode((string) data_get($doc, 'files.url', '')), PATHINFO_FILENAME)),
-                mb_strtolower((string) data_get($doc, 'title', '')),
-            ])
+        $existing = collect($this->cache->documentsFor($project))
+            ->map(fn (array $doc) => $this->keyFromUrl((string) data_get($doc, 'files.url', '')))
             ->filter()
             ->flip();
 
-        $extension = pathinfo($filename, PATHINFO_EXTENSION);
-        $base = pathinfo($filename, PATHINFO_FILENAME);
+        $key = $prefix.$filename;
 
-        if (! isset($taken[mb_strtolower($base)])) {
-            return $prefix.$filename;
+        if (! isset($existing[$key])) {
+            return $key;
         }
 
+        $extension = pathinfo($filename, PATHINFO_EXTENSION);
+        $base = pathinfo($filename, PATHINFO_FILENAME);
         $suffix = 1;
 
         do {
-            $candidate = $base." ({$suffix})";
+            $key = $prefix.$base." ({$suffix})".($extension !== '' ? ".{$extension}" : '');
             $suffix++;
-        } while (isset($taken[mb_strtolower($candidate)]));
+        } while (isset($existing[$key]));
 
-        return $prefix.$candidate.($extension !== '' ? ".{$extension}" : '');
+        return $key;
+    }
+
+    /**
+     * Object key MinIO dari `files.url` BEPM (ter-encode, bisa URL penuh).
+     */
+    private function keyFromUrl(string $url): string
+    {
+        $decoded = rawurldecode($url);
+
+        if (str_contains($decoded, '/storage/')) {
+            $decoded = Str::after($decoded, '/storage/');
+        }
+
+        return ltrim($decoded, '/');
     }
 
     /**

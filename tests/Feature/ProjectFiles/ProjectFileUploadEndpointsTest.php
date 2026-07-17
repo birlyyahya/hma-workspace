@@ -219,7 +219,7 @@ test('a duplicate filename gets a numeric suffix', function () {
         ->assertJsonPath('key', 'projects_docs/2026/5/laporan (2).pdf');
 });
 
-test('a duplicate basename with a different extension gets a numeric suffix', function () {
+test('only an exact key collision gets a suffix — same basename with another extension does not', function () {
     $leader = User::factory()->create();
     fakeBepmForUpload(leaderId: $leader->id, docs: [
         ['id' => 1, 'title' => 'bengkulu', 'files' => ['url' => 'projects_docs%2F2026%2F5%2Fbengkulu.pdf']],
@@ -228,7 +228,7 @@ test('a duplicate basename with a different extension gets a numeric suffix', fu
     mock(ProjectFileStorage::class)
         ->shouldReceive('initiateMultipart')
         ->once()
-        ->with('projects_docs/2026/5/bengkulu (1).png', 'image/png')
+        ->with('projects_docs/2026/5/bengkulu.png', 'image/png')
         ->andReturn('upload-abc');
 
     $this->actingAs($leader)
@@ -238,10 +238,10 @@ test('a duplicate basename with a different extension gets a numeric suffix', fu
             'mime' => 'image/png',
         ])
         ->assertCreated()
-        ->assertJsonPath('key', 'projects_docs/2026/5/bengkulu (1).png');
+        ->assertJsonPath('key', 'projects_docs/2026/5/bengkulu.png');
 });
 
-test('a filename colliding with an existing BEPM document title gets a numeric suffix', function () {
+test('a filename matching an existing BEPM title is not suffixed when the key differs', function () {
     $leader = User::factory()->create();
     fakeBepmForUpload(leaderId: $leader->id, docs: [
         ['id' => 1, 'title' => 'Laporan Akhir', 'files' => ['url' => 'projects_docs%2F2026%2F5%2Fdok-lain.pdf']],
@@ -250,7 +250,7 @@ test('a filename colliding with an existing BEPM document title gets a numeric s
     mock(ProjectFileStorage::class)
         ->shouldReceive('initiateMultipart')
         ->once()
-        ->with('projects_docs/2026/5/Laporan Akhir (1).pdf', 'application/pdf')
+        ->with('projects_docs/2026/5/Laporan Akhir.pdf', 'application/pdf')
         ->andReturn('upload-abc');
 
     $this->actingAs($leader)
@@ -260,7 +260,30 @@ test('a filename colliding with an existing BEPM document title gets a numeric s
             'mime' => 'application/pdf',
         ])
         ->assertCreated()
-        ->assertJsonPath('key', 'projects_docs/2026/5/Laporan Akhir (1).pdf');
+        ->assertJsonPath('key', 'projects_docs/2026/5/Laporan Akhir.pdf');
+});
+
+test('complete keeps the title clean when the key carries an anti-collision suffix', function () {
+    $leader = User::factory()->create();
+    fakeBepmForUpload(leaderId: $leader->id);
+
+    mock(ProjectFileStorage::class)->shouldReceive('completeMultipart')->once();
+
+    $this->actingAs($leader)
+        ->postJson(route('project-files.uploads.complete', ['project' => 5, 'uploadId' => 'upload-abc']), [
+            'key' => 'projects_docs/2026/5/laporan (1).pdf',
+            'filename' => 'laporan.pdf',
+            'parts' => [
+                ['part_number' => 1, 'etag' => '"etag-1"'],
+            ],
+        ])
+        ->assertCreated();
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && str_ends_with($request->url(), 'admin-docs')
+        && $request['filename'] === 'projects_docs/2026/5/laporan (1).pdf'
+        && $request['title'] === 'laporan'
+        && $request['original_name'] === 'laporan.pdf');
 });
 
 // ----------------------------------------------------------------------- Sign

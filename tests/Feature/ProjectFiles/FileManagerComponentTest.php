@@ -122,6 +122,49 @@ test('file sizes come from MinIO, not the zero size BEPM reports', function () {
         ->and($row['size_bytes'])->toBe(3.0 * 1024 * 1024);
 });
 
+test('two documents can share the same display name — the suffix lives only in the key', function () {
+    $leader = User::factory()->create();
+    fakeBepmForFileManager(leaderId: $leader->id, docs: [
+        ['id' => 1, 'title' => 'laporan', 'created_at' => '2026-06-01T00:00:00Z', 'admin_doc_category_id' => 7, 'files' => ['url' => 'projects_docs/2026/5/laporan.pdf', 'size' => '2 MB']],
+        ['id' => 2, 'title' => 'laporan', 'created_at' => '2026-06-02T00:00:00Z', 'admin_doc_category_id' => 7, 'files' => ['url' => 'projects_docs/2026/5/laporan (1).pdf', 'size' => '1 MB']],
+    ]);
+
+    $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak']);
+    ProjectFolderFile::place(5, 2, $folder->id);
+
+    $component = Volt::actingAs($leader)->test('project.components.file-manager', ['id' => 5]);
+
+    expect(collect($component->get('files'))->firstWhere('id', 1)['name'])->toBe('laporan.pdf');
+
+    $component->call('openFolder', $folder->id);
+
+    $row = collect($component->get('files'))->firstWhere('id', 2);
+    expect($row['name'])->toBe('laporan.pdf')
+        ->and($row['key'])->toBe('projects_docs/2026/5/laporan (1).pdf');
+});
+
+test('renaming to a taken name suffixes only the physical key and keeps the title clean', function () {
+    $leader = User::factory()->create();
+    fakeBepmForFileManager(leaderId: $leader->id);
+
+    mock(ProjectFileStorage::class)
+        ->shouldReceive('move')
+        ->once()
+        ->with('projects_docs/2026/5/kontrak.pdf', 'projects_docs/2026/5/laporan (1).pdf');
+
+    Volt::actingAs($leader)
+        ->test('project.components.file-manager', ['id' => 5])
+        ->call('startRenameDoc', 2)
+        ->set('renameDocName', 'laporan')
+        ->call('renameDoc')
+        ->assertHasNoErrors();
+
+    Http::assertSent(fn ($request) => $request->method() === 'PATCH'
+        && str_contains($request->url(), 'admin-docs/2')
+        && $request['file'] === 'projects_docs/2026/5/laporan (1).pdf'
+        && $request['title'] === 'laporan');
+});
+
 test('opening a folder shows only the files mapped to it', function () {
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id);
@@ -569,7 +612,7 @@ test('a percent-encoded BEPM url is decoded to the real object key', function ()
 
     Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
-        ->assertSee('Pengajuan Dana (1).pdf')
+        ->assertSee('survei.pdf')
         ->call('openPreview', 10)
         ->assertSet('previewUrl', 'https://minio/presigned');
 });
