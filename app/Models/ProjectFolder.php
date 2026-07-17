@@ -44,6 +44,11 @@ class ProjectFolder extends Model
         return $this->hasMany(self::class, 'parent_id');
     }
 
+    public function files(): HasMany
+    {
+        return $this->hasMany(ProjectFolderFile::class, 'project_folder_id');
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
