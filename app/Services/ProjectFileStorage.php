@@ -47,13 +47,13 @@ class ProjectFileStorage
     public function signParts(string $key, string $uploadId, array $partNumbers): array
     {
         try {
-            $client = $this->client();
+            $client = $this->signingClient();
             $expires = '+'.((int) config('uploads.project_files.presign_ttl')).' minutes';
             $urls = [];
 
             foreach ($partNumbers as $partNumber) {
                 $command = $client->getCommand('UploadPart', [
-                    'Bucket' => $this->bucket(),
+                    'Bucket' => $this->signingBucket(),
                     'Key' => $key,
                     'UploadId' => $uploadId,
                     'PartNumber' => (int) $partNumber,
@@ -110,12 +110,12 @@ class ProjectFileStorage
     public function presignedGetUrl(string $key, int $ttlMinutes = 10): string
     {
         try {
-            $command = $this->client()->getCommand('GetObject', [
-                'Bucket' => $this->bucket(),
+            $command = $this->signingClient()->getCommand('GetObject', [
+                'Bucket' => $this->signingBucket(),
                 'Key' => $key,
             ]);
 
-            return (string) $this->client()
+            return (string) $this->signingClient()
                 ->createPresignedRequest($command, "+{$ttlMinutes} minutes")
                 ->getUri();
         } catch (\Throwable $e) {
@@ -254,25 +254,44 @@ class ProjectFileStorage
         return $aborted;
     }
 
+    /**
+     * Klien endpoint INTERNAL — untuk semua operasi server-side (create/complete
+     * multipart, copy/move, exists, delete, list).
+     */
     private function client(): S3Client
     {
-        return $this->adapter()->getClient();
+        return $this->adapterFor((string) config('uploads.project_files.disk'))->getClient();
     }
 
     private function bucket(): string
     {
-        return (string) $this->adapter()->getConfig()['bucket'];
+        return (string) $this->adapterFor((string) config('uploads.project_files.disk'))->getConfig()['bucket'];
     }
 
-    private function adapter(): AwsS3V3Adapter
+    /**
+     * Klien endpoint PUBLIK — HANYA untuk menandatangani presigned URL yang
+     * diambil browser. Penandatanganan murni kripto lokal (tanpa jaringan),
+     * jadi server tak perlu bisa menjangkau endpoint publik untuk sign.
+     */
+    private function signingClient(): S3Client
     {
-        $disk = Storage::disk((string) config('uploads.project_files.disk'));
+        return $this->adapterFor((string) config('uploads.project_files.signing_disk'))->getClient();
+    }
 
-        if (! $disk instanceof AwsS3V3Adapter) {
-            throw new \RuntimeException('Disk project files bukan disk S3 — periksa config uploads.project_files.disk.');
+    private function signingBucket(): string
+    {
+        return (string) $this->adapterFor((string) config('uploads.project_files.signing_disk'))->getConfig()['bucket'];
+    }
+
+    private function adapterFor(string $disk): AwsS3V3Adapter
+    {
+        $instance = Storage::disk($disk);
+
+        if (! $instance instanceof AwsS3V3Adapter) {
+            throw new \RuntimeException("Disk '{$disk}' bukan disk S3 — periksa config filesystems & uploads.project_files.");
         }
 
-        return $disk;
+        return $instance;
     }
 
     /**

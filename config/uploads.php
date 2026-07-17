@@ -16,7 +16,13 @@ return [
     'project_files' => [
 
         // Disk filesystem yang menunjuk bucket MinIO khusus project files.
+        // Endpoint internal — dipakai untuk semua operasi server-side.
         'disk' => env('PROJECT_FILES_DISK', 'project-files'),
+
+        // Disk untuk MENANDATANGANI presigned URL (byte browser ↔ MinIO).
+        // Endpoint publik yang terjangkau browser. Bila sama dengan disk
+        // internal, presigned & operasi server-side memakai endpoint sama.
+        'signing_disk' => env('PROJECT_FILES_SIGNING_DISK', 'project-files-public'),
 
         // Ukuran maksimum satu file (bytes). Default 2 GB.
         'max_file_size' => (int) env('PROJECT_FILES_MAX_SIZE', 2 * 1024 * 1024 * 1024),

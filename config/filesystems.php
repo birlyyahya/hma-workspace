@@ -74,6 +74,23 @@ return [
             'report' => false,
         ],
 
+        // Kembaran project-files yang hanya berbeda endpoint: memakai endpoint
+        // PUBLIK (terjangkau browser) untuk MENANDATANGANI presigned URL. Byte
+        // upload/download browser lewat sini; operasi server-side tetap lewat
+        // disk 'project-files' (endpoint internal). Fallback ke AWS_ENDPOINT
+        // bila AWS_PUBLIC_ENDPOINT tidak diisi (perilaku single-endpoint lama).
+        'project-files-public' => [
+            'driver' => 's3',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION'),
+            'bucket' => env('AWS_PROJECT_FILES_BUCKET', env('AWS_BUCKET')),
+            'endpoint' => env('AWS_PUBLIC_ENDPOINT', env('AWS_ENDPOINT')),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', true),
+            'throw' => true,
+            'report' => false,
+        ],
+
     ],
 
     /*
