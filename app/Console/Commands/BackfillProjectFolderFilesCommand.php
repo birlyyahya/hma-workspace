@@ -22,13 +22,54 @@ use Illuminate\Support\Str;
  */
 class BackfillProjectFolderFilesCommand extends Command
 {
-    protected $signature = 'projectfiles:backfill-folders {project : ID project} {--dry-run : Tampilkan rencana tanpa menulis mapping}';
+    protected $signature = 'projectfiles:backfill-folders {project? : ID project} {--all : Proses semua project yang punya folder di DB workspace} {--dry-run : Tampilkan rencana tanpa menulis mapping}';
 
     protected $description = 'Isi mapping folder virtual dari path object key lama (tanpa menyentuh MinIO/BEPM)';
 
     public function handle(ProjectCache $cache): int
     {
-        $projectId = (int) $this->argument('project');
+        $dryRun = (bool) $this->option('dry-run');
+
+        if ($this->option('all')) {
+            // Hanya project yang punya folder di DB yang mungkin menyimpan
+            // path folder di key lamanya — file tanpa folder sudah di root.
+            $projectIds = ProjectFolder::query()
+                ->distinct()
+                ->orderBy('project_id')
+                ->pluck('project_id');
+
+            $this->info("Memproses {$projectIds->count()} project yang punya folder…");
+
+            $failures = 0;
+
+            foreach ($projectIds as $projectId) {
+                $this->line("== Project #{$projectId}");
+
+                if ($this->backfillProject($cache, (int) $projectId, $dryRun) !== self::SUCCESS) {
+                    $failures++;
+                }
+            }
+
+            if ($failures > 0) {
+                $this->error("{$failures} project gagal diproses — lihat peringatan di atas.");
+
+                return self::FAILURE;
+            }
+
+            return self::SUCCESS;
+        }
+
+        if ($this->argument('project') === null) {
+            $this->error('Sebutkan ID project atau pakai --all.');
+
+            return self::FAILURE;
+        }
+
+        return $this->backfillProject($cache, (int) $this->argument('project'), $dryRun);
+    }
+
+    private function backfillProject(ProjectCache $cache, int $projectId, bool $dryRun): int
+    {
         $project = $cache->projectFor($projectId);
 
         if ($project === []) {
@@ -39,7 +80,6 @@ class BackfillProjectFolderFilesCommand extends Command
 
         $prefix = 'projects_docs/'.project_storage_year($project)."/{$projectId}/";
         $folderIdByPath = $this->folderIdsByPath($projectId);
-        $dryRun = (bool) $this->option('dry-run');
 
         $alreadyMapped = ProjectFolderFile::query()
             ->where('project_id', $projectId)
