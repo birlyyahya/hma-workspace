@@ -126,7 +126,9 @@ class ReconcileProjectFilesCommand extends Command
         $registeredCount = $failed = 0;
 
         foreach ($orphans as $key) {
-            $name = basename($key);
+            // Prefix ULID pada key baru dibuang — title/original_name harus
+            // berupa nama yang bermakna, bukan alamat fisik.
+            $name = (string) preg_replace('/^[0-9a-hjkmnp-tv-z]{26}-/', '', basename($key));
             $this->line("DAFTAR objek yatim: {$key}");
 
             if ($dryRun) {
@@ -140,7 +142,7 @@ class ReconcileProjectFilesCommand extends Command
                 'admin_doc_category_id' => $categoryId,
                 'filename' => $key,
                 'original_name' => $name,
-                'keyword' => project_doc_keywords($project, $projectId, $key),
+                'keyword' => project_doc_keywords($project, $projectId, $key, null, $name),
             ]);
 
             $result['ok'] ? $registeredCount++ : $failed++;

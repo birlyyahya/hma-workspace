@@ -31,17 +31,19 @@ class ProjectFileUploadController extends Controller
     ) {}
 
     /**
-     * Mulai multipart upload. Object key SELALU flat di root project
-     * (projects_docs/{tahun}/{project}/{nama}) — folder murni virtual, lokasi
-     * file dicatat di tabel project_folder_files saat complete, bukan di key.
+     * Mulai multipart upload. Object key SELALU flat di root project dengan
+     * prefix ULID: projects_docs/{tahun}/{project}/{ulid}-{nama}. Folder murni
+     * virtual (dicatat di project_folder_files saat complete), dan ULID
+     * menjamin key unik tanpa pengecekan dedup — kebal race dua upload
+     * bernama sama yang saling menimpa. Nama asli tetap dipertahankan di key
+     * demi keterbacaan operasional; nama tampilan datang dari title BEPM.
      */
     public function initiate(InitiateUploadRequest $request, int $project): JsonResponse
     {
         $filename = $this->sanitizeFilename((string) $request->validated('filename'));
 
         $year = project_storage_year($this->cache->projectFor($project));
-        $prefix = "projects_docs/{$year}/{$project}/";
-        $key = $this->uniqueKey($project, $prefix, $filename);
+        $key = "projects_docs/{$year}/{$project}/".strtolower((string) Str::ulid())."-{$filename}";
 
         $uploadId = $this->storage->initiateMultipart($key, (string) $request->validated('mime'));
 
@@ -110,7 +112,7 @@ class ProjectFileUploadController extends Controller
             'admin_doc_category_id' => $categoryId,
             'filename' => $key,
             'original_name' => $original,
-            'keyword' => $this->keywordsFor($project, $key, $folder?->path()),
+            'keyword' => $this->keywordsFor($project, $key, $folder?->path(), $original),
         ];
 
         $result = $this->writer->registerDocument($project, $payload);
@@ -187,60 +189,16 @@ class ProjectFileUploadController extends Controller
     }
 
     /**
-     * Hindari tabrakan OBJECT KEY (namespace flat per project) dengan suffix
-     * " (n)". Title sengaja TIDAK ikut di-suffix — BEPM sudah tidak
-     * memvalidasi duplikat title, jadi dua file boleh tampil bernama sama di
-     * folder berbeda; suffix hanya urusan alamat fisik di MinIO.
-     */
-    private function uniqueKey(int $project, string $prefix, string $filename): string
-    {
-        $existing = collect($this->cache->documentsFor($project))
-            ->map(fn (array $doc) => $this->keyFromUrl((string) data_get($doc, 'files.url', '')))
-            ->filter()
-            ->flip();
-
-        $key = $prefix.$filename;
-
-        if (! isset($existing[$key])) {
-            return $key;
-        }
-
-        $extension = pathinfo($filename, PATHINFO_EXTENSION);
-        $base = pathinfo($filename, PATHINFO_FILENAME);
-        $suffix = 1;
-
-        do {
-            $key = $prefix.$base." ({$suffix})".($extension !== '' ? ".{$extension}" : '');
-            $suffix++;
-        } while (isset($existing[$key]));
-
-        return $key;
-    }
-
-    /**
-     * Object key MinIO dari `files.url` BEPM (ter-encode, bisa URL penuh).
-     */
-    private function keyFromUrl(string $url): string
-    {
-        $decoded = rawurldecode($url);
-
-        if (str_contains($decoded, '/storage/')) {
-            $decoded = Str::after($decoded, '/storage/');
-        }
-
-        return ltrim($decoded, '/');
-    }
-
-    /**
      * Kata kunci otomatis untuk dokumen (parameter wajib BEPM). Lihat
-     * project_doc_keywords() untuk aturannya. $folderPath dipasok eksplisit
-     * karena key flat tidak lagi memuat segmen folder.
+     * project_doc_keywords() untuk aturannya. $folderPath dan $displayName
+     * dipasok eksplisit karena key flat ber-ULID tidak lagi memuat segmen
+     * folder maupun nama yang bermakna.
      *
      * @return array<int, string>
      */
-    private function keywordsFor(int $project, string $key, ?string $folderPath = null): array
+    private function keywordsFor(int $project, string $key, ?string $folderPath = null, ?string $displayName = null): array
     {
-        return project_doc_keywords($this->cache->projectFor($project), $project, $key, $folderPath ?? '');
+        return project_doc_keywords($this->cache->projectFor($project), $project, $key, $folderPath ?? '', $displayName);
     }
 
     /**

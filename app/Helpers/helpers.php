@@ -93,12 +93,14 @@ if (! function_exists('project_doc_keywords')) {
      * $folderPath (path folder virtual, mis. "Kontrak/Addendum") dipakai bila
      * diberikan — key baru berbentuk flat sehingga segmen folder tidak lagi
      * bisa diturunkan dari key; tanpa argumen ini segmen diambil dari key
-     * (perilaku lama untuk data legacy/rekonsiliasi).
+     * (perilaku lama untuk data legacy/rekonsiliasi). $displayName menimpa
+     * nama file dari key — key baru berprefix ULID sehingga basename-nya
+     * bukan lagi nama yang bermakna.
      *
      * @param  array<string, mixed>  $project
      * @return array<int, string>
      */
-    function project_doc_keywords(array $project, int $projectId, string $key, ?string $folderPath = null): array
+    function project_doc_keywords(array $project, int $projectId, string $key, ?string $folderPath = null, ?string $displayName = null): array
     {
         $year = project_storage_year($project);
         $relative = \Illuminate\Support\Str::after($key, "projects_docs/{$year}/{$projectId}/");
@@ -107,6 +109,10 @@ if (! function_exists('project_doc_keywords')) {
 
         if ($folderPath !== null) {
             $segments = $folderPath === '' ? [] : explode('/', $folderPath);
+        }
+
+        if ($displayName !== null && $displayName !== '') {
+            $filename = $displayName;
         }
 
         return collect([

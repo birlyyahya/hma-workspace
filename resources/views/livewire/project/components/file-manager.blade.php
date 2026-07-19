@@ -237,10 +237,12 @@ new class extends Component
 
                 return [
                     'id' => $doc['id'],
-                    // Nama tampilan = TITLE BEPM — suffix " (n)" anti-tabrakan
-                    // hanya ada di key fisik. Fallback basename key bila title
-                    // kosong.
-                    'name' => $title !== '' ? $title.($ext !== '' ? ".{$ext}" : '') : basename($path),
+                    // Nama tampilan = TITLE BEPM (key fisik hanyalah alamat).
+                    // Fallback basename key bila title kosong, dengan prefix
+                    // ULID dibuang agar tetap terbaca.
+                    'name' => $title !== ''
+                        ? $title.($ext !== '' ? ".{$ext}" : '')
+                        : (string) preg_replace('/^[0-9a-hjkmnp-tv-z]{26}-/', '', basename($path)),
                     'key' => $path,
                     'ext' => $ext,
                     'category' => $this->categoryOf($ext),

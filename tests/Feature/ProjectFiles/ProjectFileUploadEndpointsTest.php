@@ -79,17 +79,18 @@ test('a user with project view-all scope can initiate an upload', function () {
 
 // ------------------------------------------------------------------- Initiate
 
-test('the project leader can initiate and receives upload metadata', function () {
+test('the project leader can initiate and receives a ULID-prefixed flat key', function () {
     $leader = User::factory()->create();
     fakeBepmForUpload(leaderId: $leader->id);
 
     mock(ProjectFileStorage::class)
         ->shouldReceive('initiateMultipart')
         ->once()
-        ->with('projects_docs/2026/5/laporan.pdf', 'application/pdf')
+        ->withArgs(fn (string $key, string $mime) => preg_match('#^projects_docs/2026/5/[0-9a-hjkmnp-tv-z]{26}-laporan\.pdf$#', $key) === 1
+            && $mime === 'application/pdf')
         ->andReturn('upload-abc');
 
-    $this->actingAs($leader)
+    $response = $this->actingAs($leader)
         ->postJson(route('project-files.uploads.initiate', ['project' => 5]), [
             'filename' => 'laporan.pdf',
             'size' => 1000,
@@ -98,9 +99,11 @@ test('the project leader can initiate and receives upload metadata', function ()
         ->assertCreated()
         ->assertJson([
             'upload_id' => 'upload-abc',
-            'key' => 'projects_docs/2026/5/laporan.pdf',
             'part_size' => (int) config('uploads.project_files.part_size'),
         ]);
+
+    expect((string) $response->json('key'))
+        ->toMatch('#^projects_docs/2026/5/[0-9a-hjkmnp-tv-z]{26}-laporan\.pdf$#');
 });
 
 test('a disallowed extension is rejected', function () {
@@ -158,18 +161,20 @@ test('the object key stays flat even when uploading into a folder', function () 
     mock(ProjectFileStorage::class)
         ->shouldReceive('initiateMultipart')
         ->once()
-        ->with('projects_docs/2026/5/laporan.pdf', 'application/pdf')
         ->andReturn('upload-abc');
 
-    $this->actingAs($leader)
+    $response = $this->actingAs($leader)
         ->postJson(route('project-files.uploads.initiate', ['project' => 5]), [
             'filename' => 'laporan.pdf',
             'size' => 1000,
             'mime' => 'application/pdf',
             'folder_id' => $child->id,
         ])
-        ->assertCreated()
-        ->assertJsonPath('key', 'projects_docs/2026/5/laporan.pdf');
+        ->assertCreated();
+
+    expect((string) $response->json('key'))
+        ->toMatch('#^projects_docs/2026/5/[0-9a-hjkmnp-tv-z]{26}-laporan\.pdf$#')
+        ->not->toContain('Kontrak');
 });
 
 test('path traversal characters in the filename are sanitized', function () {
@@ -196,71 +201,28 @@ test('path traversal characters in the filename are sanitized', function () {
         ->and($key)->toEndWith('.pdf');
 });
 
-test('a duplicate filename gets a numeric suffix', function () {
+test('two uploads with the same filename always receive distinct keys', function () {
     $leader = User::factory()->create();
     fakeBepmForUpload(leaderId: $leader->id, docs: [
         ['id' => 1, 'title' => 'laporan', 'files' => ['url' => 'projects_docs/2026/5/laporan.pdf']],
-        ['id' => 2, 'title' => 'laporan (1)', 'files' => ['url' => 'projects_docs/2026/5/laporan (1).pdf']],
     ]);
 
     mock(ProjectFileStorage::class)
         ->shouldReceive('initiateMultipart')
-        ->once()
-        ->with('projects_docs/2026/5/laporan (2).pdf', 'application/pdf')
+        ->twice()
         ->andReturn('upload-abc');
 
-    $this->actingAs($leader)
+    $keys = collect(range(1, 2))->map(fn () => (string) $this->actingAs($leader)
         ->postJson(route('project-files.uploads.initiate', ['project' => 5]), [
             'filename' => 'laporan.pdf',
             'size' => 1000,
             'mime' => 'application/pdf',
         ])
         ->assertCreated()
-        ->assertJsonPath('key', 'projects_docs/2026/5/laporan (2).pdf');
-});
+        ->json('key'));
 
-test('only an exact key collision gets a suffix — same basename with another extension does not', function () {
-    $leader = User::factory()->create();
-    fakeBepmForUpload(leaderId: $leader->id, docs: [
-        ['id' => 1, 'title' => 'bengkulu', 'files' => ['url' => 'projects_docs%2F2026%2F5%2Fbengkulu.pdf']],
-    ]);
-
-    mock(ProjectFileStorage::class)
-        ->shouldReceive('initiateMultipart')
-        ->once()
-        ->with('projects_docs/2026/5/bengkulu.png', 'image/png')
-        ->andReturn('upload-abc');
-
-    $this->actingAs($leader)
-        ->postJson(route('project-files.uploads.initiate', ['project' => 5]), [
-            'filename' => 'bengkulu.png',
-            'size' => 1000,
-            'mime' => 'image/png',
-        ])
-        ->assertCreated()
-        ->assertJsonPath('key', 'projects_docs/2026/5/bengkulu.png');
-});
-
-test('a filename matching an existing BEPM title is not suffixed when the key differs', function () {
-    $leader = User::factory()->create();
-    fakeBepmForUpload(leaderId: $leader->id, docs: [
-        ['id' => 1, 'title' => 'Laporan Akhir', 'files' => ['url' => 'projects_docs%2F2026%2F5%2Fdok-lain.pdf']],
-    ]);
-
-    mock(ProjectFileStorage::class)
-        ->shouldReceive('initiateMultipart')
-        ->once()
-        ->with('projects_docs/2026/5/Laporan Akhir.pdf', 'application/pdf')
-        ->andReturn('upload-abc');
-
-    $this->actingAs($leader)
-        ->postJson(route('project-files.uploads.initiate', ['project' => 5]), [
-            'filename' => 'Laporan Akhir.pdf',
-            'size' => 1000,
-            'mime' => 'application/pdf',
-        ])
-        ->assertCreated()
-        ->assertJsonPath('key', 'projects_docs/2026/5/Laporan Akhir.pdf');
+    expect($keys->unique()->count())->toBe(2)
+        ->and($keys->first())->toMatch('#^projects_docs/2026/5/[0-9a-hjkmnp-tv-z]{26}-laporan\.pdf$#');
 });
 
 test('complete keeps the title clean when the key carries an anti-collision suffix', function () {
