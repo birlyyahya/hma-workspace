@@ -7,6 +7,7 @@ use App\Http\Requests\ProjectFiles\CompleteUploadRequest;
 use App\Http\Requests\ProjectFiles\InitiateUploadRequest;
 use App\Http\Requests\ProjectFiles\SignUploadPartsRequest;
 use App\Jobs\RegisterProjectDocJob;
+use App\Models\ProjectFileSize;
 use App\Models\ProjectFolder;
 use App\Models\ProjectFolderFile;
 use App\Services\ProjectCache;
@@ -81,6 +82,7 @@ class ProjectFileUploadController extends Controller
 
         $folderId = $request->validated('folder_id') !== null ? (int) $request->validated('folder_id') : null;
         $folder = $folderId !== null ? ProjectFolder::query()->find($folderId) : null;
+        $sizeBytes = $request->validated('size') !== null ? (int) $request->validated('size') : null;
 
         $categoryId = $request->validated('admin_doc_category_id') !== null
             ? (int) $request->validated('admin_doc_category_id')
@@ -119,7 +121,7 @@ class ProjectFileUploadController extends Controller
 
         if (! $result['ok']) {
             if ($this->isTransientFailure($result)) {
-                RegisterProjectDocJob::dispatch($project, $payload, $folderId);
+                RegisterProjectDocJob::dispatch($project, $payload, $folderId, $sizeBytes);
 
                 return response()->json([
                     'name' => $name,
@@ -142,8 +144,14 @@ class ProjectFileUploadController extends Controller
 
         $docId = (int) data_get($result, 'body.data.id', 0);
 
-        if ($folderId !== null && $docId > 0) {
-            ProjectFolderFile::place($project, $docId, $folderId);
+        if ($docId > 0) {
+            if ($folderId !== null) {
+                ProjectFolderFile::place($project, $docId, $folderId);
+            }
+
+            if ($sizeBytes !== null) {
+                ProjectFileSize::record($project, $docId, $sizeBytes);
+            }
         } elseif ($folderId !== null) {
             Log::warning('Upload complete: BEPM tidak mengembalikan doc id — file jatuh ke root', [
                 'project_id' => $project, 'key' => $key, 'folder_id' => $folderId,

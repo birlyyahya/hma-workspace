@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\DeleteProjectFilesJob;
+use App\Models\ProjectFileSize;
 use App\Models\ProjectFolder;
 use App\Models\ProjectFolderFile;
 use App\Models\User;
@@ -12,15 +13,7 @@ use Livewire\Volt\Volt;
 
 use function Pest\Laravel\mock;
 
-beforeEach(function () {
-    Livewire::withoutLazyLoading();
-
-    // Ukuran file diambil dari MinIO saat render — default kosong supaya test
-    // tidak menyentuh jaringan. Test yang me-mock ProjectFileStorage sendiri
-    // menimpa binding ini; panggilan sizesUnder yang tak diharapkan di mock
-    // strict tertangkap oleh fallback getObjectSizesProperty.
-    mock(ProjectFileStorage::class, fn ($mock) => $mock->shouldReceive('sizesUnder')->andReturn([])->byDefault());
-});
+beforeEach(fn () => Livewire::withoutLazyLoading());
 
 /**
  * @param  array<int, array<string, mixed>>  $docs
@@ -103,15 +96,13 @@ test('searching hides folders whose name does not match', function () {
     expect(collect($component->get('folders'))->pluck('name')->all())->toBe(['Laporan Bulanan']);
 });
 
-test('file sizes come from MinIO, not the zero size BEPM reports', function () {
+test('file sizes come from the workspace DB, not the zero size BEPM reports', function () {
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id, docs: [
         ['id' => 1, 'title' => 'laporan', 'created_at' => '2026-06-01T00:00:00Z', 'admin_doc_category_id' => 7, 'files' => ['url' => 'projects_docs/2026/5/laporan.pdf', 'size' => '0 KB']],
     ]);
 
-    mock(ProjectFileStorage::class, fn ($mock) => $mock->shouldReceive('sizesUnder')
-        ->with('projects_docs/2026/5/')
-        ->andReturn(['projects_docs/2026/5/laporan.pdf' => 3 * 1024 * 1024]));
+    ProjectFileSize::record(5, 1, 3 * 1024 * 1024);
 
     $component = Volt::actingAs($leader)->test('project.components.file-manager', ['id' => 5]);
 

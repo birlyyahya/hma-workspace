@@ -106,6 +106,7 @@ export function createProjectFileUploader({ projectId, partSize, getFolderId, on
             const json = await jsonRequest('POST', `${base}/${encodeURIComponent(uploadId)}/complete`, {
                 key,
                 filename: file.name,
+                size: file.size ?? null,
                 folder_id: folderIds.get(uploadId) ?? null,
                 parts: parts.map((part) => ({
                     part_number: part.PartNumber,

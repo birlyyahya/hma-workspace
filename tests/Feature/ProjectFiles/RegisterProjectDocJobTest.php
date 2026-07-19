@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\RegisterProjectDocJob;
+use App\Models\ProjectFileSize;
 use App\Models\ProjectFolder;
 use App\Models\ProjectFolderFile;
 use App\Services\ProjectCache;
@@ -48,7 +49,7 @@ test('it skips registration when the key already exists (idempotent under timeou
     Http::assertNotSent(fn ($request) => $request->method() === 'POST' && str_ends_with($request->url(), 'admin-docs'));
 });
 
-test('it records the folder placement after a successful registration', function () {
+test('it records the folder placement and size after a successful registration', function () {
     $folder = ProjectFolder::factory()->create(['project_id' => 5, 'name' => 'Kontrak']);
 
     Http::fake([
@@ -57,9 +58,10 @@ test('it records the folder placement after a successful registration', function
         '*' => Http::response(['status' => 200, 'data' => []], 200),
     ]);
 
-    (new RegisterProjectDocJob(5, registerPayload(), $folder->id))->handle(app(ProjectCache::class), app(ProjectWriter::class));
+    (new RegisterProjectDocJob(5, registerPayload(), $folder->id, 2048))->handle(app(ProjectCache::class), app(ProjectWriter::class));
 
-    expect(ProjectFolderFile::query()->where('doc_id', 10)->value('project_folder_id'))->toBe($folder->id);
+    expect(ProjectFolderFile::query()->where('doc_id', 10)->value('project_folder_id'))->toBe($folder->id)
+        ->and(ProjectFileSize::query()->where('doc_id', 10)->value('size_bytes'))->toBe(2048);
 });
 
 test('it records the folder placement even when the key turns out to be already registered', function () {

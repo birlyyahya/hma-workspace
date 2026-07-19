@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\RegisterProjectDocJob;
+use App\Models\ProjectFileSize;
 use App\Models\ProjectFolder;
 use App\Models\ProjectFolderFile;
 use App\Models\Role;
@@ -333,7 +334,7 @@ test('complete finishes the multipart upload and registers the document to BEPM'
     });
 });
 
-test('complete records the folder placement and folder keywords', function () {
+test('complete records the folder placement, size, and folder keywords', function () {
     $leader = User::factory()->create();
     fakeBepmForUpload(leaderId: $leader->id);
 
@@ -345,6 +346,8 @@ test('complete records the folder placement and folder keywords', function () {
     $this->actingAs($leader)
         ->postJson(route('project-files.uploads.complete', ['project' => 5, 'uploadId' => 'upload-abc']), [
             'key' => 'projects_docs/2026/5/laporan.pdf',
+            'filename' => 'laporan.pdf',
+            'size' => 2048,
             'folder_id' => $child->id,
             'parts' => [
                 ['part_number' => 1, 'etag' => '"etag-1"'],
@@ -352,7 +355,8 @@ test('complete records the folder placement and folder keywords', function () {
         ])
         ->assertCreated();
 
-    expect(ProjectFolderFile::query()->where('doc_id', 99)->value('project_folder_id'))->toBe($child->id);
+    expect(ProjectFolderFile::query()->where('doc_id', 99)->value('project_folder_id'))->toBe($child->id)
+        ->and(ProjectFileSize::query()->where('doc_id', 99)->value('size_bytes'))->toBe(2048);
 
     Http::assertSent(fn ($request) => $request->method() === 'POST'
         && str_ends_with($request->url(), 'admin-docs')
@@ -436,6 +440,7 @@ test('a transient BEPM failure keeps the object and registers in the background'
     $this->actingAs($leader)
         ->postJson(route('project-files.uploads.complete', ['project' => 5, 'uploadId' => 'upload-abc']), [
             'key' => 'projects_docs/2026/5/laporan.pdf',
+            'size' => 2048,
             'folder_id' => $folder->id,
             'parts' => [
                 ['part_number' => 1, 'etag' => '"etag-1"'],
@@ -446,7 +451,8 @@ test('a transient BEPM failure keeps the object and registers in the background'
 
     Queue::assertPushed(RegisterProjectDocJob::class, fn (RegisterProjectDocJob $job) => $job->projectId === 5
         && $job->payload['filename'] === 'projects_docs/2026/5/laporan.pdf'
-        && $job->folderId === $folder->id);
+        && $job->folderId === $folder->id
+        && $job->sizeBytes === 2048);
 });
 
 // ---------------------------------------------------------------------- Abort

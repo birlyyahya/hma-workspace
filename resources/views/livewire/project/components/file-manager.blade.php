@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\DeleteProjectFilesJob;
+use App\Models\ProjectFileSize;
 use App\Models\ProjectFolder;
 use App\Models\ProjectFolderFile;
 use App\Services\ProjectCache;
@@ -192,22 +193,6 @@ new class extends Component
     }
 
     /**
-     * Ukuran objek per key dari MinIO (BEPM selalu melaporkan "0 KB" karena
-     * byte tidak pernah lewat BEPM). Computed → satu panggilan list per
-     * request; bila MinIO tak terjangkau, fallback ke angka BEPM.
-     *
-     * @return array<string, int>
-     */
-    public function getObjectSizesProperty(): array
-    {
-        try {
-            return app(ProjectFileStorage::class)->sizesUnder($this->rootPrefix());
-        } catch (\Throwable $e) {
-            return [];
-        }
-    }
-
-    /**
      * Baris file di folder aktif, setelah search + filter kategori + sort.
      * Lokasi file dibaca dari mapping project_folder_files (folder virtual) —
      * BUKAN dari object key; dokumen tanpa baris mapping berada di root.
@@ -219,9 +204,14 @@ new class extends Component
     public function getFilesProperty(): array
     {
         $rootPrefix = $this->rootPrefix();
-        $sizes = $this->objectSizes;
         $currentId = $this->currentFolderId !== null ? (int) $this->currentFolderId : null;
         $subtreePaths = $this->subtreeRelativePaths();
+
+        // Ukuran dicatat di DB saat upload (BEPM selalu "0 KB"; menanyakan
+        // MinIO tiap render mahal). Data lama: projectfiles:backfill-sizes.
+        $sizes = ProjectFileSize::query()
+            ->where('project_id', (int) $this->id)
+            ->pluck('size_bytes', 'doc_id');
 
         $placements = ProjectFolderFile::query()
             ->where('project_id', (int) $this->id)
@@ -231,8 +221,8 @@ new class extends Component
             ->map(function (array $doc) use ($sizes, $placements) {
                 $path = $this->keyFromUrl((string) data_get($doc, 'files.url', ''));
                 $ext = strtolower(Str::afterLast($path, '.'));
-                $bytes = (float) ($sizes[$path] ?? $this->sizeToBytes((string) (data_get($doc, 'files.size') ?? '')));
                 $docId = (int) ($doc['id'] ?? 0);
+                $bytes = (float) ($sizes[$docId] ?? $this->sizeToBytes((string) (data_get($doc, 'files.size') ?? '')));
                 $title = trim((string) ($doc['title'] ?? ''));
 
                 return [
@@ -931,6 +921,7 @@ new class extends Component
         }
 
         ProjectFolderFile::query()->where('doc_id', (int) $row['id'])->delete();
+        ProjectFileSize::query()->where('doc_id', (int) $row['id'])->delete();
 
         try {
             app(ProjectFileStorage::class)->deleteObject($row['key']);

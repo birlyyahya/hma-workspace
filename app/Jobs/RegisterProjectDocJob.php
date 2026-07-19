@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\ProjectFileSize;
 use App\Models\ProjectFolderFile;
 use App\Services\ProjectCache;
 use App\Services\ProjectWriter;
@@ -36,6 +37,7 @@ class RegisterProjectDocJob implements ShouldQueue
         public readonly int $projectId,
         public readonly array $payload,
         public readonly ?int $folderId = null,
+        public readonly ?int $sizeBytes = null,
     ) {}
 
     public function handle(ProjectCache $cache, ProjectWriter $writer): void
@@ -46,7 +48,7 @@ class RegisterProjectDocJob implements ShouldQueue
 
         foreach ($cache->documentsFor($this->projectId) as $doc) {
             if ($this->keyFromUrl((string) data_get($doc, 'files.url', '')) === $key) {
-                $this->placeInFolder((int) ($doc['id'] ?? 0));
+                $this->finalizeDoc((int) ($doc['id'] ?? 0));
 
                 return;
             }
@@ -62,16 +64,25 @@ class RegisterProjectDocJob implements ShouldQueue
             throw new \RuntimeException("Registrasi dokumen BEPM gagal untuk {$key}");
         }
 
-        $this->placeInFolder((int) data_get($result, 'body.data.id', 0));
+        $this->finalizeDoc((int) data_get($result, 'body.data.id', 0));
     }
 
-    private function placeInFolder(int $docId): void
+    /**
+     * Catat penempatan folder dan ukuran setelah doc id BEPM diketahui.
+     */
+    private function finalizeDoc(int $docId): void
     {
-        if ($this->folderId === null || $docId <= 0) {
+        if ($docId <= 0) {
             return;
         }
 
-        ProjectFolderFile::place($this->projectId, $docId, $this->folderId);
+        if ($this->folderId !== null) {
+            ProjectFolderFile::place($this->projectId, $docId, $this->folderId);
+        }
+
+        if ($this->sizeBytes !== null) {
+            ProjectFileSize::record($this->projectId, $docId, $this->sizeBytes);
+        }
     }
 
     public function failed(?\Throwable $exception): void
