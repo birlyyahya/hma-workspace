@@ -138,22 +138,6 @@ class ProjectFileStorage
         }
     }
 
-    /**
-     * Server-side copy — bagian dari urutan rename/move yang aman-gagal.
-     */
-    public function copyObject(string $fromKey, string $toKey): void
-    {
-        try {
-            $this->client()->copyObject([
-                'Bucket' => $this->bucket(),
-                'Key' => $toKey,
-                'CopySource' => rawurlencode($this->bucket().'/'.$fromKey),
-            ]);
-        } catch (\Throwable $e) {
-            throw $this->wrap('copyObject', $e, ['from' => $fromKey, 'to' => $toKey]);
-        }
-    }
-
     public function deleteObject(string $key): void
     {
         try {
@@ -167,43 +151,12 @@ class ProjectFileStorage
     }
 
     /**
-     * Pindahkan objek dalam bucket yang sama (CopyObject + DeleteObject via
-     * S3Client). Sengaja TIDAK memakai Flysystem move: Flysystem melakukan
-     * HeadObject dulu, dan HEAD bertanda tangan ditolak 403 oleh reverse proxy
-     * publik MinIO (storage.hanatekindo.com) — copy langsung tidak. Melempar
-     * bila sumber tidak ada / gagal.
-     */
-    public function move(string $fromKey, string $toKey): void
-    {
-        $this->copyObject($fromKey, $toKey);
-        $this->deleteObject($fromKey);
-    }
-
-    /**
-     * Apakah sebuah objek ada di MinIO. Dipakai untuk membuat move/rename
-     * idempotent: bila move gagal karena sumber sudah tidak ada, objek mungkin
-     * sudah berada di key tujuan dari percobaan sebelumnya yang terputus.
-     * Memakai ListObjectsV2, bukan HeadObject — HEAD bertanda tangan ditolak
-     * 403 oleh reverse proxy publik MinIO (lihat move()).
-     */
-    public function exists(string $key): bool
-    {
-        try {
-            $result = $this->client()->listObjectsV2([
-                'Bucket' => $this->bucket(),
-                'Prefix' => $key,
-                'MaxKeys' => 1,
-            ]);
-
-            return (string) data_get($result, 'Contents.0.Key') === $key;
-        } catch (\Throwable $e) {
-            throw $this->wrap('exists', $e, ['key' => $key]);
-        }
-    }
-
-    /**
      * Object key sebenarnya di MinIO di bawah sebuah prefix (rekursif).
-     * Sumber otoritatif untuk operasi move — TIDAK bergantung pada cache BEPM.
+     * Sumber otoritatif untuk rekonsiliasi — TIDAK bergantung pada cache BEPM.
+     *
+     * Catatan: operasi server-side di service ini sengaja menghindari
+     * HeadObject — HEAD bertanda tangan ditolak 403 oleh reverse proxy publik
+     * MinIO (storage.hanatekindo.com) yang dipakai saat pengembangan lokal.
      *
      * @return array<int, string>
      */
