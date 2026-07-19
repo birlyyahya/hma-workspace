@@ -34,6 +34,16 @@ test('a presigned GET url is signed with the public endpoint, not the internal o
         ->and($url)->toContain('X-Amz-Signature');
 });
 
+test('a presigned GET with a download name sets an inline content-disposition', function () {
+    $url = (new ProjectFileStorage)->presignedGetUrl('projects_docs/2026/5/xyz.pdf', 5, 'Laporan Akhir.pdf');
+
+    parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+    expect($query['response-content-disposition'] ?? '')
+        ->toContain('inline')
+        ->toContain('filename="Laporan Akhir.pdf"');
+});
+
 test('presigned upload part urls are signed with the public endpoint', function () {
     $urls = (new ProjectFileStorage)->signParts('projects_docs/2026/5/laporan.pdf', 'upload-1', [1]);
 

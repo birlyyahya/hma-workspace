@@ -1,7 +1,6 @@
 <?php
 
 use App\Jobs\DeleteProjectFilesJob;
-use App\Jobs\SyncProjectDocPathJob;
 use App\Models\ProjectFolder;
 use App\Models\ProjectFolderFile;
 use App\Models\User;
@@ -143,14 +142,9 @@ test('two documents can share the same display name — the suffix lives only in
         ->and($row['key'])->toBe('projects_docs/2026/5/laporan (1).pdf');
 });
 
-test('renaming to a taken name suffixes only the physical key and keeps the title clean', function () {
+test('renaming to a name already used by another document is allowed', function () {
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id);
-
-    mock(ProjectFileStorage::class)
-        ->shouldReceive('move')
-        ->once()
-        ->with('projects_docs/2026/5/kontrak.pdf', 'projects_docs/2026/5/laporan (1).pdf');
 
     Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
@@ -161,7 +155,6 @@ test('renaming to a taken name suffixes only the physical key and keeps the titl
 
     Http::assertSent(fn ($request) => $request->method() === 'PATCH'
         && str_contains($request->url(), 'admin-docs/2')
-        && $request['file'] === 'projects_docs/2026/5/laporan (1).pdf'
         && $request['title'] === 'laporan');
 });
 
@@ -274,14 +267,11 @@ test('an intruder cannot create folders even by calling the action directly', fu
     expect(ProjectFolder::query()->where('project_id', 5)->exists())->toBeFalse();
 });
 
-test('renaming a file moves the object synchronously in MinIO', function () {
+test('renaming a file patches only the title — the object key never changes', function () {
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id);
 
-    mock(ProjectFileStorage::class)
-        ->shouldReceive('move')
-        ->once()
-        ->with('projects_docs/2026/5/laporan.pdf', 'projects_docs/2026/5/laporan-final.pdf');
+    mock(ProjectFileStorage::class)->shouldNotReceive('move');
 
     Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
@@ -292,8 +282,8 @@ test('renaming a file moves the object synchronously in MinIO', function () {
 
     Http::assertSent(fn ($request) => $request->method() === 'PATCH'
         && str_contains($request->url(), 'admin-docs/1')
-        && $request['file'] === 'projects_docs/2026/5/laporan-final.pdf'
-        && $request['title'] === 'laporan-final');
+        && $request['title'] === 'laporan-final'
+        && ! array_key_exists('file', $request->data()));
 });
 
 test('renaming an unknown document id is a no-op', function () {
@@ -525,14 +515,14 @@ test('moving a file back to the root removes its mapping row', function () {
     expect(ProjectFolderFile::query()->where('doc_id', 2)->exists())->toBeFalse();
 });
 
-test('preview uses a presigned url for MinIO files', function () {
+test('preview presigns the real object key but names the download after the display title', function () {
     $leader = User::factory()->create();
     fakeBepmForFileManager(leaderId: $leader->id);
 
     mock(ProjectFileStorage::class)
         ->shouldReceive('presignedGetUrl')
         ->once()
-        ->with('projects_docs/2026/5/laporan.pdf', (int) config('uploads.project_files.presign_ttl'))
+        ->with('projects_docs/2026/5/laporan.pdf', (int) config('uploads.project_files.presign_ttl'), 'laporan.pdf')
         ->andReturn('https://minio/presigned/laporan.pdf');
 
     Volt::actingAs($leader)
@@ -542,8 +532,7 @@ test('preview uses a presigned url for MinIO files', function () {
         ->assertSet('previewExt', 'pdf');
 });
 
-test('a rename whose BEPM sync fails hands off to the background job without rollback', function () {
-    Queue::fake();
+test('a rename rejected by BEPM shows an error and keeps the modal state', function () {
     $leader = User::factory()->create();
 
     Http::fake([
@@ -559,42 +548,14 @@ test('a rename whose BEPM sync fails hands off to the background job without rol
         '*' => Http::response(['status' => 200, 'data' => []], 200),
     ]);
 
-    $storage = mock(ProjectFileStorage::class);
-    $storage->shouldReceive('move')->once()->with('projects_docs/2026/5/laporan.pdf', 'projects_docs/2026/5/laporan-final.pdf');
+    mock(ProjectFileStorage::class)->shouldNotReceive('move');
 
     Volt::actingAs($leader)
         ->test('project.components.file-manager', ['id' => 5])
         ->call('startRenameDoc', 1)
         ->set('renameDocName', 'laporan-final')
         ->call('renameDoc')
-        ->assertHasNoErrors();
-
-    Queue::assertPushed(SyncProjectDocPathJob::class, fn (SyncProjectDocPathJob $job) => $job->docId === 1
-        && $job->newKey === 'projects_docs/2026/5/laporan-final.pdf'
-        && $job->extra['title'] === 'laporan-final');
-});
-
-test('a rename whose object is already at the destination is treated as done and still syncs BEPM', function () {
-    $leader = User::factory()->create();
-    fakeBepmForFileManager(leaderId: $leader->id);
-
-    $storage = mock(ProjectFileStorage::class);
-    $storage->shouldReceive('move')->once()
-        ->with('projects_docs/2026/5/laporan.pdf', 'projects_docs/2026/5/laporan-final.pdf')
-        ->andThrow(new RuntimeException('source missing'));
-    $storage->shouldReceive('exists')->once()
-        ->with('projects_docs/2026/5/laporan-final.pdf')->andReturn(true);
-
-    Volt::actingAs($leader)
-        ->test('project.components.file-manager', ['id' => 5])
-        ->call('startRenameDoc', 1)
-        ->set('renameDocName', 'laporan-final')
-        ->call('renameDoc')
-        ->assertHasNoErrors();
-
-    Http::assertSent(fn ($request) => $request->method() === 'PATCH'
-        && str_contains($request->url(), 'admin-docs/1')
-        && $request['file'] === 'projects_docs/2026/5/laporan-final.pdf');
+        ->assertSet('renamingDocId', 1);
 });
 
 test('a percent-encoded BEPM url is decoded to the real object key', function () {
@@ -607,7 +568,7 @@ test('a percent-encoded BEPM url is decoded to the real object key', function ()
     mock(ProjectFileStorage::class)
         ->shouldReceive('presignedGetUrl')
         ->once()
-        ->with('projects_docs/2026/5/Pengajuan Dana (1).pdf', (int) config('uploads.project_files.presign_ttl'))
+        ->with('projects_docs/2026/5/Pengajuan Dana (1).pdf', (int) config('uploads.project_files.presign_ttl'), 'survei.pdf')
         ->andReturn('https://minio/presigned');
 
     Volt::actingAs($leader)

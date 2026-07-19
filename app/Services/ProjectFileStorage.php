@@ -6,6 +6,7 @@ use Aws\S3\S3Client;
 use Illuminate\Filesystem\AwsS3V3Adapter;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
  * Control plane S3 Multipart Upload untuk project files di MinIO.
@@ -106,14 +107,28 @@ class ProjectFileStorage
 
     /**
      * Presigned GET URL untuk preview/download.
+     *
+     * $downloadName menyetel Content-Disposition "inline; filename=..." pada
+     * respons MinIO: nama file yang diterima user mengikuti nama tampilan
+     * (title), BUKAN basename object key — key tidak pernah di-rename, jadi
+     * nama unduhan harus datang dari metadata. "inline" agar preview iframe/
+     * img tetap jalan; browser tetap memakai filename saat menyimpan.
      */
-    public function presignedGetUrl(string $key, int $ttlMinutes = 10): string
+    public function presignedGetUrl(string $key, int $ttlMinutes = 10, ?string $downloadName = null): string
     {
         try {
-            $command = $this->signingClient()->getCommand('GetObject', [
+            $params = [
                 'Bucket' => $this->signingBucket(),
                 'Key' => $key,
-            ]);
+            ];
+
+            if ($downloadName !== null && $downloadName !== '') {
+                $ascii = str_replace(['"', '\\'], '', Str::ascii($downloadName));
+                $params['ResponseContentDisposition'] =
+                    "inline; filename=\"{$ascii}\"; filename*=UTF-8''".rawurlencode($downloadName);
+            }
+
+            $command = $this->signingClient()->getCommand('GetObject', $params);
 
             return (string) $this->signingClient()
                 ->createPresignedRequest($command, "+{$ttlMinutes} minutes")

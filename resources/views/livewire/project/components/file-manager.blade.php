@@ -1,7 +1,6 @@
 <?php
 
 use App\Jobs\DeleteProjectFilesJob;
-use App\Jobs\SyncProjectDocPathJob;
 use App\Models\ProjectFolder;
 use App\Models\ProjectFolderFile;
 use App\Services\ProjectCache;
@@ -582,7 +581,7 @@ new class extends Component
 
         try {
             $this->previewUrl = app(ProjectFileStorage::class)
-                ->presignedGetUrl($row['key'], (int) config('uploads.project_files.presign_ttl'));
+                ->presignedGetUrl($row['key'], (int) config('uploads.project_files.presign_ttl'), $row['name']);
         } catch (\Throwable $e) {
             Toaster::error('Gagal menyiapkan preview');
 
@@ -607,6 +606,11 @@ new class extends Component
         Flux::modal('rename-file-modal')->show();
     }
 
+    /**
+     * Rename = metadata murni: PATCH title ke BEPM. Object key TIDAK pernah
+     * berubah (key hanyalah alamat; nama tampilan & nama download berasal
+     * dari title). Menghapus seluruh kelas kegagalan copy+delete parsial.
+     */
     public function renameDoc(): void
     {
         $row = collect($this->files)->firstWhere('id', $this->renamingDocId);
@@ -628,26 +632,18 @@ new class extends Component
             return;
         }
 
-        // Nama duplikat diperbolehkan (PM tidak memvalidasi title lagi) —
-        // hanya KEY fisik yang diberi suffix bila tabrakan di MinIO.
-        $newKey = $this->uniqueFlatKey($newName.($row['ext'] !== '' ? '.'.$row['ext'] : ''), (int) $row['id']);
+        $result = app(ProjectWriter::class)->updateDoc((int) $row['id'], ['title' => $newName], (int) $this->id);
 
-        if ($newKey !== $row['key'] && ! $this->moveObject($row['key'], $newKey)) {
-            Toaster::error('Rename gagal di storage');
+        if (! $result['ok']) {
+            Toaster::error('Rename gagal — BEPM menolak perubahan');
 
             return;
         }
 
-        $synced = $this->syncDocPath((int) $row['id'], $newKey, ['title' => $newName]);
-
-        app(ProjectCache::class)->flushDocs((int) $this->id);
         unset($this->files);
         $this->reset('renamingDocId', 'renameDocName');
         Flux::modal('rename-file-modal')->close();
-
-        $synced
-            ? Toaster::success('File di-rename')
-            : Toaster::warning('File di-rename — sinkronisasi metadata diproses di background');
+        Toaster::success('File di-rename');
     }
 
     public function startEditKeyword(int $docId): void
@@ -843,61 +839,6 @@ new class extends Component
 
     // ---------------------------------------------------------------- helpers
 
-    /**
-     * Pindahkan objek di MinIO secara idempotent. Bila move gagal karena sumber
-     * sudah tidak ada tetapi objek sudah berada di key tujuan (percobaan
-     * sebelumnya yang terputus), anggap sukses sehingga alur bisa lanjut
-     * menyinkronkan BEPM. Mengembalikan false hanya bila objek benar-benar hilang.
-     */
-    protected function moveObject(string $oldKey, string $newKey): bool
-    {
-        $storage = app(ProjectFileStorage::class);
-
-        try {
-            $storage->move($oldKey, $newKey);
-
-            return true;
-        } catch (\Throwable $e) {
-            try {
-                if ($storage->exists($newKey)) {
-                    return true;
-                }
-            } catch (\Throwable $ignored) {
-                // fallback: perlakukan sebagai kegagalan sebenarnya di bawah
-            }
-
-            Log::warning('file-manager: pindah objek gagal', ['from' => $oldKey, 'to' => $newKey, 'error' => $e->getMessage()]);
-
-            return false;
-        }
-    }
-
-    /**
-     * Sinkronkan path dokumen di BEPM setelah objek dipindah/rename di MinIO.
-     *
-     * MinIO adalah sumber kebenaran, jadi objek TIDAK di-rollback saat BEPM
-     * gagal — sebaliknya sinkronisasi dijamin selesai via SyncProjectDocPathJob
-     * (idempotent, diretry queue) sehingga tahan refresh/crash. Mengembalikan
-     * true bila BEPM langsung tersinkron, false bila diserahkan ke background.
-     *
-     * $extra untuk field lain yang ikut diperbarui (mis. `title` saat rename).
-     *
-     * @param  array<string, mixed>  $extra
-     */
-    protected function syncDocPath(int $docId, string $newKey, array $extra = []): bool
-    {
-        $result = app(ProjectWriter::class)->updateDoc($docId, ['file' => $newKey, ...$extra]);
-
-        if ($result['ok']) {
-            return true;
-        }
-
-        Log::warning('file-manager: update path BEPM inline gagal, diserahkan ke background', ['doc_id' => $docId, 'to' => $newKey, 'status' => $result['status']]);
-        SyncProjectDocPathJob::dispatch((int) $this->id, $docId, $newKey, $extra);
-
-        return false;
-    }
-
     protected function ownFolder(?int $folderId): ?ProjectFolder
     {
         if ($folderId === null || $this->forbidden) {
@@ -969,36 +910,6 @@ new class extends Component
         }
 
         return ltrim($decoded, '/');
-    }
-
-    /**
-     * Object key flat yang belum dipakai dokumen lain di project — beri
-     * suffix " (n)" bila nama fisiknya tabrakan di MinIO.
-     */
-    protected function uniqueFlatKey(string $filename, int $exceptDocId): string
-    {
-        $existing = collect($this->allDocs())
-            ->reject(fn (array $doc) => (int) ($doc['id'] ?? 0) === $exceptDocId)
-            ->map(fn (array $doc) => $this->keyFromUrl((string) data_get($doc, 'files.url', '')))
-            ->filter()
-            ->flip();
-
-        $key = $this->rootPrefix().$filename;
-
-        if (! isset($existing[$key])) {
-            return $key;
-        }
-
-        $ext = pathinfo($filename, PATHINFO_EXTENSION);
-        $base = pathinfo($filename, PATHINFO_FILENAME);
-        $suffix = 1;
-
-        do {
-            $key = $this->rootPrefix().$base." ({$suffix})".($ext !== '' ? ".{$ext}" : '');
-            $suffix++;
-        } while (isset($existing[$key]));
-
-        return $key;
     }
 
     /**
