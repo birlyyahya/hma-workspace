@@ -907,8 +907,8 @@ new class extends Component {
 
     <x-confirm-modal name="delete-task" confirm="deleteTask" title="Hapus aktivitas ini?"
         description="Aktivitas DAR akan dihapus secara permanen. Tindakan ini tidak dapat dibatalkan." />
-
-    <flux:modal name="create-task" class="w-xs sm:w-sm max-sm:max-h-[85dvh] md:min-w-3xl lg:min-w-5xl xl:min-w-6xl overflow-visible">
+    
+    <flux:modal name="create-task" class="w-xs sm:w-sm max-sm:max-h-[85dvh] md:min-w-3xl lg:min-w-5xl xl:min-w-6xl md:overflow-visible overflow-auto">
         <form wire:submit="createActivity" class="space-y-4 sm:space-y-5">
             {{-- ── Header ── --}}
             <div class="flex items-start gap-3 border-b border-zinc-100 pb-4">
