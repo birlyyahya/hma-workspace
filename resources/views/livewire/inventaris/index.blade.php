@@ -1,12 +1,58 @@
 <?php
 
+use App\Services\InventarisDummy;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
+use Masmerise\Toaster\Toaster;
 
 new
 #[Layout('components.layouts.app', ['title' => 'Inventaris — Pilih Project'])]
 class extends Component {
-    //
+    public string $search = '';
+
+    public string $filter = '';
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    #[Computed]
+    public function projects(): array
+    {
+        $projects = app(InventarisDummy::class)->projects();
+
+        if ($this->filter === '') {
+            return $projects;
+        }
+
+        return array_values(array_filter(
+            $projects,
+            fn (array $p) => str_contains(strtolower($p['name'].' '.$p['company']), strtolower($this->filter)),
+        ));
+    }
+
+    /**
+     * Cari unit lintas project berdasarkan SN atau kode unit, lalu buka detailnya.
+     */
+    public function searchSn(): void
+    {
+        $unit = app(InventarisDummy::class)->findBySnOrCode($this->search);
+
+        if ($unit === null) {
+            Toaster::warning('SN / kode unit "'.$this->search.'" tidak ditemukan.');
+
+            return;
+        }
+
+        $this->redirectRoute('inventaris.unit-detail', ['unitId' => $unit['id']], navigate: true);
+    }
+
+    public function resetDemo(): void
+    {
+        app(InventarisDummy::class)->reset();
+        unset($this->projects);
+        Toaster::success('Data demo inventaris dikembalikan ke kondisi awal.');
+    }
 } ?>
 
 <div class="bg-zinc-50/50 dark:bg-zinc-900/50 min-h-screen">
@@ -38,6 +84,9 @@ class extends Component {
                 </div>
 
                 <div class="flex w-full flex-col gap-2 sm:flex-row md:w-auto md:gap-3">
+                    <flux:button icon="arrow-path" variant="ghost" wire:click="resetDemo" class="cursor-pointer w-full sm:w-auto text-white! hover:bg-white/10!">
+                        Reset Demo
+                    </flux:button>
                     <a href="{{ route('inventaris.scan') }}" wire:navigate class="w-full sm:w-auto">
                         <flux:button icon="qr-code" variant="primary" class="cursor-pointer w-full sm:w-auto bg-white! text-red-700! hover:bg-white/90!">
                             Scan SN
@@ -49,81 +98,47 @@ class extends Component {
 
         {{-- SEARCH SN GLOBAL + FILTER PROJECT --}}
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <flux:input icon="qr-code" placeholder="Cari serial number di semua project..." class="sm:max-w-md" />
-            <flux:input icon="magnifying-glass" placeholder="Filter project..." class="sm:max-w-xs" />
+            <form wire:submit="searchSn" class="w-full sm:max-w-md">
+                <flux:input wire:model="search" icon="qr-code" placeholder="Cari SN / kode unit lalu Enter..." kbd="↵" />
+            </form>
+            <flux:input wire:model.live.debounce.300ms="filter" icon="magnifying-glass" placeholder="Filter project..." class="sm:max-w-xs" />
         </div>
 
         {{-- PROJECT CARDS --}}
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-
-            <a href="{{ route('inventaris.project', 101) }}" wire:navigate
-                class="group rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-red-300 hover:shadow-md dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-red-700">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                        <flux:heading class="truncate group-hover:text-red-700 dark:group-hover:text-red-400">
-                            Pembangunan Jaringan FO Cikarang
-                        </flux:heading>
-                        <flux:text size="sm" class="mt-0.5">PT Telkom Infra</flux:text>
+            @forelse ($this->projects as $project)
+                @php
+                    $snPct = $project['total_units'] > 0 ? round($project['sn_units'] / $project['total_units'] * 100) : 0;
+                    $genOnlyPct = $project['total_units'] > 0 ? round(($project['generated_units'] - $project['sn_units']) / $project['total_units'] * 100) : 0;
+                @endphp
+                <a href="{{ route('inventaris.project', $project['id']) }}" wire:navigate wire:key="project-{{ $project['id'] }}"
+                    class="group rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-red-300 hover:shadow-md dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-red-700">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <flux:heading class="truncate group-hover:text-red-700 dark:group-hover:text-red-400">
+                                {{ $project['name'] }}
+                            </flux:heading>
+                            <flux:text size="sm" class="mt-0.5">{{ $project['company'] }}</flux:text>
+                        </div>
+                        <flux:badge size="sm" :color="$project['status_color']">{{ $project['status_label'] }}</flux:badge>
                     </div>
-                    <flux:badge size="sm" color="amber">Batch belum lengkap</flux:badge>
+                    <div class="mt-4 space-y-2">
+                        <div class="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+                            <span>{{ $project['sn_units'] }}/{{ $project['total_units'] }} unit ber-SN</span>
+                            <span>{{ $project['spektek_count'] }} spektek</span>
+                        </div>
+                        <div class="flex h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-700">
+                            <div class="bg-emerald-500" style="width: {{ $snPct }}%"></div>
+                            <div class="bg-blue-400" style="width: {{ $genOnlyPct }}%"></div>
+                        </div>
+                    </div>
+                    <flux:text size="xs" class="mt-3">Aktivitas terakhir: {{ $project['last_activity'] }}</flux:text>
+                </a>
+            @empty
+                <div class="col-span-full rounded-2xl border border-dashed border-zinc-300 bg-white p-10 text-center dark:border-zinc-700 dark:bg-zinc-800">
+                    <flux:text>Tidak ada project yang cocok dengan filter "{{ $filter }}".</flux:text>
                 </div>
-                <div class="mt-4 space-y-2">
-                    <div class="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-                        <span>86/120 unit ber-SN</span>
-                        <span>4 spektek</span>
-                    </div>
-                    <div class="flex h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-700">
-                        <div class="w-[72%] bg-emerald-500"></div>
-                        <div class="w-[13%] bg-blue-400"></div>
-                    </div>
-                </div>
-                <flux:text size="xs" class="mt-3">Aktivitas terakhir: 9 Jul 2026</flux:text>
-            </a>
-
-            <a href="{{ route('inventaris.project', 102) }}" wire:navigate
-                class="group rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-red-300 hover:shadow-md dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-red-700">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                        <flux:heading class="truncate group-hover:text-red-700 dark:group-hover:text-red-400">
-                            Instalasi CCTV Kawasan MM2100
-                        </flux:heading>
-                        <flux:text size="sm" class="mt-0.5">PT Bekasi Fajar</flux:text>
-                    </div>
-                    <flux:badge size="sm" color="emerald">Lengkap</flux:badge>
-                </div>
-                <div class="mt-4 space-y-2">
-                    <div class="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-                        <span>45/45 unit ber-SN</span>
-                        <span>2 spektek</span>
-                    </div>
-                    <div class="flex h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-700">
-                        <div class="w-full bg-emerald-500"></div>
-                    </div>
-                </div>
-                <flux:text size="xs" class="mt-3">Aktivitas terakhir: 7 Jul 2026</flux:text>
-            </a>
-
-            <a href="{{ route('inventaris.project', 103) }}" wire:navigate
-                class="group rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-red-300 hover:shadow-md dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-red-700">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                        <flux:heading class="truncate group-hover:text-red-700 dark:group-hover:text-red-400">
-                            Upgrade Server Room Gedung B
-                        </flux:heading>
-                        <flux:text size="sm" class="mt-0.5">PT Hana Tekindo</flux:text>
-                    </div>
-                    <flux:badge size="sm" color="zinc">Belum mulai</flux:badge>
-                </div>
-                <div class="mt-4 space-y-2">
-                    <div class="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
-                        <span>0/18 unit ber-SN</span>
-                        <span>3 spektek</span>
-                    </div>
-                    <div class="flex h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-700"></div>
-                </div>
-                <flux:text size="xs" class="mt-3">Aktivitas terakhir: 1 Jul 2026</flux:text>
-            </a>
-
+            @endforelse
         </div>
     </div>
 </div>
