@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ProjectFileSize;
 use App\Models\User;
 use App\Services\Concerns\CachesFlexibly;
 use App\Services\Concerns\MakesExternalRequests;
@@ -315,7 +316,6 @@ class ProjectCache
     {
         try {
             $response = $this->externalRead(timeout: 15)->get($this->apiBase.'/admin-docs/search', $params);
-
             if ($response->failed()) {
                 throw new \RuntimeException('admin-docs search status '.$response->status());
             }
@@ -417,7 +417,7 @@ class ProjectCache
      */
     public function progressStages(int $id): array
     {
-        return $this->rememberFlexible([self::TAG_PROJECTS], "progress-stages:project:{$id}", [self::TTL_USER, self::TTL_USER * 4], function () use ($id) {
+        return $this->rememberFlexible([self::TAG_PROJECTS, "progress-stages:project:{$id}"], "progress-stages:project:{$id}", [self::TTL_USER, self::TTL_USER * 4], function () use ($id) {
             $timelines = collect($this->timelines($id));
 
             if ($timelines->isEmpty()) {
@@ -426,7 +426,7 @@ class ProjectCache
 
             $activities = collect(app(DarCache::class)->tasks(['project_id' => $id])['data'] ?? []);
             $activitiesByCategory = $activities->groupBy('project_category_id');
-            $documents = collect($this->searchDocs(['project_id' => $id, 'limit' => 999])['data'] ?? []);
+            $documents = collect($this->documentsFor($id)) ?? [];
 
             $userNames = User::whereIn('id', $activities->pluck('user_id')->filter()->unique())
                 ->pluck('name', 'id');
@@ -435,12 +435,12 @@ class ProjectCache
 
             return $timelines
                 ->sortBy(fn (array $timeline): int => Carbon::parse($timeline['start_date'])->timestamp)
-                ->map(function (array $timeline) use ($activitiesByCategory, $documents, $userNames, $today): array {
+                ->map(function (array $timeline) use ($activitiesByCategory, $documents, $userNames, $today, $id): array {
                     $start = Carbon::parse($timeline['start_date'])->startOfDay();
                     $end = Carbon::parse($timeline['end_date'])->endOfDay();
 
                     $stageActivities = $this->buildStageActivities($activitiesByCategory->get($timeline['id'], collect()), $userNames);
-                    $stageDocuments = $this->buildStageDocuments($documents, $stageActivities, $timeline['title'], $start, $end) ?? [];
+                    $stageDocuments = $this->buildStageDocuments($documents, $stageActivities, $timeline['title'], $start, $end, $id) ?? [];
                     $status = $this->resolveStageStatus($today, $start, $end, $stageActivities, $stageDocuments);
 
                     return [
@@ -519,44 +519,52 @@ class ProjectCache
      * @param  Collection<int, array<string, mixed>>  $documents
      * @return array<int, array{name: string, size: ?string}>
      */
-    private function buildStageDocuments(Collection $documents,Array $stageActivities, String $title, Carbon $start, Carbon $end): array
+    private function buildStageDocuments(Collection $documents, array $stageActivities, string $title, Carbon $start, Carbon $end, int $id): array
     {
+
         $keywords = collect([$title])
-        ->merge(
-            collect($stageActivities)
-                ->flatMap(fn ($activity) => [
-                    $activity['title'] ?? null,
-                    $activity['description'] ?? null,
-                ])
-        )
-        ->filter()
-        ->flatMap(fn ($text) => preg_split('/\s+/', Str::lower($text)))
-        ->filter(fn ($word) => strlen($word) >= 4)
-        ->unique()
-        ->values()
-        ->all();
+            ->merge(
+                collect($stageActivities)
+                    ->flatMap(fn ($activity) => [
+                        $activity['title'] ?? null,
+                        $activity['description'] ?? null,
+                    ])
+            )
+            ->filter()
+            ->flatMap(fn ($text) => preg_split('/\s+/', Str::lower($text)))
+            ->filter(fn ($word) => strlen($word) >= 4)
+            ->unique()
+            ->values()
+            ->all();
+
+        $fileSizes = ProjectFileSize::query()
+            ->where('project_id', (int) $id)
+            ->pluck('size_bytes', 'doc_id');
 
         return $documents
-            ->filter(function (array $doc) use ($start, $end, $keywords): bool {
+            ->filter(function (array $doc) use ($keywords): bool {
 
-            if (empty($doc['created_at'])) {
-                return false;
-            }
+                if (empty($doc['created_at'])) {
+                    return false;
+                }
+                $haystack = collect([$doc['title'] ?? ''])
+                    ->merge($doc['keyword'] ?? [])
+                    ->join(',');
 
-            $inDate = Carbon::parse($doc['created_at'])
-                ->between($start, $end->copy()->endOfDay());
+                return Str::contains(
+                    Str::lower($haystack),
+                    $keywords
+                );
+            })
+            ->map(function (array $doc) use ($fileSizes): array {
 
-            $matchKeyword = Str::contains(
-                Str::lower($doc['title'] ?? ''),
-                $keywords
-            );
+                $docId = (int) ($doc['id'] ?? 0);
 
-            return $inDate && $matchKeyword;
-             })
-            ->map(fn (array $doc): array => [
-                'name' => $doc['title'] ?? 'Dokumen',
-                'size' => $doc['files']['size'] ?? null,
-            ])
+                return [
+                    'name' => $doc['title'] ?? 'Dokumen',
+                    'size' => $fileSizes[$docId] ?? 0,
+                ];
+            })
             ->values()
             ->toArray();
     }
@@ -644,5 +652,6 @@ class ProjectCache
     public function flushDocs(int $projectId): void
     {
         Cache::tags(["docs:project:{$projectId}"])->flush();
+        Cache::tags(["progress-stages:project:{$projectId}"])->flush();
     }
 }

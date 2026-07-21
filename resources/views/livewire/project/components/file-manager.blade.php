@@ -103,7 +103,8 @@ new class extends Component
     #[On('file-uploaded')]
     public function onFileUploaded(): void
     {
-        // Cache dokumen sudah di-flush oleh endpoint complete; render ulang saja.
+        // Cache dokumen sudah di-flush oleh RegisterProjectDocJob; hanya perlu dispatch ke progress tab.
+        $this->dispatch('doc-updated', projectId: (int) $this->id);
     }
 
     // ------------------------------------------------------------ data sources
@@ -636,6 +637,7 @@ new class extends Component
         $this->reset('renamingDocId', 'renameDocName');
         Flux::modal('rename-file-modal')->close();
         Toaster::success('File di-rename');
+        $this->notifyDocumentChanged();
     }
 
     public function startEditKeyword(int $docId): void
@@ -722,6 +724,7 @@ new class extends Component
         $this->reset('keywordDocId', 'keywordTags');
         Flux::modal('keyword-file-modal')->close();
         Toaster::success('Keyword diperbarui');
+        $this->notifyDocumentChanged();
     }
 
     public function confirmDeleteDoc(int $docId): void
@@ -755,9 +758,8 @@ new class extends Component
 
         if ($this->deleteOne($row)) {
             Toaster::success('File dihapus');
-            app(ProjectCache::class)->flushDocs((int) $this->id);
             unset($this->files);
-            $this->dispatch('file-uploaded');
+            $this->notifyDocumentChanged();
         } else {
             Toaster::error('Hapus file gagal');
         }
@@ -830,6 +832,12 @@ new class extends Component
     }
 
     // ---------------------------------------------------------------- helpers
+
+    private function notifyDocumentChanged(): void
+    {
+        app(ProjectCache::class)->flushDocs((int) $this->id);
+        $this->dispatch('doc-updated', projectId: (int) $this->id);
+    }
 
     protected function ownFolder(?int $folderId): ?ProjectFolder
     {

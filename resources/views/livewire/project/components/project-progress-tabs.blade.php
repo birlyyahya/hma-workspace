@@ -5,26 +5,35 @@ use App\Services\DarCache;
 use App\Services\ProjectCache;
 use Carbon\Carbon;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 
 new class extends Component {
 
     public $id;
 
-    public function mount() {
-        $this->getStagesProperty();
-    }
 
     #[Computed]
-    public function getStagesProperty(): array
+    public function stages(): array
     {
         return app(ProjectCache::class)->progressStages($this->id);
     }
 
     #[Computed]
-    public function getSummaryProperty(): array
+    public function summary(): array
     {
         return app(ProjectCache::class)->progressSummary($this->id);
+    }
+
+    #[On('doc-updated')]
+    public function refresh(int $projectId): void
+    {
+        if ($projectId !== $this->id) {
+            return;
+        }
+
+        unset($this->stages);
+        unset($this->summary);
     }
 
 }; ?>
@@ -177,7 +186,7 @@ new class extends Component {
                             <span class="inline-flex items-center gap-1.5 pl-2 pr-3 py-1.5 rounded-lg bg-red-50 text-red-700 ring-1 ring-red-100 text-xs font-medium cursor-pointer hover:bg-red-100 transition">
                                 <flux:icon.document-text class="w-4 h-4" />
                                 {{ $doc['name'] }}
-                                <span class="text-red-400 font-normal">{{ $doc['size'] }}</span>
+                                <span class="text-red-400 font-normal">{{ Number::fileSize($doc['size']) }}</span>
                             </span>
                             @endforeach
                         </div>
