@@ -84,11 +84,82 @@ const registerExcelImport = (Alpine) => {
     }));
 };
 
+// Komponen Alpine reusable untuk field CKEditor manapun (lihat
+// resources/views/components/ckeditor.blade.php). Didaftarkan global (bukan
+// lewat @script per-halaman) supaya bisa dipakai dari komponen manapun tanpa
+// bergantung pada halaman lain yang kebetulan me-render definisinya duluan.
+const registerCkeditorField = (Alpine) => {
+    Alpine.data('ckeditorField', (model, placeholder) => ({
+        editor: null,
+        value: model,
+
+        init() {
+            this.whenEditorReady(() => this.mountEditor(placeholder));
+        },
+
+        destroy() {
+            this.editor?.destroy().catch(() => {});
+            this.editor = null;
+        },
+
+        whenEditorReady(callback, tries = 0) {
+            if (window.ClassicEditor) {
+                callback();
+                return;
+            }
+
+            if (tries > 200) {
+                console.error('Editor gagal dimuat.');
+                return;
+            }
+
+            setTimeout(() => this.whenEditorReady(callback, tries + 1), 50);
+        },
+
+        mountEditor(placeholder) {
+            if (this.editor) {
+                return;
+            }
+
+            ClassicEditor
+                .create(this.$refs.editor, {
+                    toolbar: [
+                        'heading', '|',
+                        'bold', 'italic', '|',
+                        'bulletedList', 'numberedList', '|',
+                        'link', 'blockQuote', '|',
+                        'undo', 'redo',
+                    ],
+                    placeholder: placeholder || 'Tulis deskripsi...',
+                })
+                .then((editor) => {
+                    this.editor = editor;
+                    editor.setData(this.value || '');
+
+                    editor.model.document.on('change:data', () => {
+                        this.value = editor.getData();
+                    });
+
+                    this.$watch('value', (val) => {
+                        if (editor.getData() !== (val || '')) {
+                            editor.setData(val || '');
+                        }
+                    });
+                })
+                .catch((error) => console.error(error));
+        },
+    }));
+};
+
 // Daftarkan segera bila Alpine sudah aktif (mis. Livewire memulai Alpine sebelum
 // modul ini dieksekusi), selain itu tunggu event alpine:init. Ini mencegah
 // "excelImport is not defined" akibat urutan pemuatan skrip.
 if (window.Alpine) {
     registerExcelImport(window.Alpine);
+    registerCkeditorField(window.Alpine);
 } else {
-    document.addEventListener('alpine:init', () => registerExcelImport(window.Alpine));
+    document.addEventListener('alpine:init', () => {
+        registerExcelImport(window.Alpine);
+        registerCkeditorField(window.Alpine);
+    });
 }

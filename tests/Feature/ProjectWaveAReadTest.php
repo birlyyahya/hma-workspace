@@ -21,6 +21,35 @@ test('timeline gantt loads timelines through ProjectCache', function () {
         ->assertStatus(200);
 });
 
+test('timeline gantt can add a DAR activity to a fase', function () {
+    Http::fake([
+        '*timelines/search*' => Http::response([
+            'status' => 200,
+            'data' => [
+                ['id' => 1, 'title' => 'Fase 1', 'start_date' => '2026-01-01', 'end_date' => '2026-02-01'],
+            ],
+        ], 200),
+        '*dar/list*' => Http::response(['data' => []], 200),
+        '*dar/create*' => Http::response(['success' => true, 'data' => ['id' => 99]], 200),
+    ]);
+
+    $this->actingAs(User::factory()->create());
+
+    Volt::test('project.components.project-timeline-gantt', ['id' => 401])
+        ->call('openAddDar', 1)
+        ->assertSet('addingTimelineId', 1)
+        ->assertSet('addingTimelineTitle', 'Fase 1')
+        ->assertSet('form.isproject', true)
+        ->assertSet('form.timelines_id', 1)
+        ->set('form.activity', 'Koordinasi bandwidth')
+        ->set('form.start_date', '2026-01-05T09:00')
+        ->set('form.end_date', '2026-01-05T11:00')
+        ->call('saveDar')
+        ->assertHasNoErrors()
+        ->assertDispatched('timelineLoad')
+        ->assertSet('addingTimelineId', null);
+});
+
 test('project preview sets the project on success', function () {
     Http::fake(['*projects/402*' => Http::response([
         'status' => 200,

@@ -556,8 +556,11 @@ new class extends Component {
                         $filterProjects = $isSuperadmin
                             ? $allProjects
                             : collect($allProjects)->whereIn('id', $accessibleProjectIds)->values()->toArray();
-                        $projectLabel = $projectFilter !== ''
-                            ? (collect($allProjects)->firstWhere('id', (int) $projectFilter) ?? 'Semua project')
+                        $projectLabelMatch = $projectFilter !== ''
+                            ? collect($allProjects)->firstWhere('id', (int) $projectFilter)
+                            : null;
+                        $projectLabel = $projectLabelMatch
+                            ? ($projectLabelMatch['code'] ?? '').' - '.($projectLabelMatch['name'] ?? '')
                             : 'Semua project';
                     @endphp
                     <div x-show="tab === 'project'" x-cloak class="relative w-full sm:w-56" x-data="{ open: false, query: '' }" @click.away="open = false" @keydown.escape.window="open = false">
@@ -935,7 +938,7 @@ new class extends Component {
                     </div>
 
                     <div>
-                        <flux:textarea wire:model="form.description" rows="3" placeholder="Jelaskan lebih detail apa yang akan dikerjakan..." />
+                        <x-ckeditor model="form.description" placeholder="Jelaskan lebih detail apa yang akan dikerjakan..." />
                         @error('form.description')
                         <flux:error message="{{ $message }}" /> @enderror
                     </div>
