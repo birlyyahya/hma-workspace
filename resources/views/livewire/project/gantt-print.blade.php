@@ -416,9 +416,6 @@ class extends Component {
                 @endfor
                 <td class="cell wk" colspan="{{ $activity['span'] }}">
                     <div class="bar act-bar" style="background:{{ $activity['color'] }};" title="{{ $activity['title'] }} · {{ $activity['start_label'] }} – {{ $activity['end_label'] }} · {{ $activity['status_label'] }}">
-                        @if($activity['span'] >= 2)
-                        <span class="bar-label">{{ $activity['title'] }}</span>
-                        @endif
                     </div>
                 </td>
                 @for ($i = 0; $i < $activity['trailing']; $i++)
