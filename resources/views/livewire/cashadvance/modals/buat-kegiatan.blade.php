@@ -12,10 +12,14 @@ new class extends Component {
     {
         $this->kodeCa = $kodeCa;
     }
+
+    public function save(){
+
+    }
 }; ?>
 
 <flux:modal name="buat-kegiatan" class="w-lg">
-    <form class="space-y-6">
+    <form wire:submit='save' class="space-y-6">
         <div>
             <flux:heading size="lg">Buat Dompet Kegiatan</flux:heading>
             <flux:text class="mt-1">Dana cair dicatat sebagai transaksi masuk pertama.</flux:text>

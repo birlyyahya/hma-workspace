@@ -147,6 +147,27 @@ class CaWriter
         }
     }
 
+
+    // Buat Dompoet Kegiatan
+
+    public function createDompetKegiatan(Array $payload){
+        try {
+            $response = $this->externalWrite()->sendTransaction($this->apiBase . '/topup-wallet-kegiatan', $payload);
+
+            $body = $response->json();
+            $ok = $response->successful() || (bool) ($body['success'] ?? false);
+            return $this->result($ok, $body, $response->status(), [
+            'name' => 'ca',
+            'event' => 'deleted',
+            'description' => "Create dompet kegiatan {$body['data']['kode_ca']}",
+            'properties' => ['payload' => $payload],
+            ]);
+        }catch (\Throwable $e) {
+            return $this->fail('createDompetKegiatan', $e, ['user_id' => $payload['user_id']]);
+        }
+
+    }
+
     /**
      * Bangun struktur hasil; flush cache CA & catat activity saat sukses.
      *
