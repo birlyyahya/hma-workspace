@@ -303,7 +303,7 @@ class extends Component {
         .gantt-doc tr.act .dot { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
 
         /* Bar pil membulat mengambang di atas grid */
-        .gantt-doc .bar { border-radius:9999px; box-shadow: 0 1px 2px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(0,0,0,0.04); display:flex; align-items:center; overflow:hidden; }
+        .gantt-doc .bar { border-radius:4px; box-shadow: 0 1px 2px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(0,0,0,0.04); display:flex; align-items:center; overflow:hidden; }
         .gantt-doc .bar.phase-bar { height:19px; padding:0 9px; }
         .gantt-doc .bar.act-bar { height:13px; padding:0 6px; }
         .gantt-doc .bar .bar-label { color:#fff; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-shadow:0 1px 1px rgba(0,0,0,0.18); }
@@ -416,6 +416,9 @@ class extends Component {
                 @endfor
                 <td class="cell wk" colspan="{{ $activity['span'] }}">
                     <div class="bar act-bar" style="background:{{ $activity['color'] }};" title="{{ $activity['title'] }} · {{ $activity['start_label'] }} – {{ $activity['end_label'] }} · {{ $activity['status_label'] }}">
+                        @if($activity['span'] >= 1)
+                        <span class="bar-label">{{ $activity['title'] }}</span>
+                        @endif
                     </div>
                 </td>
                 @for ($i = 0; $i < $activity['trailing']; $i++)
