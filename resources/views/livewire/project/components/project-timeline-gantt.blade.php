@@ -325,6 +325,11 @@ new class extends Component {
                     {{ count($monthGroups) }} bulan
                 </span>
                 @endif
+                @if(count($timelines))
+                <flux:button size="sm" variant="ghost" icon="arrow-down-tray" :href="route('projects.gantt-print', $id)" target="_blank">
+                    Export PDF
+                </flux:button>
+                @endif
             </div>
         </div>
 

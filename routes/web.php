@@ -24,6 +24,7 @@ Route::middleware('auth')->group(function () {
         Volt::route('/edit/{id}', 'project.project-edit')->name('projects.edit');
         Volt::route('/show/{id}', 'project.project-show')->name('projects.show');
         Volt::route('/preview/{id}', 'project.project-preview')->name('projects.preview');
+        Volt::route('/gantt-print/{id}', 'project.gantt-print')->name('projects.gantt-print');
     });
 
     // DAR

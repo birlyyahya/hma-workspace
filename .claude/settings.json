@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs -0 ls -t)",
+      "Bash(php artisan test *)",
+      "Bash(php -l *)",
+      "Bash(php artisan route:list *)",
+      "mcp__laravel-boost__database-query",
+      "mcp__laravel-boost__search-docs",
+      "mcp__laravel-boost__get-absolute-url",
+      "Bash(python3 -c \"import json; json.load\\(open\\('/Users/birlyyahya/Documents/webdev/hma-workspace/.claude/settings.json'\\)\\); print\\('valid JSON'\\)\")"
+    ]
+  }
+}
