@@ -305,18 +305,47 @@ new class extends Component {
 }; ?>
 
 <div>
-    <div class="bg-white border rounded-2xl overflow-hidden">
+    <div
+        class="bg-white border rounded-2xl overflow-hidden"
+        x-data="{ labelCollapsed: window.matchMedia('(max-width: 767px)').matches }"
+    >
         {{-- HEADER --}}
-        <div class="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-6 py-4 border-b">
-            <div class="flex items-center gap-3">
-                <flux:icon name="chart-bar" class="w-5 h-5 text-gray-400" />
-                <div>
-                    <h2 class="text-base font-semibold">Gantt Chart Timeline</h2>
-                    <p class="text-xs text-gray-500">Fase &amp; aktivitas DAR per minggu</p>
+        <div class="px-4 sm:px-6 py-4 border-b">
+            <div class="flex items-start justify-between gap-3">
+                {{-- Title --}}
+                <div class="flex items-center gap-3 min-w-0">
+                    <flux:icon name="chart-bar" class="w-5 h-5 text-gray-400 shrink-0" />
+                    <div class="min-w-0">
+                        <h2 class="text-base font-semibold truncate">Gantt Chart Timeline</h2>
+                        <p class="text-xs text-gray-500 truncate">Fase &amp; aktivitas DAR per minggu</p>
+                    </div>
                 </div>
+
+                {{-- Actions --}}
+                @if(count($timelines))
+                <div class="flex items-center gap-1.5 shrink-0">
+                    {{-- Ciutkan kolom judul — terutama berguna di mobile agar bar terlihat --}}
+                    <button
+                        type="button"
+                        @click="labelCollapsed = !labelCollapsed"
+                        class="inline-flex items-center gap-1.5 rounded-lg h-8 px-2 sm:px-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-800 transition"
+                        :title="labelCollapsed ? 'Tampilkan judul' : 'Ciutkan judul'"
+                    >
+                        <flux:icon x-show="!labelCollapsed" name="chevron-double-left" class="w-4 h-4 shrink-0" />
+                        <flux:icon x-show="labelCollapsed" name="chevron-double-right" class="w-4 h-4 shrink-0" />
+                        <span class="hidden sm:inline" x-text="labelCollapsed ? 'Judul' : 'Ciutkan'"></span>
+                    </button>
+                    <flux:button size="sm" variant="ghost" icon="arrow-down-tray" :href="route('projects.gantt-print', $id)" target="_blank">
+                        <span class="hidden sm:inline">Export PDF</span>
+                        <span class="sm:hidden">PDF</span>
+                    </flux:button>
+                </div>
+                @endif
             </div>
 
-            <div class="flex items-center gap-2 text-xs font-semibold text-gray-500">
+            {{-- Meta pills --}}
+            @if(count($timelines))
+            <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-gray-500">
                 <span class="rounded-full bg-gray-100 px-2.5 py-1 ring-1 ring-gray-200">
                     {{ count($timelines) }} timeline
                 </span>
@@ -325,12 +354,8 @@ new class extends Component {
                     {{ count($monthGroups) }} bulan
                 </span>
                 @endif
-                @if(count($timelines))
-                <flux:button size="sm" variant="ghost" icon="arrow-down-tray" :href="route('projects.gantt-print', $id)" target="_blank">
-                    Export PDF
-                </flux:button>
-                @endif
             </div>
+            @endif
         </div>
 
         @if(empty($timelines) || empty($weeks))
@@ -345,19 +370,33 @@ new class extends Component {
             $todayMarker = $this->todayMarker;
             $weekCount = count($weeks);
             $labelColWidth = 220;
+            $collapsedLabelWidth = 52;
             $weekMinWidth = 56;
-            $totalMinWidth = $labelColWidth + ($weekCount * $weekMinWidth);
-            $gridTemplate = $labelColWidth.'px repeat('.$weekCount.', minmax('.$weekMinWidth.'px, 1fr))';
+            $weeksMinWidth = $weekCount * $weekMinWidth;
+            // Lebar kolom judul memakai CSS var agar bisa diciutkan lewat Alpine
+            // (mobile) tanpa render ulang server. Grid & min-width ikut var ini.
+            $gridTemplate = 'var(--gantt-label-w, '.$labelColWidth.'px) repeat('.$weekCount.', minmax('.$weekMinWidth.'px, 1fr))';
         @endphp
 
-        <div class="overflow-x-auto">
-            <div class="min-w-max" style="min-width: {{ $totalMinWidth }}px;">
+        <style>
+            /* Saat diciutkan: sembunyikan isi label & rapatkan kolom judul. */
+            .gantt-collapsed .gantt-label-full { display: none !important; }
+            /* Kurangi indent aktivitas agar dot status tetap terlihat di kolom sempit. */
+            .gantt-collapsed .gantt-act-label { padding-left: 0.85rem !important; padding-right: 0.5rem !important; }
+        </style>
+
+        <div
+            class="overflow-x-auto"
+            :class="{ 'gantt-collapsed': labelCollapsed }"
+            :style="`--gantt-label-w: ${labelCollapsed ? '{{ $collapsedLabelWidth }}px' : '{{ $labelColWidth }}px'}`"
+        >
+            <div class="min-w-max" style="min-width: calc(var(--gantt-label-w, {{ $labelColWidth }}px) + {{ $weeksMinWidth }}px);">
 
                 {{-- HEADER: months (row 1) + weeks (row 2) --}}
-                <div class="border-b bg-gray-50 sticky top-0 z-10">
+                <div class="border-b bg-gray-50 sticky top-0 z-30">
                     <div class="grid" style="grid-template-columns: {{ $gridTemplate }};">
-                        <div class="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 border-r bg-gray-50 sticky left-0 z-10">
-                            Timeline
+                        <div class="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 border-r bg-gray-50 sticky left-0 z-10 overflow-hidden">
+                            <span class="gantt-label-full">Timeline</span>
                         </div>
                         @foreach($monthGroups as $group)
                         <div class="px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-wide border-r last:border-r-0 border-b border-gray-200 text-gray-600" style="grid-column: span {{ $group['span'] }};">
@@ -366,8 +405,8 @@ new class extends Component {
                         @endforeach
                     </div>
                     <div class="grid" style="grid-template-columns: {{ $gridTemplate }};">
-                        <div class="px-4 py-1.5 text-[10px] text-gray-400 border-r bg-gray-50 sticky left-0 z-10">
-                            Weeks
+                        <div class="px-4 py-1.5 text-[10px] text-gray-400 border-r bg-gray-50 sticky left-0 z-10 overflow-hidden">
+                            <span class="gantt-label-full">Weeks</span>
                         </div>
                         @foreach($weeks as $i => $week)
                         @php
@@ -402,16 +441,16 @@ new class extends Component {
 
                     @foreach($rows as $row)
                     {{-- Fase row --}}
-                    <div wire:key="gantt-row-{{ $row['id'] }}" class="grid items-center border-b last:border-b-0 hover:bg-gray-50/60 transition" style="grid-template-columns: {{ $gridTemplate }}; min-height: 56px;">
+                    <div wire:key="gantt-row-{{ $row['id'] }}" class="group/phase grid items-center border-b last:border-b-0 hover:bg-gray-50 transition" style="grid-template-columns: {{ $gridTemplate }}; min-height: 56px;">
                         {{-- Label cell --}}
-                        <div class="px-4 py-3 border-r bg-white sticky left-0 z-1 flex items-start gap-1">
+                        <div class="px-4 py-3 border-r bg-white group-hover/phase:bg-gray-50 sticky left-0 z-20 flex items-start gap-1 transition overflow-hidden">
                             <button type="button" wire:click="toggleExpand({{ $row['id'] }})" class="flex items-start gap-1.5 text-left flex-1 min-w-0 group/toggle">
                                 @if($row['activity_count'] > 0)
                                     <flux:icon name="{{ $row['expanded'] ? 'chevron-down' : 'chevron-right' }}" class="w-3.5 h-3.5 mt-0.5 shrink-0 text-gray-400 group-hover/toggle:text-gray-600" />
                                 @else
                                     <span class="w-3.5 shrink-0"></span>
                                 @endif
-                                <span class="min-w-0">
+                                <span class="gantt-label-full min-w-0">
                                     <span class="flex items-center gap-1.5">
                                         <span class="text-sm font-semibold text-gray-900 truncate">{{ $row['title'] }}</span>
                                         @if($row['activity_count'] > 0)
@@ -424,7 +463,7 @@ new class extends Component {
                                 </span>
                             </button>
                             <flux:tooltip content="Tambah DAR ke timeline ini">
-                                <button type="button" wire:click="openAddDar({{ $row['id'] }})" class="shrink-0 p-1 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition">
+                                <button type="button" wire:click="openAddDar({{ $row['id'] }})" class="gantt-label-full shrink-0 p-1 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition">
                                     <flux:icon name="plus" class="w-3.5 h-3.5" />
                                 </button>
                             </flux:tooltip>
@@ -445,11 +484,11 @@ new class extends Component {
                     @if($row['expanded'])
                     @foreach($row['activities'] as $activity)
                     <a wire:key="gantt-activity-{{ $activity['id'] }}" href="{{ route('dar.dar-show', $activity['id']) }}" wire:navigate
-                       class="grid items-center border-b last:border-b-0 bg-gray-50/40 hover:bg-gray-100/70 transition" style="grid-template-columns: {{ $gridTemplate }}; min-height: 40px;">
-                        <div class="px-4 py-2 border-r bg-gray-50/40 sticky left-0 z-1 pl-10">
+                       class="group/act grid items-center border-b last:border-b-0 bg-gray-50 hover:bg-gray-100 transition" style="grid-template-columns: {{ $gridTemplate }}; min-height: 40px;">
+                        <div class="gantt-act-label px-4 py-2 border-r bg-gray-50 group-hover/act:bg-gray-100 sticky left-0 z-20 pl-10 transition overflow-hidden">
                             <span class="flex items-center gap-1.5 min-w-0">
                                 <span class="size-1.5 rounded-full shrink-0 {{ $activity['status_dot'] }}"></span>
-                                <span class="text-xs text-gray-600 truncate">{{ $activity['title'] }}</span>
+                                <span class="gantt-label-full text-xs text-gray-600 truncate">{{ $activity['title'] }}</span>
                             </span>
                         </div>
                         <div class="px-1 py-1.5 relative" style="grid-column: {{ $activity['col_start'] }} / span {{ $activity['col_span'] }};">
