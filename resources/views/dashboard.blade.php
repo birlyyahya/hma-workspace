@@ -41,6 +41,8 @@
         {{-- Announcement (full width — important) --}}
         <livewire:widget.dashboard.announcement lazy />
 
+        <livewire:widget.dashboard.project-activity lazy />
+
         <livewire:widget.dashboard.event-calendar lazy />
 
         {{-- Latest Articles --}}
