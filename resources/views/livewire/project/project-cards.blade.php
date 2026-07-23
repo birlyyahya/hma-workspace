@@ -21,6 +21,9 @@ new class extends Component
     #[Url(as: 'year', except: '')]
     public string $year = '';
 
+    #[Url(as: 'status', except: '')]
+    public string $status = '';
+
     #[Url(as: 'view', except: 'cards')]
     public string $viewMode = 'cards';
 
@@ -59,8 +62,9 @@ new class extends Component
         $search = trim($this->search);
         $hasSearch = $search !== '';
         $hasYear = $this->year !== '';
+        $hasStatus = $this->status !== '';
 
-        if (! $hasSearch && ! $hasYear && $this->currentPage === 1) {
+        if (! $hasSearch && ! $hasYear && ! $hasStatus && $this->currentPage === 1) {
             $response = app(ProjectCache::class)->defaultProjectsList($this->limit);
 
             $this->projects = $response['data'] ?? [];
@@ -86,6 +90,12 @@ new class extends Component
             $projects = $projects->filter(
                 fn (array $project): bool => ! empty($project['start_date'])
                     && (int) \Carbon\Carbon::parse($project['start_date'])->year === (int) $this->year
+            );
+        }
+
+        if ($hasStatus) {
+            $projects = $projects->filter(
+                fn (array $project): bool => ($project['status'] ?? '') === $this->status
             );
         }
 
@@ -117,6 +127,11 @@ new class extends Component
     }
 
     public function updatedYear(): void
+    {
+        $this->applyFilters();
+    }
+
+    public function updatedStatus(): void
     {
         $this->applyFilters();
     }
@@ -227,7 +242,7 @@ new class extends Component
                 placeholder="Cari proyek berdasarkan nama, kode, atau PPK..."
                 class="w-full"
             />
-            <div wire:loading wire:target="applyFilters,goToPage,updatedYear" class="absolute right-3 top-1/2 -translate-y-1/2">
+            <div wire:loading wire:target="applyFilters,goToPage,updatedYear,updatedStatus" class="absolute right-3 top-1/2 -translate-y-1/2">
                 <svg class="animate-spin h-4 w-4 text-zinc-400" viewBox="0 0 24 24" fill="none">
                     <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" class="opacity-25"/>
                     <path fill="currentColor" class="opacity-75" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a10 10 0 00-10 10h4z"/>
@@ -247,6 +262,21 @@ new class extends Component
                 <flux:select.option value="{{ $y }}">{{ $y }}</flux:select.option>
             @endforeach
         </flux:select>
+
+        {{-- Status Filter --}}
+        <flux:dropdown>
+            <flux:button icon="funnel" icon:trailing="chevron-down" variant="{{ $status ? 'primary' : 'outline' }}" class="shrink-0">
+                {{ $status ? ($statusConfig[$status]['label'] ?? 'Status') : 'Semua Status' }}
+            </flux:button>
+            <flux:menu>
+                <flux:menu.radio.group wire:model.live="status">
+                    <flux:menu.radio value="">Semua Status</flux:menu.radio>
+                    @foreach($statusConfig as $key => $cfg)
+                        <flux:menu.radio value="{{ $key }}">{{ $cfg['label'] }}</flux:menu.radio>
+                    @endforeach
+                </flux:menu.radio.group>
+            </flux:menu>
+        </flux:dropdown>
 
         {{-- View Toggle --}}
         <div class="inline-flex rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-0.5 shrink-0">
@@ -269,7 +299,7 @@ new class extends Component
     {{-- Project Grid (Cards View) --}}
     @if($viewMode === 'cards')
     <div class="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-         wire:loading.remove wire:target="applyFilters,goToPage,year">
+         wire:loading.remove wire:target="applyFilters,goToPage,year,status">
 
         @forelse($projects as $item)
             @php
@@ -394,7 +424,7 @@ new class extends Component
     </div>
 
     {{-- Loading skeleton (Cards View) --}}
-    <div wire:loading wire:target="applyFilters,goToPage,year"
+    <div wire:loading wire:target="applyFilters,goToPage,year,status"
          class="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         @foreach(range(1, 1) as $_)
             <flux:skeleton.group animate="shimmer"
@@ -428,7 +458,7 @@ new class extends Component
 
     {{-- Project Table (List View) --}}
     @if($viewMode === 'list')
-    <div wire:loading.remove wire:target="applyFilters,goToPage,year"
+    <div wire:loading.remove wire:target="applyFilters,goToPage,year,status"
          class="overflow-x-auto rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm">
         <table class="min-w-225 md:min-w-full text-sm">
             <thead class="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-xs uppercase tracking-wider">
@@ -560,7 +590,7 @@ new class extends Component
     </div>
 
     {{-- Loading skeleton (List View) --}}
-    <div wire:loading wire:target="applyFilters,goToPage,year"
+    <div wire:loading wire:target="applyFilters,goToPage,year,status"
          class="overflow-hidden rounded-2xl border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
         <flux:skeleton.group animate="shimmer" class="divide-y divide-zinc-100 dark:divide-zinc-800">
             @foreach(range(1, 6) as $_)
@@ -587,7 +617,7 @@ new class extends Component
             )->values();
         @endphp
 
-        <div wire:loading.remove wire:target="applyFilters,goToPage,year"
+        <div wire:loading.remove wire:target="applyFilters,goToPage,year,status"
              class="flex flex-wrap items-center justify-center gap-1.5 pt-2">
 
             <flux:button
@@ -621,7 +651,7 @@ new class extends Component
             />
         </div>
 
-        <p wire:loading.remove wire:target="applyFilters,goToPage,year"
+        <p wire:loading.remove wire:target="applyFilters,goToPage,year,status"
            class="text-center text-xs text-zinc-400 dark:text-zinc-500 pb-2">
             Halaman {{ $currentPage }} dari {{ $lastPage }}
             &middot; Total {{ $pagination['total'] }} proyek
