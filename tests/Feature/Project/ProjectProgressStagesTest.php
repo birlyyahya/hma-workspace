@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ProjectFileSize;
 use App\Models\User;
 use App\Services\ProjectCache;
 use Illuminate\Support\Carbon;
@@ -39,6 +40,8 @@ test('progressStages maps timelines, activities, and documents with derived stat
     $user = User::factory()->create(['name' => 'Birly']);
     fakeProgressEndpoints($user->id);
 
+    ProjectFileSize::query()->create(['project_id' => 69, 'doc_id' => 100, 'size_bytes' => 1048576]);
+
     $stages = (new ProjectCache('http://api.test'))->progressStages(69);
 
     expect($stages)->toHaveCount(4);
@@ -53,7 +56,7 @@ test('progressStages maps timelines, activities, and documents with derived stat
         ->signals->toBe(['1 Dokumen', '1/1 Task DAR selesai'])
         ->notes->toBe('Kontrak oke');
     expect($byTitle['TANDA TANGAN KONTRAK']['activities'][0]['user'])->toBe('Birly');
-    expect($byTitle['TANDA TANGAN KONTRAK']['documents'])->toBe([['name' => 'Kontrak.pdf', 'size' => '1 MB']]);
+    expect($byTitle['TANDA TANGAN KONTRAK']['documents'])->toBe([['name' => 'Kontrak.pdf', 'size' => 1048576]]);
 
     // Hari ini di dalam rentang → current
     expect($byTitle['PEMERIKSAAN'])->status->toBe('current')->date->toBeNull();
@@ -61,10 +64,37 @@ test('progressStages maps timelines, activities, and documents with derived stat
     // Belum mulai → upcoming
     expect($byTitle['PELATIHAN'])->status->toBe('upcoming');
 
-    // Lewat tapi ada aktivitas belum CLOSED → pending
+    // Lewat tapi ada aktivitas belum CLOSED → pending. Dokumen "Kontrak.pdf"
+    // TIDAK bocor ke sini karena judul tahap "DISTRIBUSI" tak cocok dengan dokumen.
     expect($byTitle['DISTRIBUSI'])
         ->status->toBe('pending')
-        ->signals->toBe(['1 Dokumen', '0/1 Task DAR selesai']);
+        ->documents->toBe([])
+        ->signals->toBe(['0/1 Task DAR selesai']);
+});
+
+test('progressStages tidak membocorkan dokumen ke tahap lain karena nama project yang sama', function () {
+    $user = User::factory()->create(['name' => 'Birly']);
+
+    Http::fake([
+        '*/timelines/search*' => Http::response(['data' => [
+            ['id' => 1, 'title' => 'TANDA TANGAN KONTRAK', 'start_date' => '2026-05-01', 'end_date' => '2026-05-31', 'notes' => null],
+            ['id' => 2, 'title' => 'IMPLEMENTASI', 'start_date' => '2026-06-01', 'end_date' => '2026-07-31', 'notes' => null],
+        ]], 200),
+        // Aktivitas DAR di tahap IMPLEMENTASI menyebut nama paket "Assesment Center"
+        // yang juga muncul di judul dokumen kontrak — inilah sumber kebocoran lama.
+        '*/global/dar/list*' => Http::response(['data' => [
+            ['id' => 20, 'user_id' => $user->id, 'activity' => 'Survey Lokasi Server Paket B1 Assesment Center', 'date' => '2026-06-20 09:00:00', 'status' => 1, 'project_category_id' => 2],
+        ]], 200),
+        '*/admin-docs/search*' => Http::response(['data' => [
+            ['id' => 100, 'title' => 'KONTRAK PT WIJAYA MUNCUL MAKMUR ASSESMENT CENTER', 'created_at' => '2026-05-20 10:00:00'],
+        ]], 200),
+    ]);
+
+    $byTitle = collect((new ProjectCache('http://api.test'))->progressStages(69))->keyBy('title');
+
+    expect($byTitle['TANDA TANGAN KONTRAK']['documents'])->toHaveCount(1)
+        ->and($byTitle['TANDA TANGAN KONTRAK']['documents'][0]['name'])->toBe('KONTRAK PT WIJAYA MUNCUL MAKMUR ASSESMENT CENTER')
+        ->and($byTitle['IMPLEMENTASI']['documents'])->toBe([]);
 });
 
 test('progressStages sorts stages by earliest start date', function () {

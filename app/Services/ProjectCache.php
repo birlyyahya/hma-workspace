@@ -440,7 +440,7 @@ class ProjectCache
                     $end = Carbon::parse($timeline['end_date'])->endOfDay();
 
                     $stageActivities = $this->buildStageActivities($activitiesByCategory->get($timeline['id'], collect()), $userNames);
-                    $stageDocuments = $this->buildStageDocuments($documents, $stageActivities, $timeline['title'], $start, $end, $id) ?? [];
+                    $stageDocuments = $this->buildStageDocuments($documents, $timeline['title'], $id);
                     $status = $this->resolveStageStatus($today, $start, $end, $stageActivities, $stageDocuments);
 
                     return [
@@ -513,29 +513,27 @@ class ProjectCache
     }
 
     /**
-     * Dokumen admin yang `created_at`-nya jatuh di dalam rentang tahap. Dokumen
-     * tidak terikat timeline di BEPM, jadi dipetakan berdasarkan tanggal unggah.
+     * Dokumen admin yang terkait sebuah tahap. Dokumen tidak terikat timeline di
+     * BEPM, jadi dipetakan berdasarkan judul timeline: dokumen masuk bila judul
+     * atau salah satu keyword-nya memuat kata dari judul tahap (mis. "kontrak"
+     * dari "Tanda Tangan Kontrak"). Sengaja TIDAK memakai teks aktivitas DAR
+     * sebagai kata kunci — aktivitas kerap menyebut nama project/paket yang sama
+     * di banyak tahap, sehingga satu dokumen bisa bocor ke tahap yang salah.
      *
      * @param  Collection<int, array<string, mixed>>  $documents
      * @return array<int, array{name: string, size: ?string}>
      */
-    private function buildStageDocuments(Collection $documents, array $stageActivities, string $title, Carbon $start, Carbon $end, int $id): array
+    private function buildStageDocuments(Collection $documents, string $title, int $id): array
     {
-
-        $keywords = collect([$title])
-            ->merge(
-                collect($stageActivities)
-                    ->flatMap(fn ($activity) => [
-                        $activity['title'] ?? null,
-                        $activity['description'] ?? null,
-                    ])
-            )
-            ->filter()
-            ->flatMap(fn ($text) => preg_split('/\s+/', Str::lower($text)))
+        $keywords = collect(preg_split('/\s+/', Str::lower($title)))
             ->filter(fn ($word) => strlen($word) >= 4)
             ->unique()
             ->values()
             ->all();
+
+        if ($keywords === []) {
+            return [];
+        }
 
         $fileSizes = ProjectFileSize::query()
             ->where('project_id', (int) $id)
