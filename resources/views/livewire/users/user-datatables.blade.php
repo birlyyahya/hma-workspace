@@ -368,11 +368,13 @@ new class extends Component {
                     </flux:button>
                 @endif
 
+                @can('user.create')
                 <flux:modal.trigger name="create-user-modal">
                     <flux:button icon="plus" variant="primary" class="cursor-pointer">
-                        Create user
+                        Tambah user
                     </flux:button>
                 </flux:modal.trigger>
+                @endcan
             </div>
         </div>
 

@@ -68,11 +68,11 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Gate::define('viewPulse', function (User $user) {
-            return $user->hasRole('super-admin') || $user->hasPermission('view.pulse');
+            return $user->hasRole('super-admin') || $user->hasPermission('pulse.view');
         });
 
         Gate::define('viewActivityLog', function (User $user) {
-            return $user->hasRole('super-admin') || $user->hasPermission('view.activity-log');
+            return $user->hasRole('super-admin') || $user->hasPermission('activity-log.view');
         });
 
         if (app()->environment('production')) {
