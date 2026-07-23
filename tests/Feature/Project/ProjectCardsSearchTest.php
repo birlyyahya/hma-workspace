@@ -95,6 +95,17 @@ test('search matches by project code', function () {
         ->assertDontSee('Pembangunan Jembatan');
 });
 
+test('status filter matches by project status', function () {
+    $user = userWithProjectViewAll();
+
+    Volt::actingAs($user)
+        ->test('project.project-cards')
+        ->set('status', 'WAITING')
+        ->call('applyFilters')
+        ->assertSee('Sistem Informasi Keuangan')
+        ->assertDontSee('Pembangunan Jembatan');
+});
+
 test('confirming delete stages the pending project for the modal', function () {
     $user = userWithProjectViewAll();
 
