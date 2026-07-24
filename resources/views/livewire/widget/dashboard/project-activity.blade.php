@@ -137,7 +137,7 @@ new class extends Component
     }
 }; ?>
 
-<div class="bg-white rounded-2xl border border-zinc-200 shadow-xs min-h-100">
+<div class="bg-white rounded-2xl border border-zinc-200 shadow-xs min-h-100 overflow-auto lg:overflow-hidden">
     @php $stats = $this->stats; @endphp
 
     <div class="flex flex-wrap items-center justify-between gap-3 p-4 pb-0 sm:p-5 sm:pb-0">
@@ -196,7 +196,6 @@ new class extends Component
                                     theme: 'light',
                                     y: { formatter: (val) => val + ' aktivitas' },
                                     style: { fontSize: '12px' },
-                                    fixed: { enabled: true, position: 'topRight', offsetX: 0, offsetY: 0 },
                                 },
                                 states: { hover: { filter: { type: 'lighten', value: 0.08 } } },
                                 responsive: [{ breakpoint: 640, options: { chart: { height: '100%' } } }],
