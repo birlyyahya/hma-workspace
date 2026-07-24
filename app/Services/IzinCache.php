@@ -214,6 +214,24 @@ class IzinCache
         }, ['data' => []]);
     }
 
+    public function spdDetail(int $id): array
+    {
+        return $this->rememberFlexible([self::TAG, "spd:detail:{$id}"], "izin:detail:{$id}", [self::TTL_DETAIL, self::TTL_DETAIL * 4], function () use ($id) {
+            $response = Http::timeout(5)
+                ->retry(2, 200, function ($e) {
+                    return $e instanceof \Illuminate\Http\Client\ConnectionException
+                        || (method_exists($e, 'response') && optional($e->response)->serverError());
+                }, throw: false)
+                ->get($this->apiBase.'/global/dar/activity/list-spd/'.$id);
+
+            if (! $response->successful()) {
+                throw new \RuntimeException('izin detail status '.$response->status());
+            }
+
+            return $response->json() ?? [];
+        }, ['data' => []]);
+    }
+
     /**
      * Tanda tangan tersimpan milik user. Data berada di BE izin
      * (endpoint /global/user/get-user/{username}). Jarang berubah, jadi

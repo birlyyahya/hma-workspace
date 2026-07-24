@@ -19,10 +19,9 @@ class extends Component {
 
     public function mount(): void
     {
-        $response = app(IzinCache::class)->spdList(['per_page' => 1000]);
+        $response = app(IzinCache::class)->spdDetail($this->id);
 
-        $rows = $response['data'] ?? [];
-        $this->spd = collect($rows)->firstWhere('id', (int) $this->id);
+        $this->spd = $response['data'] ?? [];
     }
 
     /**
@@ -62,7 +61,8 @@ class extends Component {
 }; ?>
 
 <div class="min-h-screen px-2 py-4 sm:px-4 sm:py-6">
-    @if (! $spd)
+
+    @if (!$spd)
     <div class="mx-auto max-w-2xl rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-zinc-200">
         <div class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-zinc-100 text-zinc-400">
             <flux:icon name="exclamation-triangle" class="h-6 w-6" />
