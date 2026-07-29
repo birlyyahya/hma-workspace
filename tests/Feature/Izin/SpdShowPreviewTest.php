@@ -5,6 +5,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Services\IzinCache;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 use Livewire\Volt\Volt;
 use setasign\Fpdi\Fpdi;
@@ -56,11 +57,21 @@ function fakeSpdRow(User $user): array
     ];
 }
 
+/**
+ * IzinCache::spdDetail() mengembalikan body mentah DARBE, dibungkus di
+ * bawah key 'data' (bukan record flat). Caller (controller/Volt) wajib
+ * unwrap sendiri.
+ */
+function fakeSpdDetailResponse(User $user, array $overrides = []): array
+{
+    return ['data' => array_merge(fakeSpdRow($user), $overrides)];
+}
+
 test('renders an iframe pointing to the PDF stream route', function () {
     $user = User::factory()->create();
 
     mock(IzinCache::class, function ($mock) use ($user) {
-        $mock->shouldReceive('spdList')->andReturn(['data' => [fakeSpdRow($user)]]);
+        $mock->shouldReceive('spdDetail')->andReturn(fakeSpdDetailResponse($user));
     });
 
     Volt::actingAs($user)->test('izin.spd-show', ['id' => 1])
@@ -72,7 +83,7 @@ test('does not render print or download buttons in the header', function () {
     $user = User::factory()->create();
 
     mock(IzinCache::class, function ($mock) use ($user) {
-        $mock->shouldReceive('spdList')->andReturn(['data' => [fakeSpdRow($user)]]);
+        $mock->shouldReceive('spdDetail')->andReturn(fakeSpdDetailResponse($user));
     });
 
     Volt::actingAs($user)->test('izin.spd-show', ['id' => 1])
@@ -84,7 +95,7 @@ test('shows a not-found state when the SPD is missing', function () {
     $user = User::factory()->create();
 
     mock(IzinCache::class, function ($mock) {
-        $mock->shouldReceive('spdList')->andReturn(['data' => []]);
+        $mock->shouldReceive('spdDetail')->andReturn(['data' => []]);
     });
 
     Volt::actingAs($user)->test('izin.spd-show', ['id' => 999])
@@ -95,7 +106,7 @@ test('the PDF route streams an inline PDF binary', function () {
     $user = User::factory()->create();
 
     mock(IzinCache::class, function ($mock) use ($user) {
-        $mock->shouldReceive('spdList')->andReturn(['data' => [fakeSpdRow($user)]]);
+        $mock->shouldReceive('spdDetail')->andReturn(fakeSpdDetailResponse($user));
     });
 
     $response = actingAs($user)->get(route('izin.spd-pdf', 1));
@@ -111,7 +122,7 @@ test('the PDF route returns 404 for a missing SPD', function () {
     $user = User::factory()->create();
 
     mock(IzinCache::class, function ($mock) {
-        $mock->shouldReceive('spdList')->andReturn(['data' => []]);
+        $mock->shouldReceive('spdDetail')->andReturn(['data' => []]);
     });
 
     actingAs($user)->get(route('izin.spd-pdf', 999))->assertNotFound();
@@ -121,7 +132,7 @@ test('admin copy is cached per permission and never leaks to users without spd.c
     $target = User::factory()->create();
 
     mock(IzinCache::class, function ($mock) use ($target) {
-        $mock->shouldReceive('spdList')->andReturn(['data' => [fakeSpdRow($target)]]);
+        $mock->shouldReceive('spdDetail')->andReturn(fakeSpdDetailResponse($target));
     });
 
     // Pembuat membuka lebih dulu (memanaskan cache dengan varian 2 halaman)...
@@ -138,4 +149,31 @@ test('admin copy is cached per permission and never leaks to users without spd.c
 
     expect(spdPreviewCountPages($creatorPdf))->toBe(2)
         ->and(spdPreviewCountPages($plainPdf))->toBe(1);
+});
+
+test('the PDF route unwraps the DARBE data envelope so the attachment reaches the composer', function () {
+    $user = User::factory()->create();
+
+    $attachment = new Fpdi;
+    $attachment->AddPage();
+    $attachment->SetFont('Helvetica', '', 12);
+    $attachment->Cell(0, 10, 'Lampiran');
+
+    // spdDetail() mengembalikan {data: {...}} — kalau controller lupa unwrap 'data',
+    // attachment_url tidak pernah sampai ke SpdPdfComposer dan lampiran hilang diam-diam.
+    Http::fake([
+        'darbe.test/*' => Http::response($attachment->Output('', 'S'), 200, ['Content-Type' => 'application/pdf']),
+    ]);
+
+    mock(IzinCache::class, function ($mock) use ($user) {
+        $mock->shouldReceive('spdDetail')->andReturn(fakeSpdDetailResponse($user, [
+            'attachment_url' => 'https://darbe.test/files/lampiran.pdf',
+        ]));
+    });
+
+    $response = actingAs($user)->get(route('izin.spd-pdf', 1));
+
+    $response->assertSuccessful();
+
+    expect(spdPreviewCountPages($response->getContent()))->toBe(2);
 });

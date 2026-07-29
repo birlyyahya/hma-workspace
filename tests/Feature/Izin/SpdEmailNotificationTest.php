@@ -133,7 +133,7 @@ test('spd-show sendEmail sends the mail from the preview header', function () {
     $target = User::factory()->create();
 
     mock(IzinCache::class, function ($mock) use ($target) {
-        $mock->shouldReceive('spdList')->andReturn(['data' => [spdEmailRow($target)]]);
+        $mock->shouldReceive('spdDetail')->andReturn(['data' => spdEmailRow($target)]);
     });
 
     Volt::actingAs($creator)->test('izin.spd-show', ['id' => 9])

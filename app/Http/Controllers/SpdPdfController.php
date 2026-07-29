@@ -18,7 +18,7 @@ class SpdPdfController extends Controller
     public function __invoke(int $id, IzinCache $izinCache, SpdPdfComposer $composer): Response
     {
         $response = $izinCache->spdDetail($id);
-        $spd = $response;
+        $spd = $response['data'] ?? [];
 
         abort_if(! $spd, 404);
 
