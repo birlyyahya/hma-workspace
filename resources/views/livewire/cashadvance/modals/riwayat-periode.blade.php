@@ -1,12 +1,15 @@
 <?php
 
 use App\Services\CaCache;
+use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 
 new class extends Component {
     /**
      * @return array<string, mixed>
      */
+
+     #[On('riwayat-updated')]
     public function riwayatDompetCaPl(): array
     {
         return app(CaCache::class)->riwayatDompetCaPl(Auth::id()) ?? [];

@@ -5,7 +5,7 @@ use Livewire\Volt\Component;
 
 new #[Layout('components.layouts.ca-pdf', ['title' => 'Laporan CA PL'])]
 class extends Component {
-    //
+
 }; ?>
 
 <div>
@@ -16,19 +16,19 @@ class extends Component {
         </div>
         <div class="company">
             <strong>PT Hanatekindo Mulia Abadi</strong>
-            <span>Cash Advance &mdash; Dompet PL</span>
+            <span>Cash Advance</span>
         </div>
     </div>
 
     <table class="meta">
-        <tr><td>Jenis Dompet</td><td>:</td><td>CA PL (imprest / dana tetap)</td></tr>
+        <tr><td>Nama</td><td>:</td><td>CA PL (imprest / dana tetap)</td></tr>
         <tr><td>Saldo Float (Imprest)</td><td>:</td><td>Rp 0</td></tr>
-        <tr><td>Periode Dibuka</td><td>:</td><td>&mdash;</td></tr>
-        <tr><td>Tanggal Cetak</td><td>:</td><td>{{ now()->translatedFormat('d F Y') }}</td></tr>
+        <tr><td>Nama PT</td><td>:</td><td>&mdash;</td></tr>
+        <tr><td>Tanggal</td><td>:</td><td>{{ now()->translatedFormat('d F Y') }}</td></tr>
     </table>
 
     <div class="summary">
-        <div class="box"><span>Saldo Awal (Opening)</span><strong>Rp 0</strong></div>
+        <div class="box"><span>Saldo Awal (Opening)</span><strong>Rp {{ $balance['saldo_awal_priode'] }}</strong></div>
         <div class="box"><span>Total Pengeluaran</span><strong class="neg">Rp 0</strong></div>
         <div class="box"><span>Saldo Akhir (Closing)</span><strong>Rp 0</strong></div>
     </div>

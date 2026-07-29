@@ -20,6 +20,7 @@ trait MakesExternalRequests
     {
         $client = Http::timeout($timeout)
             ->connectTimeout($connect)
+            ->acceptJson()
             ->retry(2, 200, function ($e) {
                 return $e instanceof ConnectionException
                     || (method_exists($e, 'response') && optional($e->response)->serverError());
@@ -40,6 +41,7 @@ trait MakesExternalRequests
     {
         $client = Http::timeout($timeout)
             ->connectTimeout($connect)
+            ->acceptJson()
             ->retry(2, 200, function ($e) {
                 return $e instanceof ConnectionException;
             }, throw: false);

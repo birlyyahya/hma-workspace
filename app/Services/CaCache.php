@@ -21,11 +21,11 @@ class CaCache
 
     public function __construct(private string $apiBase) {}
 
-    public function dashboard(int $id)
+    public function DompetCaActiveTransaksi(int $id)
     {
-        $key = 'ca:dashboard:'.$id;
+        $key = 'ca:dompetca:'.$id;
 
-        $url = $this->apiBase.'/cashadvance?user_id='.$id;
+        $url = $this->apiBase.'/list-wallet-pl?user_id='.$id.'&is_active=1';
 
         return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], function () use ($url) {
             try {
@@ -39,7 +39,7 @@ class CaCache
                     throw new \RuntimeException('status '.$response->status());
                 }
 
-                return $response->json() ?? ['data' => []];
+                return $response->json()['data'] ?? ['data' => []];
             } catch (\Throwable $e) {
                 Log::warning('CaCache dashboard gagal', ['error' => $e->getMessage()]);
 
@@ -48,33 +48,118 @@ class CaCache
         });
     }
 
-    public function transaksiCaPlActive(string $kode)
+    public function transaksiCaPlActive(string $kode, array $param = []): array
     {
-        $key = 'ca:transaksi-pl-active:'.$kode;
-
         $url = $this->apiBase.'/transaksi-wallet-pl/'.$kode;
 
-        return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], function () use ($url) {
-            try {
-                $response = Http::timeout(15)
-                    ->retry(2, 200, function ($e) {
-                        return $e instanceof \Illuminate\Http\Client\ConnectionException
-                            || (method_exists($e, 'response') && optional($e->response)->serverError());
-                    }, throw: false)
-                    ->get($url);
+        try {
+            $response = Http::timeout(15)
+                ->retry(2, 200, function ($e) {
+                    return $e instanceof \Illuminate\Http\Client\ConnectionException
+                        || (method_exists($e, 'response') && optional($e->response)->serverError());
+                }, throw: false)
+                ->get($url, array_filter($param));
 
-                if ($response->failed()) {
-                    throw new \RuntimeException('status '.$response->status());
-                }
-
-                return $response->json() ?? ['data' => []];
-            } catch (\Throwable $e) {
-                Log::warning('CaCache transaksiCaPlActive gagal', ['error' => $e->getMessage()]);
-
-                throw $e;
+            if ($response->failed()) {
+                throw new \RuntimeException('status '.$response->status());
             }
-        });
 
+            return $response->json() ?? ['data' => []];
+        } catch (\Throwable $e) {
+            Log::warning('CaCache transaksiCaPlActive gagal', ['error' => $e->getMessage()]);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Daftar dompet kegiatan milik user (kartu di sidebar ca-index).
+     *
+     * @param  array<string, mixed>  $param
+     */
+    public function listWalletKegiatan(int $userId, array $param = []): array
+    {
+        $url = $this->apiBase.'/list-wallet-kegiatan';
+
+        try {
+            $response = Http::acceptJson()
+                ->timeout(15)
+                ->retry(2, 200, function ($e) {
+                    return $e instanceof \Illuminate\Http\Client\ConnectionException
+                        || (method_exists($e, 'response') && optional($e->response)->serverError());
+                }, throw: false)
+                ->get($url, array_filter([...$param, 'user_id' => $userId, 'tr_ca_transaction' => 'true']));
+
+            if ($response->failed()) {
+                throw new \RuntimeException('status '.$response->status());
+            }
+
+            return $response->json() ?? ['data' => []];
+        } catch (\Throwable $e) {
+            Log::warning('CaCache listWalletKegiatan gagal', ['error' => $e->getMessage()]);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Detail satu dompet kegiatan berdasarkan kode CA.
+     *
+     * @param  array<string, mixed>  $param
+     */
+    public function walletKegiatanByKode(string $kode, array $param = []): array
+    {
+        $url = $this->apiBase.'/wallet-kegiatan/'.$kode;
+
+        try {
+            $response = Http::acceptJson()
+                ->timeout(15)
+                ->retry(2, 200, function ($e) {
+                    return $e instanceof \Illuminate\Http\Client\ConnectionException
+                        || (method_exists($e, 'response') && optional($e->response)->serverError());
+                }, throw: false)
+                ->get($url, array_filter($param));
+
+            if ($response->failed()) {
+                throw new \RuntimeException('status '.$response->status());
+            }
+
+            return $response->json() ?? ['data' => []];
+        } catch (\Throwable $e) {
+            Log::warning('CaCache walletKegiatanByKode gagal', ['kode' => $kode, 'error' => $e->getMessage()]);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Transaksi pada satu dompet kegiatan.
+     *
+     * @param  array<string, mixed>  $param
+     */
+    public function transaksiWalletKegiatan(string $kode, array $param = []): array
+    {
+        $url = $this->apiBase.'/transaksi-wallet-kegiatan/'.$kode;
+
+        try {
+            $response = Http::acceptJson()
+                ->timeout(15)
+                ->retry(2, 200, function ($e) {
+                    return $e instanceof \Illuminate\Http\Client\ConnectionException
+                        || (method_exists($e, 'response') && optional($e->response)->serverError());
+                }, throw: false)
+                ->get($url, array_filter($param));
+
+            if ($response->failed()) {
+                throw new \RuntimeException('status '.$response->status());
+            }
+
+            return $response->json() ?? ['data' => []];
+        } catch (\Throwable $e) {
+            Log::warning('CaCache transaksiWalletKegiatan gagal', ['kode' => $kode, 'error' => $e->getMessage()]);
+
+            throw $e;
+        }
     }
 
     public function riwayatDompetCaPl(int $id)

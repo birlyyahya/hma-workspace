@@ -12,18 +12,17 @@ new class extends Component {
     /** @var array<int, string> */
     public array $categories = [];
 
+    public string $search = '';
+
     public function mount(): void
     {
-        $this->refreshDashboard();
+        $this->Dompet();
     }
 
-    /**
-     * Pengguna dianggap sudah memiliki CA bila dashboard API mengembalikan
-     * kode dompet CA PL. Bila belum, UI onboarding top up ditampilkan.
-     */
-    public function hasCa(): bool
+    public function performSearch(): void
     {
-        return filled($this->caPlBalance['kode_ca'] ?? null);
+        // Method ini dipanggil saat Enter di search input
+        // Blade akan refresh component dan meload data dengan search param
     }
 
     /**
@@ -32,15 +31,14 @@ new class extends Component {
      *
      * @return array<string, mixed>
      */
-    public function transaksiCaPl(): array
+    public function transaksiCaPl($kode): array
     {
-        $result = app(CaCache::class)->transaksiCaPlActive($this->caPlBalance['kode_ca'] ?? '') ?? [];
-
-        $result['data'] = array_map(function (array $trx): array {
+        $result = app(CaCache::class)->transaksiCaPlActive($kode, ['search' => $this->search])['data'] ?? [];
+        $result = array_map(function (array $trx): array {
             $trx['bukti_url'] = $this->buktiUrl($trx['bukti'] ?? null);
 
             return $trx;
-        }, $result['data'] ?? []);
+        }, $result ?? []);
 
         return $result;
     }
@@ -61,24 +59,122 @@ new class extends Component {
         return config('services.aws_url').'cashadvance/'.$path;
     }
 
-    /**
-     * Muat ulang dashboard setelah modal anak mengubah data (catat/edit/hapus).
-     * Cache CA sudah di-flush oleh CaWriter, jadi pemanggilan ini mengambil data segar.
-     */
     #[On('ca-updated')]
-    public function refreshDashboard(): void
+    public function refreshDompet(): void
     {
-        $response = app(CaCache::class)->dashboard(Auth::id());
-        $this->caPlBalance = $response['card_left'] ?? [];
-        $this->chart = $response['chart'] ?? [];
-        $this->caKegiatanBalance = $response['card_right'] ?? [];
-        $this->categories = $response['categories'] ?? ['Transport', 'Akomodasi', 'Konsumsi', 'ATK', 'Komunikasi', 'Lain-lain'];
+        $this->Dompet();
+
+        $this->dispatch(
+            'ca-chart-updated',
+            series: $this->getChart()
+        );
+
+        $this->dispatch('riwayat-updated');
     }
+
+    public function Dompet() : Array
+    {
+        $reponse = app(CaCache::class)->DompetCaActiveTransaksi(Auth::id());
+
+        $this->caPlBalance = collect($reponse)->where('is_active', 1)->first() ?? [];
+
+        $this->categories = $response['categories'] ?? ['Transport', 'Akomodasi', 'Konsumsi', 'ATK', 'Komunikasi', 'Lain-lain'];
+
+        $this->loadKegiatan();
+
+        return collect($reponse)->first() ?? [];
+    }
+
+    /**
+     * Dompet kegiatan aktif milik user (kartu sidebar ca-index).
+     */
+    public function loadKegiatan(): void
+    {
+        $response = app(CaCache::class)->listWalletKegiatan(Auth::id());
+        $data = $response['data'] ?? [];
+
+        $this->caKegiatanBalance = [
+            'jumlah_dompet' => $response['meta']['total'] ?? count($data),
+            'data' => collect($data)
+                ->map(fn (array $item): array => [
+                    'kode_ca' => $item['kode_ca'],
+                    'judul_kegiatan' => $item['judul_kegiatan'],
+                    'status' => ($item['is_active'] ?? 1) ? 'open' : 'closed',
+                    'sisa_saldo' => (float) ($item['saldo_akhir'] ?? 0),
+                ])
+                ->all(),
+        ];
+    }
+
+    public function hasCa() {
+        return $this->caPlBalance['kode_ca'] ?? [];
+    }
+
+    public function getChart(): array
+    {
+        $transactions = collect(
+            app(CaCache::class)->transaksiCaPlActive($this->caPlBalance['kode_ca'])['data'] ?? []
+        );
+
+        $expense = collect(range(1, 12))
+            ->map(function ($month) use ($transactions) {
+                return $transactions
+                    ->filter(fn ($transaction) =>
+                        ($transaction['jenis'] ?? null) === 'pengeluaran'
+                        && Carbon\Carbon::parse($transaction['tanggal'])->month === $month
+                    )
+                    ->sum(fn ($transaction) => (float) $transaction['jumlah']);
+            })
+            ->values()
+            ->all();
+
+
+        return [
+            [
+                'name' => 'Expense',
+                'data' => $expense,
+            ],
+        ];
+    }
+
+    public function getKategoriPengeluaran() {
+        $transaksi = collect(
+            $this->caPlBalance['tr_ca_transaction'] ?? []
+        );
+
+       $pengeluaran = $transaksi
+        ->filter(fn ($transaction) =>
+            ($transaction['jenis'] ?? null) === 'pengeluaran'
+        );
+
+        $totalPengeluaran = $pengeluaran->sum(
+            fn($transaksi) => (float) $transaksi['jumlah']
+        );
+
+        return $pengeluaran
+            ->groupBy('kategori')
+            ->map(function($transaksi, $kategori) use ($totalPengeluaran){
+                $jumlah = $transaksi->sum(
+                    fn($transaksi) => (float) $transaksi['jumlah']
+                );
+
+                return [
+                'nama' => $kategori,
+                'jumlah' => $jumlah,
+                'persentase' => $totalPengeluaran > 0
+                    ? round(($jumlah / $totalPengeluaran) * 100, 1)
+                    : 0,
+                ];
+            })
+            ->sortByDesc('jumlah')
+            ->values()
+            ->all();
+    }
+
 }; ?>
 
 <div class="space-y-4">
-
-    @if (! $this->hasCa())
+    @if (!$this->hasCa())
     {{-- ================= ONBOARDING: BELUM MEMILIKI CA ================= --}}
     <div class="relative rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
 
@@ -138,11 +234,11 @@ new class extends Component {
                         </div>
 
                         <h2 class="text-4xl font-semibold tabular-nums text-zinc-900 dark:text-white">
-                            Rp {{ number_format($this->caPlBalance['sisa_saldo'] ?? 0, 0, ',', '.') }}
+                            Rp {{ number_format($this->caPlBalance['saldo_akhir'] ?? 0, 0, ',', '.') }}
                         </h2>
 
                         <p class="text-sm text-zinc-500 dark:text-zinc-400">
-                            Dibuka &mdash;
+                            Dibuka {{ Carbon\Carbon::parse($this->caPlBalance['created_at'])->locale('id')->translatedFormat('D, d M Y') }}
                         </p>
                     </div>
 
@@ -161,16 +257,31 @@ new class extends Component {
                 {{-- CHART (data statik; wiring API dilakukan manual) --}}
                 <div wire:ignore x-data="{ chart: null }" x-init="
                         chart = new ApexCharts($refs.caChart, {
-                             series: @js($this->chart['series'] ?? []),
-                            chart: { height: 280, type: 'area', toolbar: { show: false } },
+                            series: @js($this->getChart() ?? []),
+                            chart: { height: 280, type: 'area', toolbar: {
+                                show: true,
+                                tools: {
+                                    download: true,
+                                    selection: true,
+                                    zoom: true,
+                                    zoomin: true,
+                                    zoomout: true,
+                                    pan: true,
+                                    reset: true,
+                                },
+                            }, },
                             dataLabels: { enabled: false },
                             stroke: { curve: 'smooth', width: 3 },
-                            colors: ['#2E93fA', '#E91E63'],
+                            colors: ['#E91E63'],
                             xaxis: { type: 'category', categories: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] },
                             yaxis: { labels: { align: 'left', formatter: (v) => 'Rp ' + new Intl.NumberFormat('id-ID').format(v) } },
                             tooltip: { theme: 'light' },
+
                         });
                         chart.render();
+                        Livewire.on('ca-chart-updated', (data) => {
+                            chart.updateSeries(data.series);
+                        });
                     ">
                     <div x-ref="caChart" class="h-72 w-full"></div>
                 </div>
@@ -184,7 +295,7 @@ new class extends Component {
                         <flux:badge size="sm" color="blue">Opening periode</flux:badge>
                     </div>
                     <h3 class="text-2xl font-semibold mt-2 tabular-nums text-zinc-900 dark:text-white">
-                        Rp {{ number_format($this->caPlBalance['income'] ?? 0, 0, ',', '.') }}
+                        Rp {{ number_format($this->caPlBalance['saldo_awal_priode'] ?? 0, 0, ',', '.') }}
                     </h3>
                     <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Saldo awal periode aktif</p>
                 </div>
@@ -195,7 +306,7 @@ new class extends Component {
                         <flux:badge size="sm" color="red">Pengeluaran</flux:badge>
                     </div>
                     <h3 class="text-2xl font-semibold mt-2 tabular-nums text-zinc-900 dark:text-white">
-                        Rp {{ number_format($this->caPlBalance['expense'] ?? 0, 0, ',', '.') }}
+                        Rp {{ number_format($this->caPlBalance['total_pengeluaran'] ?? 0, 0, ',', '.') }}
                     </h3>
                     <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Total pengeluaran periode aktif</p>
                 </div>
@@ -211,27 +322,31 @@ new class extends Component {
                     <h3 class="font-semibold text-zinc-900 dark:text-white">Dompet Kegiatan</h3>
                     <span class="text-sm text-zinc-400">{{ $this->caKegiatanBalance['jumlah_dompet'] ?? 0 }} dompet</span>
                 </div>
-                @forelse (collect($this->caKegiatanBalance['data'] ?? [])->take(4) as $item)
-                <a wire:key="dompet-{{ $item['kode_ca'] }}" href="{{ route('cashadvance.dompet-show', $item['kode_ca']) }}" wire:navigate class="flex items-center justify-between -mx-2 px-2 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition">
-                    <div class="flex items-center gap-3 min-w-0">
-                        <flux:avatar :name="$item['judul_kegiatan']" color="{{ $item['status'] ?? 'closed' === 'closed' ? 'zinc' : 'blue' }}" size="sm" />
-                        <div class="text-left min-w-0">
-                            <p class="text-sm font-medium truncate text-zinc-900 dark:text-white">{{ $item['judul_kegiatan'] }}</p>
-                            <div class="flex items-center gap-1.5">
-                                <span class="text-xs text-zinc-500">{{ $item['kode_ca'] }}</span>
-                                @if ($item['status'] ?? 'closed' === 'closed')
-                                <flux:badge size="sm" color="zinc">closed</flux:badge>
-                                @endif
+                <div class="space-y-1">
+                    @forelse (collect($this->caKegiatanBalance['data'] ?? [])->take(4) as $item)
+                    @php $isClosed = ($item['status'] ?? 'open') === 'closed'; @endphp
+                    <a wire:key="dompet-{{ $item['kode_ca'] }}" href="{{ route('cashadvance.dompet-show', $item['kode_ca']) }}" wire:navigate
+                        class="flex items-center justify-between -mx-2 px-2 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition {{ $isClosed ? 'opacity-60' : '' }}">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <flux:avatar :name="$item['judul_kegiatan']" :color="$isClosed ? 'zinc' : 'blue'" size="sm" />
+                            <div class="text-left min-w-0">
+                                <p class="text-sm font-medium truncate text-zinc-900 dark:text-white">{{ $item['judul_kegiatan'] }}</p>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-xs text-zinc-500">{{ $item['kode_ca'] }}</span>
+                                    @if ($isClosed)
+                                    <flux:badge size="sm" color="zinc">closed</flux:badge>
+                                    @endif
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <p class="text-sm font-medium tabular-nums {{ $item['sisa_saldo'] < 0 ? 'text-red-600' : 'text-zinc-900 dark:text-white' }}">
-                        Rp {{ number_format($item['sisa_saldo'], 0, ',', '.') }}
-                    </p>
-                </a>
-                @empty
-                <p class="text-sm text-zinc-400">Belum ada dompet kegiatan.</p>
-                @endforelse
+                        <p class="text-sm font-medium tabular-nums shrink-0 {{ $item['sisa_saldo'] < 0 ? 'text-red-600' : 'text-zinc-900 dark:text-white' }}">
+                            Rp {{ number_format($item['sisa_saldo'], 0, ',', '.') }}
+                        </p>
+                    </a>
+                    @empty
+                    <p class="text-sm text-zinc-400 py-2">Belum ada dompet kegiatan.</p>
+                    @endforelse
+                </div>
                 <flux:modal.trigger name="buat-kegiatan">
                     <flux:button variant="outline" class="w-full" icon="plus">Create new card</flux:button>
                 </flux:modal.trigger>
@@ -241,7 +356,7 @@ new class extends Component {
             <div class="p-6 space-y-4">
                 <p class="text-sm text-zinc-500 dark:text-zinc-400">Pengeluaran per kategori &mdash; periode aktif</p>
                 <h3 class="text-2xl font-semibold tabular-nums text-zinc-900 dark:text-white">
-                    Rp {{ number_format($this->caKegiatanBalance['total_pengeluaran'] ?? 0, 0, ',', '.') }}
+                    Rp {{ number_format($this->caPlBalance['total_pengeluaran'] ?? 0, 0, ',', '.') }}
                 </h3>
                 @php
                 // Kelas literal lengkap agar Tailwind men-generate-nya (jangan dirangkai dinamis).
@@ -254,16 +369,18 @@ new class extends Component {
                 ['bg' => 'bg-teal-500/20', 'border' => 'border-teal-500'],
                 ];
                 @endphp
-                @if (!empty($this->caKegiatanBalance['total_pengeluaran']))
+                @if (!empty($this->caPlBalance['total_pengeluaran']))
                 <div class="h-10 rounded bg-zinc-100 dark:bg-zinc-800 overflow-hidden flex">
-                    @foreach ($this->caKegiatanBalance['kategori_pengeluaran'] as $i => $row)
-                    @php $c = $palette[$i % count($palette)]; @endphp
+                    @foreach ($this->getKategoriPengeluaran() as $i => $row)
+                    @php
+                    $c = $palette[$i % count($palette)];
+                    @endphp
                     <div class="{{ $c['bg'] }} border-l-2 {{ $c['border'] }}" style="width: {{ max($row['persentase'], 2) }}%" wire:key="bar-{{ $row['nama'] }}"></div>
                     @endforeach
                 </div>
 
                 <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-                    @foreach ($this->caKegiatanBalance['kategori_pengeluaran'] as $i => $row)
+                    @foreach ($this->getKategoriPengeluaran() as $i => $row)
                     <p class="border-l-2 ps-2 {{ $palette[$i % count($palette)]['border'] }}" wire:key="legend-{{ $row['nama'] }}">
                         {{ $row['nama'] }} • {{ $row['persentase'] }}%
                     </p>
@@ -286,7 +403,12 @@ new class extends Component {
                 <flux:text class="text-xs">Periode #1 (aktif) saja</flux:text>
             </div>
             <div class="flex gap-2">
-                <flux:input icon="magnifying-glass" placeholder="Cari deskripsi / kategori" />
+                <div class="flex-1 relative">
+                    <flux:input wire:model="search" wire:keydown.enter="performSearch" icon="magnifying-glass" placeholder="Cari deskripsi / kategori (tekan Enter)" wire:loading.attr="disabled" wire:target="performSearch" />
+                    <div wire:loading wire:target="performSearch" class="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div class="animate-spin h-5 w-5 border-2 border-zinc-300 border-t-zinc-900 dark:border-zinc-600 dark:border-t-white rounded-full"></div>
+                    </div>
+                </div>
                 <flux:dropdown position="bottom" align="end">
                     <flux:button icon="calendar" variant="outline" />
                     <flux:menu>
@@ -320,9 +442,9 @@ new class extends Component {
                         <th class="px-3 py-3 md:px-6 font-normal text-center whitespace-nowrap">Aksi</th>
                     </tr>
                 </thead>
-                <tbody>
-                    @forelse ($this->transaksiCaPl()['data'] ?? [] as $trx)
-                    <tr wire:key="trx-{{ $trx['dompet_id'] }}" class="border-t border-zinc-100 dark:border-zinc-800">
+                <tbody wire:loading.class="opacity-50" wire:target="performSearch">
+                    @forelse ($this->transaksiCaPl($caPlBalance['kode_ca']) ?? [] as $trx)
+                    <tr wire:key="trx-{{ $trx['id_transaksi'] }}" class="border-t border-zinc-100 dark:border-zinc-800">
                         <td class="px-3 py-3 md:px-6 whitespace-nowrap text-zinc-900 dark:text-white">{{ $trx['deskripsi'] }}</td>
                         <td class="px-3 py-3 md:px-6 whitespace-nowrap">{{ $trx['kategori'] ?? '-' }}</td>
                         <td class="px-3 py-3 md:px-6 whitespace-nowrap">{{ \Carbon\Carbon::parse($trx['created_at'])->translatedFormat('d/m/Y h:i') }}</td>
