@@ -4,7 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title ?? 'Laporan Cash Advance' }}</title>
+    @vite(['resources/css/app.css'])
     <style>
+        [x-cloak] { display: none !important; }
+
         @page { size: A4 portrait; margin: 16mm; }
 
         * { box-sizing: border-box; }
@@ -138,8 +141,8 @@
         <button onclick="window.print()" class="btn btn-primary">Cetak / Simpan PDF</button>
     </div>
 
-    <div class="sheet">
-        {{ $slot }}
-    </div>
+    {{ $slot }}
+
+    @livewireScripts
 </body>
 </html>

@@ -8,7 +8,7 @@ class extends Component {
     //
 }; ?>
 
-<div>
+<div class="sheet">
     <div class="report-head">
         <div>
             <h1>Laporan Pertanggungjawaban Kegiatan</h1>
