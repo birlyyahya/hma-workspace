@@ -79,7 +79,9 @@ test('create forwards the selected type to the spectech API', function () {
 
     Http::assertSent(fn ($request) => str_contains($request->url(), 'spekteks')
         && ! str_contains($request->url(), 'search')
-        && $request['type'] === 'software');
+        && $request['type'] === 'software'
+        && $request['qty_received'] === 0
+        && $request['qty_recived'] === 0);
 });
 
 test('type is required and must be hardware or software', function () {
