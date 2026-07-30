@@ -30,7 +30,7 @@ class CaCache
         try {
             return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], function () use ($url) {
                 $response = Http::acceptJson()
-                    ->timeout(15)
+                    ->timeout(8)
                     ->retry(2, 200, function ($e) {
                         return $e instanceof \Illuminate\Http\Client\ConnectionException
                             || (method_exists($e, 'response') && optional($e->response)->serverError());
@@ -53,25 +53,23 @@ class CaCache
     public function transaksiCaPlActive(string $kode, array $param = []): array
     {
         $url = $this->apiBase.'/transaksi-wallet-pl/'.$kode;
+        $query = array_filter($param);
+        $key = 'ca:transaksi-ca-pl:'.$kode.':'.md5(serialize($query));
 
-        try {
-            $response = Http::timeout(15)
+        return $this->rememberFlexible([self::TAG], $key, [self::TTL_DETAIL, self::TTL_DETAIL * 4], function () use ($url, $query) {
+            $response = Http::timeout(8)
                 ->retry(2, 200, function ($e) {
                     return $e instanceof \Illuminate\Http\Client\ConnectionException
                         || (method_exists($e, 'response') && optional($e->response)->serverError());
                 }, throw: false)
-                ->get($url, array_filter($param));
+                ->get($url, $query);
 
             if ($response->failed()) {
                 throw new \RuntimeException('status '.$response->status());
             }
 
             return $response->json() ?? ['data' => []];
-        } catch (\Throwable $e) {
-            Log::warning('CaCache transaksiCaPlActive gagal', ['error' => $e->getMessage()]);
-
-            return ['data' => []];
-        }
+        }, ['data' => []]);
     }
 
     /**
@@ -82,26 +80,24 @@ class CaCache
     public function listWalletKegiatan(int $userId, array $param = []): array
     {
         $url = $this->apiBase.'/list-wallet-kegiatan';
+        $query = array_filter([...$param, 'user_id' => $userId, 'tr_ca_transaction' => 'true']);
+        $key = 'ca:list-wallet-kegiatan:'.$userId.':'.md5(serialize($query));
 
-        try {
+        return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], function () use ($url, $query) {
             $response = Http::acceptJson()
-                ->timeout(15)
+                ->timeout(8)
                 ->retry(2, 200, function ($e) {
                     return $e instanceof \Illuminate\Http\Client\ConnectionException
                         || (method_exists($e, 'response') && optional($e->response)->serverError());
                 }, throw: false)
-                ->get($url, array_filter([...$param, 'user_id' => $userId, 'tr_ca_transaction' => 'true']));
+                ->get($url, $query);
 
             if ($response->failed()) {
                 throw new \RuntimeException('status '.$response->status());
             }
 
             return $response->json() ?? ['data' => []];
-        } catch (\Throwable $e) {
-            Log::warning('CaCache listWalletKegiatan gagal', ['error' => $e->getMessage()]);
-
-            return ['data' => []];
-        }
+        }, ['data' => []]);
     }
 
     /**
@@ -115,7 +111,7 @@ class CaCache
 
         try {
             $response = Http::acceptJson()
-                ->timeout(15)
+                ->timeout(8)
                 ->retry(2, 200, function ($e) {
                     return $e instanceof \Illuminate\Http\Client\ConnectionException
                         || (method_exists($e, 'response') && optional($e->response)->serverError());
@@ -145,7 +141,7 @@ class CaCache
 
         try {
             $response = Http::acceptJson()
-                ->timeout(15)
+                ->timeout(8)
                 ->retry(2, 200, function ($e) {
                     return $e instanceof \Illuminate\Http\Client\ConnectionException
                         || (method_exists($e, 'response') && optional($e->response)->serverError());
@@ -172,7 +168,7 @@ class CaCache
 
         try {
             return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], function () use ($url) {
-                $response = Http::timeout(15)
+                $response = Http::timeout(8)
                     ->retry(2, 200, function ($e) {
                         return $e instanceof \Illuminate\Http\Client\ConnectionException
                             || (method_exists($e, 'response') && optional($e->response)->serverError());

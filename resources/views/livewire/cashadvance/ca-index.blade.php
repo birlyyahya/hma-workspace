@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\CaCache;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 
@@ -19,6 +20,14 @@ new class extends Component {
         $this->Dompet();
     }
 
+    /**
+     * Skeleton yang tampil selama komponen lazy di-mount (fetch data BEPM).
+     */
+    public function placeholder(): \Illuminate\Contracts\View\View
+    {
+        return view('livewire.cashadvance.ca-index-placeholder');
+    }
+
     public function performSearch(): void
     {
         // Method ini dipanggil saat Enter di search input
@@ -31,8 +40,10 @@ new class extends Component {
      *
      * @return array<string, mixed>
      */
-    public function transaksiCaPl($kode): array
+    #[Computed]
+    public function transaksiCaPl(): array
     {
+        $kode = $this->caPlBalance['kode_ca'] ?? '';
         $result = app(CaCache::class)->transaksiCaPlActive($kode, ['search' => $this->search])['data'] ?? [];
         $result = array_map(function (array $trx): array {
             $trx['bukti_url'] = $this->buktiUrl($trx['bukti'] ?? null);
@@ -64,9 +75,11 @@ new class extends Component {
     {
         $this->Dompet();
 
+        unset($this->getChart, $this->transaksiCaPl, $this->getKategoriPengeluaran);
+
         $this->dispatch(
             'ca-chart-updated',
-            series: $this->getChart()
+            series: $this->getChart
         );
     }
 
@@ -108,6 +121,7 @@ new class extends Component {
         return $this->caPlBalance['kode_ca'] ?? [];
     }
 
+    #[Computed]
     public function getChart(): array
     {
         $transactions = collect(
@@ -135,9 +149,10 @@ new class extends Component {
         ];
     }
 
+    #[Computed]
     public function getKategoriPengeluaran() {
         $transaksi = collect(
-            $this->transaksiCaPl($this->caPlBalance['kode_ca']) ?? []
+            $this->transaksiCaPl ?? []
         );
 
        $pengeluaran = $transaksi
@@ -253,9 +268,11 @@ new class extends Component {
                 </div>
 
                 {{-- CHART (data statik; wiring API dilakukan manual) --}}
-                <div wire:ignore x-data="{ chart: null }" x-init="
+                {{-- wire:key wajib: memaksa morph menyisipkan node fresh saat swap dari --}}
+                {{-- skeleton placeholder, agar Alpine menjalankan x-init & chart ter-render. --}}
+                <div wire:key="ca-chart-wrapper" wire:ignore x-data="{ chart: null }" x-init="
                         chart = new ApexCharts($refs.caChart, {
-                            series: @js($this->getChart() ?? []),
+                            series: @js($this->getChart ?? []),
                             chart: { height: 280, type: 'area', toolbar: {
                                 show: true,
                                 tools: {
@@ -376,7 +393,7 @@ new class extends Component {
                 @endphp
                 @if (!empty($this->caPlBalance['total_pengeluaran']))
                 <div class="h-10 rounded bg-zinc-100 dark:bg-zinc-800 overflow-hidden flex">
-                    @foreach ($this->getKategoriPengeluaran() as $i => $row)
+                    @foreach ($this->getKategoriPengeluaran as $i => $row)
                     @php
                     $c = $palette[$i % count($palette)];
                     @endphp
@@ -385,7 +402,7 @@ new class extends Component {
                 </div>
 
                 <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-                    @foreach ($this->getKategoriPengeluaran() as $i => $row)
+                    @foreach ($this->getKategoriPengeluaran as $i => $row)
                     <p class="border-l-2 ps-2 {{ $palette[$i % count($palette)]['border'] }}" wire:key="legend-{{ $row['nama'] }}">
                         {{ $row['nama'] }} • {{ $row['persentase'] }}%
                     </p>
@@ -448,7 +465,7 @@ new class extends Component {
                     </tr>
                 </thead>
                 <tbody wire:loading.class="opacity-50" wire:target="performSearch">
-                    @forelse ($this->transaksiCaPl($caPlBalance['kode_ca']) ?? [] as $trx)
+                    @forelse ($this->transaksiCaPl ?? [] as $trx)
                     <tr wire:key="trx-{{ $trx['id_transaksi'] }}" class="border-t border-zinc-100 dark:border-zinc-800">
                         <td class="px-3 py-3 md:px-6 whitespace-nowrap text-zinc-900 dark:text-white">{{ $trx['deskripsi'] }}</td>
                         <td class="px-3 py-3 md:px-6 whitespace-nowrap">{{ $trx['kategori'] ?? '-' }}</td>
