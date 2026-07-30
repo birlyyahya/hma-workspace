@@ -33,21 +33,21 @@ class SpectechForm extends Form
 
     protected function payload(?int $projectId = null): array
     {
+        $received = $this->idUpdate !== null ? (int) ($this->received_quantity ?? 0) : 0;
+
         $payload = [
             'name' => $this->name,
             'qty_total' => $this->quantity,
             'total_nominal' => (int) preg_replace('/[^0-9]/', '', (string) $this->price),
             'note' => $this->notes,
             'detail' => $this->detail,
+            'qty_recived' => $received,
+            'qty_received' => $received,
             'type' => $this->type,
         ];
 
         if ($projectId !== null) {
             $payload['project_id'] = $projectId;
-        }
-
-        if ($this->idUpdate !== null) {
-            $payload['qty_recived'] = (int) ($this->received_quantity ?? 0);
         }
 
         return $payload;
