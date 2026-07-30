@@ -22,6 +22,7 @@ new class extends Component {
         $response = app(CaWriter::class)->topup($payload);
         if($response['ok']){
             $this->dispatch('ca-updated');
+            $this->dispatch('riwayat-updated');
 
             Flux::modal('topup-laporan')->close();
 

@@ -21,31 +21,33 @@ class CaCache
 
     public function __construct(private string $apiBase) {}
 
-    public function DompetCaActiveTransaksi(int $id)
+    public function DompetCaActiveTransaksi(int $id): array
     {
         $key = 'ca:dompetca:'.$id;
 
         $url = $this->apiBase.'/list-wallet-pl?user_id='.$id.'&is_active=1';
 
-        return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], function () use ($url) {
-            try {
-                $response = Http::timeout(15)
+        try {
+            return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], function () use ($url) {
+                $response = Http::acceptJson()
+                    ->timeout(15)
                     ->retry(2, 200, function ($e) {
                         return $e instanceof \Illuminate\Http\Client\ConnectionException
                             || (method_exists($e, 'response') && optional($e->response)->serverError());
                     }, throw: false)
                     ->get($url);
+
                 if ($response->failed()) {
                     throw new \RuntimeException('status '.$response->status());
                 }
 
-                return $response->json()['data'] ?? ['data' => []];
-            } catch (\Throwable $e) {
-                Log::warning('CaCache dashboard gagal', ['error' => $e->getMessage()]);
+                return $response->json()['data'] ?? [];
+            });
+        } catch (\Throwable $e) {
+            Log::warning('CaCache dashboard gagal', ['error' => $e->getMessage()]);
 
-                throw $e;
-            }
-        });
+            return [];
+        }
     }
 
     public function transaksiCaPlActive(string $kode, array $param = []): array
@@ -68,7 +70,7 @@ class CaCache
         } catch (\Throwable $e) {
             Log::warning('CaCache transaksiCaPlActive gagal', ['error' => $e->getMessage()]);
 
-            throw $e;
+            return ['data' => []];
         }
     }
 
@@ -98,7 +100,7 @@ class CaCache
         } catch (\Throwable $e) {
             Log::warning('CaCache listWalletKegiatan gagal', ['error' => $e->getMessage()]);
 
-            throw $e;
+            return ['data' => []];
         }
     }
 
@@ -128,7 +130,7 @@ class CaCache
         } catch (\Throwable $e) {
             Log::warning('CaCache walletKegiatanByKode gagal', ['kode' => $kode, 'error' => $e->getMessage()]);
 
-            throw $e;
+            return ['data' => []];
         }
     }
 
@@ -158,18 +160,18 @@ class CaCache
         } catch (\Throwable $e) {
             Log::warning('CaCache transaksiWalletKegiatan gagal', ['kode' => $kode, 'error' => $e->getMessage()]);
 
-            throw $e;
+            return ['data' => []];
         }
     }
 
-    public function riwayatDompetCaPl(int $id)
+    public function riwayatDompetCaPl(int $id): array
     {
         $key = 'ca:riwayat-dompet-ca-pl:'.$id;
 
         $url = $this->apiBase.'/riwayat-wallet-kegiatan?user_id='.$id.'&is_active=0';
 
-        return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], function () use ($url) {
-            try {
+        try {
+            return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], function () use ($url) {
                 $response = Http::timeout(15)
                     ->retry(2, 200, function ($e) {
                         return $e instanceof \Illuminate\Http\Client\ConnectionException
@@ -182,12 +184,12 @@ class CaCache
                 }
 
                 return $response->json() ?? ['data' => []];
-            } catch (\Throwable $e) {
-                Log::warning('CaCache riwayat Dompket Ca Pl gagal', ['error' => $e->getMessage()]);
+            });
+        } catch (\Throwable $e) {
+            Log::warning('CaCache riwayat Dompket Ca Pl gagal', ['error' => $e->getMessage()]);
 
-                throw $e;
-            }
-        });
+            return ['data' => []];
+        }
     }
 
     public function flush(): void

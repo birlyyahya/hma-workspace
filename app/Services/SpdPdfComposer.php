@@ -82,7 +82,6 @@ class SpdPdfComposer
                 $fpdi->useTemplate($templateId);
             }
         }
-
         return $fpdi->Output('', 'S');
     }
 

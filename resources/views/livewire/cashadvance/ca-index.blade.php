@@ -68,8 +68,6 @@ new class extends Component {
             'ca-chart-updated',
             series: $this->getChart()
         );
-
-        $this->dispatch('riwayat-updated');
     }
 
     public function Dompet() : Array
@@ -139,7 +137,7 @@ new class extends Component {
 
     public function getKategoriPengeluaran() {
         $transaksi = collect(
-            $this->caPlBalance['tr_ca_transaction'] ?? []
+            $this->transaksiCaPl($this->caPlBalance['kode_ca']) ?? []
         );
 
        $pengeluaran = $transaksi
@@ -347,6 +345,13 @@ new class extends Component {
                     <p class="text-sm text-zinc-400 py-2">Belum ada dompet kegiatan.</p>
                     @endforelse
                 </div>
+                @if (count($this->caKegiatanBalance['data'] ?? []) > 4)
+                <flux:modal.trigger name="semua-dompet-kegiatan">
+                    <button type="button" class="flex w-full justify-end mb-5 items-center gap-1 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-white">
+                        Lihat semua ({{ $this->caKegiatanBalance['jumlah_dompet'] ?? 0 }}) <flux:icon name="arrow-right" class="size-3.5" />
+                    </button>
+                </flux:modal.trigger>
+                @endif
                 <flux:modal.trigger name="buat-kegiatan">
                     <flux:button variant="outline" class="w-full" icon="plus">Create new card</flux:button>
                 </flux:modal.trigger>
@@ -492,6 +497,7 @@ new class extends Component {
     <livewire:cashadvance.modals.topup-laporan :balance="$caPlBalance" />
     <livewire:cashadvance.modals.buat-kegiatan :kode-ca="$this->caPlBalance['kode_ca'] ?? ''" />
     <livewire:cashadvance.modals.riwayat-periode />
+    <livewire:cashadvance.modals.semua-dompet-kegiatan />
 
     {{-- ================= MODAL: PREVIEW BUKTI ================= --}}
     {{-- Satu modal dipakai bersama semua baris; url & judul diisi lewat event Alpine dari tombol paper-clip. --}}
