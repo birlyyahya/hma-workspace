@@ -374,7 +374,7 @@ new class extends Component {
                     <a wire:key="dompet-{{ $item['kode_ca'] }}" href="{{ route('cashadvance.dompet-show', $item['kode_ca']) }}" wire:navigate
                         class="flex w-36 shrink-0 flex-col gap-3 rounded-2xl border p-3.5 snap-start transition hover:-translate-y-0.5 lg:w-auto {{ $isClosed ? 'border-zinc-200 bg-zinc-50 opacity-70 dark:border-zinc-700 dark:bg-zinc-800/60' : $tone['tint'] }}">
                         <div class="flex items-center justify-between">
-                            <span class="size-2 rounded-full {{ $isClosed ? 'bg-zinc-400' : $tone['dot'] }}"></span>
+                            <flux:icon :name="$isClosed ? 'lock-closed' : 'briefcase'" class="size-4 {{ $isClosed ? 'text-zinc-400' : $tone['text'] }}" />
                             <span class="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">{{ $isClosed ? 'Ditutup' : 'Aktif' }}</span>
                         </div>
                         <div>
