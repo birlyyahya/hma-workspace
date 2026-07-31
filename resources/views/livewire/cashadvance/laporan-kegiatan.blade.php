@@ -35,7 +35,7 @@ class extends Component
         if (! empty($this->wallet['kode_ca'])) {
             $transaksi = collect(app(CaCache::class)->transaksiWalletKegiatan($kodeCa)['data'] ?? []);
 
-            $this->penerimaan = $transaksi->where('jenis', 'pemasukan')->values()->all();
+            $this->penerimaan = $transaksi->where('jenis', 'penerimaan')->values()->all();
             $this->pengeluaran = $transaksi->where('jenis', 'pengeluaran')->values()->all();
         }
     }

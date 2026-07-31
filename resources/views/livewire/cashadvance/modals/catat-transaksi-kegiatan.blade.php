@@ -82,7 +82,7 @@ new class extends Component {
     protected function rules(): array
     {
         return [
-            'jenis' => ['required', 'in:pemasukan,pengeluaran'],
+            'jenis' => ['required', 'in:penerimaan,pengeluaran'],
             'jumlah' => ['required', 'integer', 'min:1'],
             'kategori' => ['required', 'string'],
             'deskripsi' => ['nullable', 'string'],
@@ -148,7 +148,7 @@ new class extends Component {
 
         <flux:radio.group wire:model="jenis" label="Arah" variant="segmented">
             <flux:radio value="pengeluaran" label="Keluar" />
-            <flux:radio value="pemasukan" label="Masuk" />
+            <flux:radio value="penerimaan" label="Masuk" />
         </flux:radio.group>
 
         <flux:field>

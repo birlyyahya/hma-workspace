@@ -54,35 +54,35 @@ new class extends Component {
 
                     <div class="min-w-0 flex-1">
                         <div class="flex items-center gap-2">
-                            <p class="truncate font-semibold text-zinc-900 dark:text-white">{{ $dompet['judul_kegiatan'] ?? 'CA PL' }}</p>
+                            <p class="truncate text-sm font-semibold text-zinc-900 dark:text-white">{{ $dompet['judul_kegiatan'] ?? 'CA PL' }}</p>
                             <flux:badge size="sm" color="zinc">Ditutup</flux:badge>
                         </div>
                         <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{{ $dompet['kode_ca'] }}</p>
                         <p class="mt-1 flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
                             <flux:icon name="calendar" class="size-3.5 shrink-0" />
-                            {{ \Carbon\Carbon::parse($dompet['tanggal_mulai'] ?? now())->translatedFormat('d M Y') }}
-                            &ndash; {{ \Carbon\Carbon::parse($dompet['tanggal_selesai'] ?? now()->addDays(1))->translatedFormat('d M Y') }}
+                            {{ \Carbon\Carbon::parse($dompet['tanggal_mulai'])->translatedFormat('d M Y') }}
+                            &ndash; {{ \Carbon\Carbon::parse($dompet['tanggal_selesai'])->translatedFormat('d M Y') }}
                         </p>
                     </div>
 
                     <div class="flex items-center flex-col text-right gap-1.5">
-                        <div class="block">
-                            <p class="text-sm font-bold tabular-nums {{ $dompet['saldo_akhir'] < 0 ? 'text-red-600' : 'text-zinc-900 dark:text-white' }}">
+                        <div class="block w-full justify-end">
+                            <p class="text-sm text-right font-bold tabular-nums {{ $dompet['saldo_akhir'] < 0 ? 'text-red-600' : 'text-zinc-900 dark:text-white' }}">
                                 Rp {{ number_format($dompet['saldo_akhir'], 0, ',', '.') }}
                             </p>
-                            <p class="mt-0.5 text-xs font-medium text-ca-copper-deep dark:text-ca-copper">
+                            <p class="mt-0.5 text-right text-xs font-medium text-ca-copper-deep dark:text-ca-copper">
                                 &minus; Rp {{ number_format($dompet['total_pengeluaran'], 0, ',', '.') }}
                             </p>
                         </div>
                         <div class="flex gap-1">
-                            @if ($url = $this->buktiSetorUrl($dompet['bukti_setor'] ?? null))
-                            <flux:button size="sm" variant="ghost" icon="paper-clip" type="button"
+                            @if ($url = $this->buktiSetorUrl($dompet['bukti'] ?? null))
+                            <flux:button size="xs" variant="ghost" icon="paper-clip" type="button"
                                 x-on:click="$dispatch('preview-bukti', { url: '{{ $url }}', title: 'Bukti Setor {{ $dompet['kode_ca'] }}' }); $flux.modal('bukti-preview').show()">
-                                Bukti Setor
+                                Bukti
                             </flux:button>
                             @endif
                             <flux:button :href="route('cashadvance.laporan.capl', $dompet['kode_ca'])" target="_blank"
-                                size="sm" variant="ghost" icon="document-arrow-down" class="text-ca-copper! hover:text-ca-copper-deep!">
+                                size="xs" variant="ghost" icon="document-arrow-down" class="text-ca-copper! hover:text-ca-copper-deep!">
                                 Laporan
                             </flux:button>
                         </div>
