@@ -164,7 +164,7 @@ class CaCache
     {
         $key = 'ca:riwayat-dompet-ca-pl:'.$id;
 
-        $url = $this->apiBase.'/riwayat-wallet-kegiatan?user_id='.$id.'&is_active=0';
+        $url = $this->apiBase.'/riwayat-wallet-pl?user_id='.$id;
 
         try {
             return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], function () use ($url) {

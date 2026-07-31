@@ -3,8 +3,8 @@
 <div class="space-y-4 animate-pulse" aria-busy="true" aria-label="Memuat data Cash Advance">
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-        {{-- LEFT: MASTER WALLET CARD + CHART --}}
-        <div class="lg:col-span-2 space-y-4">
+        {{-- LEFT: MASTER WALLET CARD (saldo + chart menyatu) --}}
+        <div class="lg:col-span-2">
             <div class="rounded-2xl bg-ca-ink/90 p-6 space-y-5">
                 <div class="flex items-start justify-between gap-3">
                     <div class="space-y-2">
@@ -16,8 +16,8 @@
                 <div class="space-y-2">
                     <div class="h-3 w-24 rounded bg-white/10"></div>
                     <div class="h-10 w-56 rounded bg-white/15"></div>
-                    <div class="h-3 w-40 rounded bg-white/10"></div>
                 </div>
+                <div class="h-32 w-full rounded-lg bg-white/5"></div>
                 <div class="flex gap-2">
                     <div class="h-10 flex-1 rounded-xl bg-white/10"></div>
                     <div class="h-10 w-28 rounded-xl bg-white/10"></div>
@@ -32,12 +32,6 @@
                         <div class="h-4 w-24 rounded bg-white/15"></div>
                     </div>
                 </div>
-            </div>
-
-            <div class="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-6 space-y-3">
-                <div class="h-3.5 w-32 rounded bg-zinc-200 dark:bg-zinc-700"></div>
-                <div class="h-3 w-44 rounded bg-zinc-200 dark:bg-zinc-700"></div>
-                <div class="h-64 w-full rounded-lg bg-zinc-100 dark:bg-zinc-800"></div>
             </div>
         </div>
 

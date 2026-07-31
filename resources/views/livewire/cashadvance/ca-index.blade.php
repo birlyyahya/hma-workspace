@@ -265,20 +265,18 @@ new class extends Component {
     <livewire:cashadvance.modals.topup-pertama />
     @else
     {{-- ================= TOP GRID ================= --}}
-    <div class="grid grid-cols-1 lg:grid-cols-3 lg:items-start gap-4">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-        {{-- ===== LEFT: MASTER WALLET CARD + CHART ===== --}}
-        <div class="lg:col-span-2 space-y-4">
-
-            {{-- MASTER WALLET CARD --}}
-            <div class="relative overflow-hidden rounded-2xl bg-linear-to-br from-ca-ink-lift to-ca-ink p-6 text-white shadow-xl shadow-black/10">
+        {{-- ===== LEFT: MASTER WALLET CARD (saldo + chart menyatu) ===== --}}
+        <div class="lg:col-span-2 rounded-2xl bg-linear-to-br from-ca-ink-lift to-ca-ink p-6 text-white shadow-xl shadow-black/10">
+            <div class="relative overflow-hidden">
                 <div class="pointer-events-none absolute inset-0 opacity-40" style="background-image: repeating-linear-gradient(115deg, rgba(255,255,255,0.06) 0 1px, transparent 1px 24px);"></div>
 
                 <div class="relative space-y-5">
                     <div class="flex items-start justify-between gap-3">
                         <div>
                             <p class="text-[11px] font-semibold uppercase tracking-wider text-ca-gold">CA PL &middot; Dompet Utama</p>
-                            <p class="mt-1 text-xs text-white/50">{{ $this->caPlBalance['kode_ca'] ?? 'N/A' }}</p>
+                            <p class="mt-1 text-xs text-white/50">{{ $this->caPlBalance['kode_ca'] ?? 'N/A' }} &middot; dibuka {{ Carbon\Carbon::parse($this->caPlBalance['created_at'])->locale('id')->translatedFormat('d M Y') }}</p>
                         </div>
                         <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">
                             <span class="size-1.5 rounded-full bg-emerald-400"></span> Aktif
@@ -290,9 +288,30 @@ new class extends Component {
                         <h2 class="mt-1 text-4xl font-bold tabular-nums sm:text-5xl">
                             Rp {{ number_format($this->caPlBalance['saldo_akhir'] ?? 0, 0, ',', '.') }}
                         </h2>
-                        <p class="mt-1 text-xs text-white/50">
-                            Dibuka {{ Carbon\Carbon::parse($this->caPlBalance['created_at'])->locale('id')->translatedFormat('d M Y') }}
-                        </p>
+                    </div>
+
+                    {{-- TREN PENGELUARAN: sparkline dekoratif menyatu dengan kartu saldo. --}}
+                    {{-- wire:key wajib: memaksa morph menyisipkan node fresh saat swap dari --}}
+                    {{-- skeleton placeholder, agar Alpine menjalankan x-init & chart ter-render. --}}
+                    <div wire:key="ca-chart-wrapper" wire:ignore x-data="{ chart: null }" x-init="
+                            chart = new ApexCharts($refs.caChart, {
+                                series: @js($this->getChart ?? []),
+                                chart: { height: 140, type: 'area', toolbar: { show: false }, background: 'transparent' },
+                                dataLabels: { enabled: false },
+                                stroke: { curve: 'smooth', width: 3 },
+                                colors: ['#D9A054'],
+                                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0, stops: [0, 90, 100] } },
+                                grid: { show: false, padding: { left: 0, right: 0, top: 0, bottom: 0 } },
+                                xaxis: { type: 'category', categories: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
+                                yaxis: { show: false },
+                                tooltip: { theme: 'dark' },
+                            });
+                            chart.render();
+                            Livewire.on('ca-chart-updated', (data) => {
+                                chart.updateSeries(data.series);
+                            });
+                        ">
+                        <div x-ref="caChart" class="-mx-2 h-32 w-[calc(100%+1rem)]"></div>
                     </div>
 
                     <div class="flex gap-2">
@@ -327,44 +346,6 @@ new class extends Component {
                     </div>
                 </div>
             </div>
-
-            {{-- TREN PENGELUARAN --}}
-            <div class="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-6">
-                <p class="text-sm font-medium text-zinc-900 dark:text-white">Tren Pengeluaran</p>
-                <p class="text-xs text-zinc-500 dark:text-zinc-400">Per bulan &mdash; periode aktif</p>
-
-                {{-- wire:key wajib: memaksa morph menyisipkan node fresh saat swap dari --}}
-                {{-- skeleton placeholder, agar Alpine menjalankan x-init & chart ter-render. --}}
-                <div wire:key="ca-chart-wrapper" wire:ignore x-data="{ chart: null }" x-init="
-                        chart = new ApexCharts($refs.caChart, {
-                            series: @js($this->getChart ?? []),
-                            chart: { height: 260, type: 'area', toolbar: {
-                                show: true,
-                                tools: {
-                                    download: true,
-                                    selection: true,
-                                    zoom: true,
-                                    zoomin: true,
-                                    zoomout: true,
-                                    pan: true,
-                                    reset: true,
-                                },
-                            }, },
-                            dataLabels: { enabled: false },
-                            stroke: { curve: 'smooth', width: 3 },
-                            colors: ['#C2542C'],
-                            xaxis: { type: 'category', categories: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] },
-                            yaxis: { labels: { align: 'left', formatter: (v) => 'Rp ' + new Intl.NumberFormat('id-ID').format(v) } },
-                            tooltip: { theme: 'light' },
-                        });
-                        chart.render();
-                        Livewire.on('ca-chart-updated', (data) => {
-                            chart.updateSeries(data.series);
-                        });
-                    ">
-                    <div x-ref="caChart" class="mt-2 h-64 w-full"></div>
-                </div>
-            </div>
         </div>
 
         {{-- ===== RIGHT: DOMPET KEGIATAN + BREAKDOWN ===== --}}
@@ -385,20 +366,20 @@ new class extends Component {
                 </div>
 
                 <div class="no-scrollbar -mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1 lg:mx-0 lg:grid lg:grid-cols-3 lg:snap-none lg:overflow-visible lg:px-0 lg:pb-0">
-                    @forelse (collect($this->caKegiatanBalance['data'] ?? []) as $i => $item)
+                    @forelse (collect($this->caKegiatanBalance['data'] ?? [])->take(5) as $i => $item)
                     @php
                         $isClosed = ($item['status'] ?? 'open') === 'closed';
                         $tone = $this->pocketTone($i);
                     @endphp
                     <a wire:key="dompet-{{ $item['kode_ca'] }}" href="{{ route('cashadvance.dompet-show', $item['kode_ca']) }}" wire:navigate
-                        class="flex w-36 shrink-0 flex-col gap-6 rounded-2xl border p-3.5 snap-start transition hover:-translate-y-0.5 lg:w-auto {{ $isClosed ? 'border-zinc-200 bg-zinc-50 opacity-70 dark:border-zinc-700 dark:bg-zinc-800/60' : $tone['tint'] }}">
+                        class="flex w-36 shrink-0 flex-col gap-3 rounded-2xl border p-3.5 snap-start transition hover:-translate-y-0.5 lg:w-auto {{ $isClosed ? 'border-zinc-200 bg-zinc-50 opacity-70 dark:border-zinc-700 dark:bg-zinc-800/60' : $tone['tint'] }}">
                         <div class="flex items-center justify-between">
                             <span class="size-2 rounded-full {{ $isClosed ? 'bg-zinc-400' : $tone['dot'] }}"></span>
                             <span class="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">{{ $isClosed ? 'Ditutup' : 'Aktif' }}</span>
                         </div>
                         <div>
                             <p class="text-sm font-semibold leading-tight text-zinc-900 dark:text-white line-clamp-2">{{ $item['judul_kegiatan'] }}</p>
-                            <p class="mt-1.5 text-sm font-bold tabular-nums {{ $isClosed ? 'text-zinc-400' : $tone['text'] }}">
+                            <p class="mt-1.5 text-xs font-bold tabular-nums {{ $isClosed ? 'text-zinc-400' : $tone['text'] }}">
                                 Rp {{ number_format($item['sisa_saldo'], 0, ',', '.') }}
                             </p>
                         </div>
@@ -448,11 +429,11 @@ new class extends Component {
     </div>
 
     {{-- ================= RECENT TRANSACTION ================= --}}
-    <div class="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+    <div class="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-ca-ink">
         <div class="p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-                <flux:heading class="font-bold">Transaksi Terbaru</flux:heading>
-                <flux:text class="text-xs">Periode #1 (aktif) saja</flux:text>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-white/50">Transaksi Terbaru</p>
+                <p class="mt-0.5 text-xs text-zinc-400 dark:text-white/40">Periode #1 (aktif) saja</p>
             </div>
             <div class="flex gap-2">
                 <div class="flex-1 relative">
@@ -476,30 +457,46 @@ new class extends Component {
                     </flux:menu>
                 </flux:dropdown>
                 <flux:button icon="arrow-down-tray" variant="outline">Export CSV</flux:button>
-                <flux:button :href="route('cashadvance.laporan.capl')" target="_blank" icon="document-arrow-down" variant="outline">Export PDF</flux:button>
+                <flux:button :href="route('cashadvance.laporan.capl')" target="_blank" icon="document-arrow-down" variant="ghost" class="text-ca-copper! hover:text-ca-copper-deep!">Export PDF</flux:button>
             </div>
         </div>
 
-        <div wire:loading.class="opacity-50" wire:target="performSearch" class="divide-y divide-zinc-100 dark:divide-zinc-800 border-t border-zinc-100 dark:border-zinc-800">
+        <div wire:loading.class="opacity-50" wire:target="performSearch" class="divide-y divide-zinc-100 dark:divide-white/10 border-t border-zinc-100 dark:border-white/10">
             @forelse ($this->transaksiCaPl ?? [] as $trx)
             @php $isIn = ($trx['jenis'] ?? null) === 'pemasukan'; @endphp
             <div wire:key="trx-{{ $trx['id_transaksi'] }}" class="flex items-center gap-3 px-4 py-3 md:px-6">
-                <span class="flex size-10 shrink-0 items-center justify-center rounded-xl {{ $isIn ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-ca-copper/10 text-ca-copper-deep dark:text-ca-copper' }}">
+                <span class="flex size-10 shrink-0 items-center justify-center rounded-full {{ $isIn ? 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300' : 'bg-ca-copper/10 text-ca-copper-deep dark:bg-ca-copper/15 dark:text-ca-copper' }}">
                     <flux:icon :name="$isIn ? 'banknotes' : $this->iconForKategori($trx['kategori'] ?? null)" class="size-5" />
                 </span>
 
-                <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm font-medium text-zinc-900 dark:text-white">{{ $trx['deskripsi'] }}</p>
-                    <p class="truncate text-xs text-zinc-500 dark:text-zinc-400">
-                        {{ $trx['kategori'] ?? '-' }} &middot; {{ \Carbon\Carbon::parse($trx['created_at'])->translatedFormat('d M Y') }}
-                    </p>
+                {{-- Tanggal: kolom tersendiri di sm+, digabung ke meta deskripsi di mobile --}}
+                <div class="hidden w-24 shrink-0 text-sm text-zinc-500 dark:text-white/50 sm:block">
+                    {{ \Carbon\Carbon::parse($trx['created_at'])->translatedFormat('d M Y') }}
                 </div>
 
+                {{-- Kategori: kolom tersendiri di sm+ --}}
+                <div class="hidden shrink-0 sm:block">
+                    <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-600 dark:bg-white/10 dark:text-white/70">
+                        {{ $isIn ? 'Pemasukan' : ($trx['kategori'] ?? '-') }}
+                    </span>
+                </div>
+
+                <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-medium text-zinc-900 dark:text-white">{{ $trx['deskripsi'] }}</p>
+                    <div class="mt-1 flex items-center gap-2 sm:hidden">
+                        <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-600 dark:bg-white/10 dark:text-white/70">
+                            {{ $isIn ? 'Pemasukan' : ($trx['kategori'] ?? '-') }}
+                        </span>
+                        <span class="text-xs text-zinc-400 dark:text-white/40">{{ \Carbon\Carbon::parse($trx['created_at'])->translatedFormat('d M Y') }}</span>
+                    </div>
+                </div>
+
+                {{-- Pengeluaran + sisa saldo --}}
                 <div class="shrink-0 text-right">
-                    <p class="text-sm font-semibold tabular-nums {{ $isIn ? 'text-emerald-600 dark:text-emerald-400' : 'text-ca-copper-deep dark:text-ca-copper' }}">
+                    <p class="text-sm font-semibold tabular-nums {{ $isIn ? 'text-emerald-600 dark:text-emerald-300' : 'text-ca-copper-deep dark:text-ca-copper' }}">
                         {{ $isIn ? '+' : '−' }} Rp {{ number_format($trx['jumlah'], 0, ',', '.') }}
                     </p>
-                    <p class="hidden text-xs text-zinc-400 sm:block">
+                    <p class="text-xs text-zinc-400 dark:text-white/40">
                         Saldo Rp {{ number_format($trx['saldo_setelah'], 0, ',', '.') }}
                     </p>
                 </div>

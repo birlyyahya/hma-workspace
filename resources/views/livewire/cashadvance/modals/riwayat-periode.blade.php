@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\CaCache;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 
@@ -10,6 +11,7 @@ new class extends Component {
      */
 
      #[On('riwayat-updated')]
+     #[Computed]
     public function riwayatDompetCaPl(): array
     {
         return app(CaCache::class)->riwayatDompetCaPl(Auth::id()) ?? [];
@@ -19,37 +21,52 @@ new class extends Component {
 <flux:modal name="riwayat-periode" class="w-xl" flyout>
     <div class="space-y-6">
         <div>
-            <flux:heading size="lg">Riwayat Periode CA PL</flux:heading>
-            <flux:text class="mt-1">Periode yang sudah disegel (read-only). Buka laporan untuk cetak/simpan PDF.</flux:text>
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-ca-copper">Riwayat Periode</p>
+            <flux:heading size="lg" class="mt-1">Periode CA PL Tersegel</flux:heading>
+            <flux:text class="mt-1">Periode yang sudah ditutup (read-only). Buka laporan untuk cetak/simpan PDF.</flux:text>
         </div>
 
-        <div class="space-y-2">
-            @forelse ($this->riwayatDompetCaPl()['data'] ?? [] as $dompet)
-                <div wire:key="seal-{{ $dompet['id'] }}"
-                    class="flex items-center justify-between gap-3 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
-                    <div>
+        <div class="space-y-2 max-h-112 overflow-y-auto -mx-1 px-1">
+            @forelse ($this->riwayatDompetCaPl['data'] ?? [] as $dompet)
+                <div wire:key="seal-{{ $dompet['id_ca'] }}"
+                    class="flex items-center gap-3 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-4 transition hover:border-ca-copper/30 dark:hover:border-ca-copper/40">
+                    <span class="flex size-11 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500">
+                        <flux:icon name="lock-closed" class="size-5" />
+                    </span>
+
+                    <div class="min-w-0 flex-1">
                         <div class="flex items-center gap-2">
-                            <p class="font-medium text-zinc-900 dark:text-white">Periode #{{ $dompet['kode_ca'] }}</p>
-                            <flux:badge size="sm" color="zinc">Closed</flux:badge>
+                            <p class="truncate font-semibold text-zinc-900 dark:text-white">{{ $dompet['judul_kegiatan'] ?? 'CA PL' }}</p>
+                            <flux:badge size="sm" color="zinc">Ditutup</flux:badge>
                         </div>
-                        <p class="text-xs text-zinc-500 mt-0.5">
-                            {{ \Carbon\Carbon::parse($dompet['tanggal_mulai'])->translatedFormat('d M Y') }}
-                            – {{ \Carbon\Carbon::parse($dompet['created_at'])->translatedFormat('d M Y') }}
-                        </p>
-                        <p class="text-xs text-zinc-500 mt-0.5">
-                            • Keluar Rp {{ number_format($dompet['total_pengeluaran'], 0, ',', '.') }}
+                        <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{{ $dompet['kode_ca'] }}</p>
+                        <p class="mt-1 flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                            <flux:icon name="calendar" class="size-3.5 shrink-0" />
+                            {{ \Carbon\Carbon::parse($dompet['tanggal_mulai'] ?? now())->translatedFormat('d M Y') }}
+                            &ndash; {{ \Carbon\Carbon::parse($dompet['tanggal_selesai'] ?? now()->addDays(1))->translatedFormat('d M Y') }}
                         </p>
                     </div>
-                    <div class="flex items-center gap-3">
-                        <span class="text-sm font-medium tabular-nums {{ $dompet['saldo_akhir'] < 0 ? 'text-red-600' : 'text-zinc-900 dark:text-white' }}">
-                            Rp {{ number_format($dompet['saldo_akhir'], 0, ',', '.') }}
-                        </span>
-                        <flux:button :href="route('cashadvance.laporan.capl', $dompet['id'])" target="_blank"
-                            size="sm" variant="outline" icon="document-arrow-down">Laporan</flux:button>
+
+                    <div class="flex items-center flex-col text-right">
+                        <div class="block">
+                            <p class="text-sm font-bold tabular-nums {{ $dompet['saldo_akhir'] < 0 ? 'text-red-600' : 'text-zinc-900 dark:text-white' }}">
+                                Rp {{ number_format($dompet['saldo_akhir'], 0, ',', '.') }}
+                            </p>
+                            <p class="mt-0.5 text-xs font-medium text-ca-copper-deep dark:text-ca-copper">
+                                &minus; Rp {{ number_format($dompet['total_pengeluaran'], 0, ',', '.') }}
+                            </p>
+                        </div>
+                        <flux:button :href="route('cashadvance.laporan.capl', $dompet['id_ca'])" target="_blank"
+                            size="sm" variant="ghost" icon="document-arrow-down" class=" text-ca-copper! hover:text-ca-copper-deep!">
+                            Laporan
+                        </flux:button>
                     </div>
                 </div>
             @empty
-            <p class="text-sm text-zinc-400 text-center py-4">Belum ada periode tersegel.</p>
+            <div class="flex flex-col items-center gap-2 py-10 text-center">
+                <flux:icon name="archive-box" class="size-8 text-zinc-300 dark:text-zinc-600" />
+                <p class="text-sm text-zinc-400">Belum ada periode tersegel.</p>
+            </div>
             @endforelse
         </div>
     </div>
