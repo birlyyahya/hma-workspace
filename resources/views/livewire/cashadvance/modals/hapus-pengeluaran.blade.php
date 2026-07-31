@@ -50,9 +50,14 @@ new class extends Component {
 
 <flux:modal name="hapus-pengeluaran" class="w-md">
     <div class="space-y-6">
-        <div>
-            <flux:heading size="lg">Hapus Pengeluaran</flux:heading>
-            <flux:text class="mt-1">Apakah Anda yakin ingin menghapus pengeluaran ini? Tindakan ini tidak dapat dibatalkan.</flux:text>
+        <div class="flex items-start gap-3">
+            <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-red-500/10 text-red-600 dark:text-red-400">
+                <flux:icon name="trash" class="size-5" />
+            </span>
+            <div>
+                <flux:heading size="lg">Hapus Pengeluaran</flux:heading>
+                <flux:text class="mt-1">Apakah Anda yakin ingin menghapus pengeluaran ini? Tindakan ini tidak dapat dibatalkan.</flux:text>
+            </div>
         </div>
 
         <div class="flex justify-end gap-2">

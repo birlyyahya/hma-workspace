@@ -73,7 +73,8 @@ new class extends Component {
 <flux:modal name="buat-kegiatan" class="w-lg" @close="$wire.resetForm()">
     <form wire:submit.prevent="save" class="space-y-6">
         <div>
-            <flux:heading size="lg">Buat Dompet Kegiatan</flux:heading>
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-ca-copper">Dompet Kegiatan</p>
+            <flux:heading size="lg" class="mt-1">Buat Dompet Kegiatan</flux:heading>
             <flux:text class="mt-1">Dana cair dicatat sebagai transaksi masuk pertama.</flux:text>
         </div>
 
@@ -96,7 +97,7 @@ new class extends Component {
         <span wire:loading wire:target="bukti" class="text-xs text-zinc-500 animate-pulse">Mengunggah bukti…</span>
         <flux:error name="bukti" />
 
-        <flux:button type="submit" variant="primary" class="w-full" wire:loading.attr="disabled" wire:target="bukti,save">
+        <flux:button type="submit" variant="primary" class="w-full bg-ca-copper! hover:bg-ca-copper-deep!" wire:loading.attr="disabled" wire:target="bukti,save">
             <span wire:loading.remove wire:target="bukti,save">Buat Dompet</span>
             <span wire:loading wire:target="bukti" class="animate-pulse">Menunggu unggahan…</span>
             <span wire:loading wire:target="save" class="animate-pulse">Membuat…</span>

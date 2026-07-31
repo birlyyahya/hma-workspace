@@ -139,7 +139,8 @@ new class extends Component {
 <flux:modal name="catat-pengeluaran" class="w-lg" @close="$wire.resetForm()">
     <form wire:submit.prevent="saveExpense" class="space-y-6">
         <div>
-            <flux:heading size="lg">
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-ca-copper">CA PL</p>
+            <flux:heading size="lg" class="mt-1">
                 <span x-show="! $wire.editingId">Catat Pengeluaran</span>
                 <span x-show="$wire.editingId" x-cloak>Edit Pengeluaran</span>
             </flux:heading>
@@ -175,7 +176,7 @@ new class extends Component {
             </flux:text>
         </div>
 
-        <flux:button type="submit" variant="primary" class="w-full"
+        <flux:button type="submit" variant="primary" class="w-full bg-ca-copper! hover:bg-ca-copper-deep!"
             wire:loading.attr="disabled" wire:target="bukti,saveExpense">
             <span wire:loading.remove wire:target="bukti,saveExpense">Simpan Pengeluaran</span>
             <span wire:loading wire:target="bukti" class="animate-pulse">Menunggu unggahan&hellip;</span>

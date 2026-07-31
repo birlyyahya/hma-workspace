@@ -41,7 +41,8 @@ new class extends Component {
 <flux:modal name="topup-pertama" class="w-lg">
     <form wire:submit.prevent="submitInitialTopup" class="space-y-6">
         <div>
-            <flux:heading size="lg">Top up Pertama</flux:heading>
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-ca-copper">Cash Advance</p>
+            <flux:heading size="lg" class="mt-1">Top up Pertama</flux:heading>
             <flux:text class="mt-1">Dana ini menjadi saldo awal (float) dompet CA PL Anda.</flux:text>
         </div>
 
@@ -51,7 +52,7 @@ new class extends Component {
             </span>
         </div>
 
-        <flux:button type="submit" variant="primary" class="w-full"
+        <flux:button type="submit" variant="primary" class="w-full bg-ca-copper! hover:bg-ca-copper-deep!"
             wire:loading.attr="disabled" wire:target="topupBukti,submitInitialTopup">
             <span wire:loading.remove wire:target="topupBukti,submitInitialTopup">Ajukan Top up</span>
             <span wire:loading wire:target="topupBukti" class="animate-pulse">Menunggu unggahan&hellip;</span>

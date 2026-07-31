@@ -265,10 +265,10 @@ new class extends Component {
     <livewire:cashadvance.modals.topup-pertama />
     @else
     {{-- ================= TOP GRID ================= --}}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 lg:flex gap-4">
 
         {{-- ===== LEFT: MASTER WALLET CARD (saldo + chart menyatu) ===== --}}
-        <div class="lg:col-span-2 rounded-2xl bg-linear-to-br from-ca-ink-lift to-ca-ink p-6 text-white shadow-xl shadow-black/10">
+        <div class="w-full lg:w-4/5 rounded-2xl bg-linear-to-br from-ca-ink-lift to-ca-ink p-6 text-white shadow-xl shadow-black/10">
             <div class="relative overflow-hidden">
                 <div class="pointer-events-none absolute inset-0 opacity-40" style="background-image: repeating-linear-gradient(115deg, rgba(255,255,255,0.06) 0 1px, transparent 1px 24px);"></div>
 
@@ -332,14 +332,14 @@ new class extends Component {
 
                     <div class="grid grid-cols-2 gap-4 border-t border-white/10 pt-4">
                         <div>
-                            <p class="text-[11px] text-white/50">Masuk periode ini</p>
-                            <p class="mt-0.5 text-sm font-semibold tabular-nums text-emerald-300">
+                            <p class="text-[11px] lg:text-md text-white/50">Masuk periode ini</p>
+                            <p class="mt-0.5 text-sm lg:text-lg font-semibold tabular-nums text-emerald-300">
                                 Rp {{ number_format($this->caPlBalance['saldo_awal_priode'] ?? 0, 0, ',', '.') }}
                             </p>
                         </div>
                         <div>
-                            <p class="text-[11px] text-white/50">Keluar periode ini</p>
-                            <p class="mt-0.5 text-sm font-semibold tabular-nums text-orange-300">
+                            <p class="text-[11px] lg:text-md text-white/50">Keluar periode ini</p>
+                            <p class="mt-0.5 text-sm lg:text-lg font-semibold tabular-nums text-orange-300">
                                 Rp {{ number_format($this->caPlBalance['total_pengeluaran'] ?? 0, 0, ',', '.') }}
                             </p>
                         </div>
@@ -546,11 +546,12 @@ new class extends Component {
         x-on:preview-bukti.window="url = $event.detail.url; title = $event.detail.title">
         <div class="space-y-4">
             <div>
-                <flux:heading size="lg">Bukti Transaksi</flux:heading>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-ca-copper">Lampiran</p>
+                <flux:heading size="lg" class="mt-1">Bukti Transaksi</flux:heading>
                 <flux:text class="mt-1 truncate" x-text="title"></flux:text>
             </div>
 
-            <div class="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800">
+            <div class="overflow-hidden rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800">
                 <template x-if="isPdf">
                     <iframe :src="url" class="h-[70vh] w-full" title="Bukti PDF"></iframe>
                 </template>
@@ -560,7 +561,7 @@ new class extends Component {
             </div>
 
             <div class="flex justify-end gap-2">
-                <flux:button href="#" x-bind:href="url" target="_blank" variant="ghost" icon="arrow-top-right-on-square">
+                <flux:button href="#" x-bind:href="url" target="_blank" variant="ghost" icon="arrow-top-right-on-square" class="text-ca-copper! hover:text-ca-copper-deep!">
                     Buka di tab baru
                 </flux:button>
                 <flux:modal.close>
