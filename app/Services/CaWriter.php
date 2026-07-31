@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Services\Concerns\MakesExternalRequests;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -37,7 +38,7 @@ class CaWriter
     public function topupCaPL(array $payload)
     {
         try {
-            $response = $this->sendTransaction($this->apiBase.'/esekusi-topup-wallet-pl', $payload);
+            $response = $this->sendTransaction($this->apiBase.'/esekusi-topup-wallet-pl', $payload, fileField: 'bukti_setor');
 
             $body = (array) $response->json();
             $ok = $response->successful() || (bool) ($body['success'] ?? false);
@@ -45,9 +46,9 @@ class CaWriter
             return $this->result($ok, $body, $response->status(), [
                 'name' => 'ca',
                 'event' => 'created',
-                'description' => "Topup CA PL {$body['data']['kode_ca']}",
-                'properties' => ['total_penerimaan' => $body['data']['total_penerimaan']],
-            ]);
+                'description' => "Topup CA PL {$payload['user_id']}",
+                'properties' => ['total_penerimaan' => $payload['total_penerimaan']],
+            ], scope: 'pl');
         } catch (\Throwable $e) {
             return $this->fail('topupCaPL', $e, ['user_id' => $payload['user_id']]);
         }
@@ -72,7 +73,7 @@ class CaWriter
                 'event' => 'created',
                 'description' => "Mencatat pengeluaran CA PL {$kode}",
                 'properties' => ['kode' => $kode],
-            ]);
+            ], scope: 'pl');
         } catch (\Throwable $e) {
             return $this->fail('createTransactionCaPl', $e, ['kode' => $kode]);
         }
@@ -101,7 +102,7 @@ class CaWriter
                 'event' => 'updated',
                 'description' => "Memperbarui transaksi CA PL {$kode} #{$id}",
                 'properties' => ['kode' => $kode, 'id' => $id],
-            ]);
+            ], scope: 'pl');
         } catch (\Throwable $e) {
             return $this->fail('updateTransactionCaPl', $e, ['kode' => $kode, 'id' => $id]);
         }
@@ -120,7 +121,7 @@ class CaWriter
                 'event' => 'deleted',
                 'description' => "Delete transaksi CA PL {$kode} #{$id}",
                 'properties' => ['kode' => $kode, 'id' => $id],
-            ]);
+            ], scope: 'pl');
         } catch (\Throwable $e) {
             return $this->fail('deleteTransaction', $e, ['kode' => $kode, 'id' => $id]);
         }
@@ -147,7 +148,7 @@ class CaWriter
                 'event' => 'created',
                 'description' => "Buat dompet kegiatan {$kodeCa}",
                 'properties' => ['user_id' => $payload['user_id'] ?? null],
-            ]);
+            ], scope: 'kegiatan');
         } catch (\Throwable $e) {
             return $this->fail('createDompetKegiatan', $e, ['user_id' => $payload['user_id'] ?? null]);
         }
@@ -173,7 +174,7 @@ class CaWriter
                 'event' => 'created',
                 'description' => "Mencatat transaksi dompet kegiatan {$kode}",
                 'properties' => ['kode' => $kode],
-            ]);
+            ], scope: 'kegiatan');
         } catch (\Throwable $e) {
             return $this->fail('createTransaksiKegiatan', $e, ['kode' => $kode]);
         }
@@ -202,7 +203,7 @@ class CaWriter
                 'event' => 'updated',
                 'description' => "Memperbarui transaksi dompet kegiatan {$kode} #{$id}",
                 'properties' => ['kode' => $kode, 'id' => $id],
-            ]);
+            ], scope: 'kegiatan');
         } catch (\Throwable $e) {
             return $this->fail('updateTransaksiKegiatan', $e, ['kode' => $kode, 'id' => $id]);
         }
@@ -224,7 +225,7 @@ class CaWriter
                 'event' => 'deleted',
                 'description' => "Delete transaksi dompet kegiatan {$kode} #{$id}",
                 'properties' => ['kode' => $kode, 'id' => $id],
-            ]);
+            ], scope: 'kegiatan');
         } catch (\Throwable $e) {
             return $this->fail('deleteTransaksiKegiatan', $e, ['kode' => $kode, 'id' => $id]);
         }
@@ -251,26 +252,35 @@ class CaWriter
                 'event' => 'updated',
                 'description' => "Tutup dompet kegiatan id={$id}",
                 'properties' => ['id' => $id],
-            ]);
+            ], scope: 'kegiatan');
         } catch (\Throwable $e) {
             return $this->fail('closeKegiatan', $e, ['id' => $payload['id'] ?? null]);
         }
     }
 
-    public function topup(array $payload)
+    /**
+     * Eksekusi top up CA PL (restore ke float). Wajib menyertakan bukti_setor:
+     * bukti TF penyelesaian dokumen resmi, atau bukti TF reimbursement dari
+     * management bila saldo akhir periode berjalan minus.
+     * NON-idempotent — multipart upload bukti_setor, timeout diperpanjang.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function topup(array $payload): array
     {
         try {
-            $response = $this->externalWrite()->post($this->apiBase.'/esekusi-topup-wallet-pl', $payload);
+            $response = $this->sendTransaction($this->apiBase.'/esekusi-topup-wallet-pl', $payload, fileField: 'bukti_setor');
 
-            $body = $response->json();
+            $body = (array) $response->json();
             $ok = $response->successful() || (bool) ($body['success'] ?? false);
 
             return $this->result($ok, $body, $response->status(), [
                 'name' => 'ca',
                 'event' => 'created',
                 'description' => "topup ca PL {$payload['tahun_anggaran']}",
-                'properties' => ['payload' => $payload],
-            ]);
+                'properties' => ['payload' => Arr::except($payload, ['bukti_setor'])],
+            ], scope: 'pl');
         } catch (\Throwable $e) {
             return $this->fail('topupCaPL', $e, ['user_id' => $payload['user_id']]);
         }
@@ -298,16 +308,26 @@ class CaWriter
     }
 
     /**
-     * Bangun struktur hasil; flush cache CA & catat activity saat sukses.
+     * Bangun struktur hasil; flush cache CA (di-scope per domain) & catat
+     * activity saat sukses.
      *
      * @param  array<string, mixed>  $body
      * @param  array{name: string, event: string, description: string, properties?: array<string, mixed>}|null  $log
+     * @param  'pl'|'kegiatan'|'all'  $scope  Domain cache yang perlu di-invalidate.
+     *                                        'pl' hanya membuang cache CA PL (saldo master, transaksi, riwayat
+     *                                        periode); 'kegiatan' hanya membuang cache daftar dompet kegiatan;
+     *                                        keduanya independen sehingga menulis di satu domain tidak memaksa
+     *                                        refetch domain lain yang tidak berubah.
      * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
      */
-    private function result(bool $ok, array $body, ?int $status, ?array $log = null): array
+    private function result(bool $ok, array $body, ?int $status, ?array $log = null, string $scope = 'all'): array
     {
         if ($ok) {
-            $this->cache->flush();
+            match ($scope) {
+                'pl' => $this->cache->flushPl(),
+                'kegiatan' => $this->cache->flushKegiatan(),
+                default => $this->cache->flush(),
+            };
 
             if ($log !== null) {
                 $this->logActivity($log);

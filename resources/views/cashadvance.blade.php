@@ -8,7 +8,7 @@
                 </div>
 
                 <flux:modal.trigger name="riwayat-periode">
-                    <flux:button size="sm" variant="outline" icon="clock">Riwayat Periode</flux:button>
+                    <flux:button size="sm" variant="ghost" class="text-ca-copper! hover:text-ca-copper-deep!" icon="clock">Riwayat Periode</flux:button>
                 </flux:modal.trigger>
             </div>
             <livewire:cashadvance.ca-index lazy />

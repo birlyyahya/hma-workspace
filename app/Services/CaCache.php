@@ -19,6 +19,12 @@ class CaCache
 
     private const TAG = 'ca';
 
+    /** Sub-tag domain CA PL (saldo master, transaksi PL, riwayat periode). */
+    private const TAG_PL = 'ca:pl';
+
+    /** Sub-tag domain dompet kegiatan (daftar kantong & saldo per kegiatan). */
+    private const TAG_KEGIATAN = 'ca:kegiatan';
+
     public function __construct(private string $apiBase) {}
 
     public function DompetCaActiveTransaksi(int $id): array
@@ -28,7 +34,7 @@ class CaCache
         $url = $this->apiBase.'/list-wallet-pl?user_id='.$id.'&is_active=1';
 
         try {
-            return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], function () use ($url) {
+            return $this->rememberFlexible([self::TAG, self::TAG_PL], $key, [self::TTL, self::TTL * 4], function () use ($url) {
                 $response = Http::acceptJson()
                     ->timeout(8)
                     ->retry(2, 200, function ($e) {
@@ -56,7 +62,7 @@ class CaCache
         $query = array_filter($param);
         $key = 'ca:transaksi-ca-pl:'.$kode.':'.md5(serialize($query));
 
-        return $this->rememberFlexible([self::TAG], $key, [self::TTL_DETAIL, self::TTL_DETAIL * 4], function () use ($url, $query) {
+        return $this->rememberFlexible([self::TAG, self::TAG_PL], $key, [self::TTL_DETAIL, self::TTL_DETAIL * 4], function () use ($url, $query) {
             $response = Http::timeout(8)
                 ->retry(2, 200, function ($e) {
                     return $e instanceof \Illuminate\Http\Client\ConnectionException
@@ -83,7 +89,7 @@ class CaCache
         $query = array_filter([...$param, 'user_id' => $userId, 'tr_ca_transaction' => 'true']);
         $key = 'ca:list-wallet-kegiatan:'.$userId.':'.md5(serialize($query));
 
-        return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], function () use ($url, $query) {
+        return $this->rememberFlexible([self::TAG, self::TAG_KEGIATAN], $key, [self::TTL, self::TTL * 4], function () use ($url, $query) {
             $response = Http::acceptJson()
                 ->timeout(8)
                 ->retry(2, 200, function ($e) {
@@ -98,6 +104,31 @@ class CaCache
 
             return $response->json() ?? ['data' => []];
         }, ['data' => []]);
+    }
+
+    public function walletPlByKode(string $kode, array $param = []): array
+    {
+        $url = $this->apiBase.'/wallet-pl/'.$kode;
+
+        try {
+            $response = Http::acceptJson()
+                ->timeout(8)
+                ->retry(2, 200, function ($e) {
+                    return $e instanceof \Illuminate\Http\Client\ConnectionException
+                        || (method_exists($e, 'response') && optional($e->response)->serverError());
+                }, throw: false)
+                ->get($url, array_filter($param));
+
+            if ($response->failed()) {
+                throw new \RuntimeException('status '.$response->status());
+            }
+
+            return $response->json() ?? ['data' => []];
+        } catch (\Throwable $e) {
+            Log::warning('CaCache walletPlByKode gagal', ['kode' => $kode, 'error' => $e->getMessage()]);
+
+            return ['data' => []];
+        }
     }
 
     /**
@@ -164,10 +195,10 @@ class CaCache
     {
         $key = 'ca:riwayat-dompet-ca-pl:'.$id;
 
-        $url = $this->apiBase.'/riwayat-wallet-pl?user_id='.$id;
+        $url = $this->apiBase.'/riwayat-wallet-pl?user_id='.$id.'&is_active=0';
 
         try {
-            return $this->rememberFlexible([self::TAG], $key, [self::TTL, self::TTL * 4], function () use ($url) {
+            return $this->rememberFlexible([self::TAG, self::TAG_PL], $key, [self::TTL, self::TTL * 4], function () use ($url) {
                 $response = Http::timeout(8)
                     ->retry(2, 200, function ($e) {
                         return $e instanceof \Illuminate\Http\Client\ConnectionException
@@ -188,8 +219,31 @@ class CaCache
         }
     }
 
+    /**
+     * Flush total seluruh cache domain CA (PL & kegiatan). Dipakai saat operasi
+     * yang efeknya lintas domain, atau untuk pemulihan manual.
+     */
     public function flush(): void
     {
         Cache::tags([self::TAG])->flush();
+    }
+
+    /**
+     * Flush hanya cache domain CA PL (saldo master, transaksi, riwayat periode)
+     * — dipanggil saat menulis data yang cuma menyentuh CA PL, tanpa memaksa
+     * refetch daftar dompet kegiatan yang tidak berubah.
+     */
+    public function flushPl(): void
+    {
+        Cache::tags([self::TAG_PL])->flush();
+    }
+
+    /**
+     * Flush hanya cache daftar dompet kegiatan — dipanggil saat menulis data
+     * yang cuma menyentuh dompet kegiatan, tanpa memaksa refetch saldo CA PL.
+     */
+    public function flushKegiatan(): void
+    {
+        Cache::tags([self::TAG_KEGIATAN])->flush();
     }
 }

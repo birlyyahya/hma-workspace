@@ -30,7 +30,7 @@ class extends Component
         $this->projects = app(ProjectCache::class)->involvedProjects($userId);
         $this->selectedProjectId = $this->projects[0]['id'] ?? null;
 
-        $dompets = collect(app(CaCache::class)->DompetCaActiveTransaksi($userId));
+        $dompets = collect(app(CaCache::class)->walletPlByKode($kodeCa));
 
         $wallet = $kodeCa !== null
             ? $dompets->firstWhere('kode_ca', $kodeCa)
@@ -115,7 +115,10 @@ class extends Component
                 :options="collect($projects)->map(fn ($p) => ['value' => $p['id'], 'label' => $p['name']])->all()"
                 placeholder="Pilih project..."
                 searchPlaceholder="Cari project..." />
+            <p class="mt-2 text-red-400">Pilih project pengeluaran terbesar sebagai judul dokumen</p>
         </div>
+
+
     </div>
     @endif
 

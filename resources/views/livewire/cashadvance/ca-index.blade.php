@@ -268,7 +268,7 @@ new class extends Component {
     <div class="grid grid-cols-1 lg:flex gap-4">
 
         {{-- ===== LEFT: MASTER WALLET CARD (saldo + chart menyatu) ===== --}}
-        <div class="w-full lg:w-4/5 rounded-2xl bg-linear-to-br from-ca-ink-lift to-ca-ink p-6 text-white shadow-xl shadow-black/10">
+        <div class="w-full lg:w-3/5 rounded-2xl bg-linear-to-br from-ca-ink-lift to-ca-ink p-6 text-white shadow-xl shadow-black/10">
             <div class="relative overflow-hidden">
                 <div class="pointer-events-none absolute inset-0 opacity-40" style="background-image: repeating-linear-gradient(115deg, rgba(255,255,255,0.06) 0 1px, transparent 1px 24px);"></div>
 
@@ -456,8 +456,7 @@ new class extends Component {
                         </flux:menu.item>
                     </flux:menu>
                 </flux:dropdown>
-                <flux:button icon="arrow-down-tray" variant="outline">Export CSV</flux:button>
-                <flux:button :href="route('cashadvance.laporan.capl')" target="_blank" icon="document-arrow-down" variant="ghost" class="text-ca-copper! hover:text-ca-copper-deep!">Export PDF</flux:button>
+                <flux:button :href="route('cashadvance.laporan.capl', ['kodeCa' => $this->caPlBalance['kode_ca']])" target="_blank" icon="document-arrow-down" variant="ghost" class="text-ca-copper! hover:text-ca-copper-deep!">Export PDF</flux:button>
             </div>
         </div>
 

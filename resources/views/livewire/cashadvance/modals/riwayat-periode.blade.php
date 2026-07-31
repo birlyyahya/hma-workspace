@@ -16,6 +16,24 @@ new class extends Component {
     {
         return app(CaCache::class)->riwayatDompetCaPl(Auth::id()) ?? [];
     }
+
+    /**
+     * URL publik MinIO untuk bukti setor (bukti TF penyelesaian dokumen resmi
+     * atau reimbursement management saat top up) — sama pola dengan bukti
+     * transaksi di ca-index.
+     */
+    public function buktiSetorUrl(?string $path): ?string
+    {
+        if (blank($path)) {
+            return null;
+        }
+
+        if (str_starts_with($path, 'http')) {
+            return $path;
+        }
+
+        return config('services.aws_url').'cashadvance/'.$path;
+    }
 }; ?>
 
 <flux:modal name="riwayat-periode" class="w-xl" flyout>
@@ -47,7 +65,7 @@ new class extends Component {
                         </p>
                     </div>
 
-                    <div class="flex items-center flex-col text-right">
+                    <div class="flex items-center flex-col text-right gap-1.5">
                         <div class="block">
                             <p class="text-sm font-bold tabular-nums {{ $dompet['saldo_akhir'] < 0 ? 'text-red-600' : 'text-zinc-900 dark:text-white' }}">
                                 Rp {{ number_format($dompet['saldo_akhir'], 0, ',', '.') }}
@@ -56,10 +74,18 @@ new class extends Component {
                                 &minus; Rp {{ number_format($dompet['total_pengeluaran'], 0, ',', '.') }}
                             </p>
                         </div>
-                        <flux:button :href="route('cashadvance.laporan.capl', $dompet['id_ca'])" target="_blank"
-                            size="sm" variant="ghost" icon="document-arrow-down" class=" text-ca-copper! hover:text-ca-copper-deep!">
-                            Laporan
-                        </flux:button>
+                        <div class="flex gap-1">
+                            @if ($url = $this->buktiSetorUrl($dompet['bukti_setor'] ?? null))
+                            <flux:button size="sm" variant="ghost" icon="paper-clip" type="button"
+                                x-on:click="$dispatch('preview-bukti', { url: '{{ $url }}', title: 'Bukti Setor {{ $dompet['kode_ca'] }}' }); $flux.modal('bukti-preview').show()">
+                                Bukti Setor
+                            </flux:button>
+                            @endif
+                            <flux:button :href="route('cashadvance.laporan.capl', $dompet['kode_ca'])" target="_blank"
+                                size="sm" variant="ghost" icon="document-arrow-down" class="text-ca-copper! hover:text-ca-copper-deep!">
+                                Laporan
+                            </flux:button>
+                        </div>
                     </div>
                 </div>
             @empty

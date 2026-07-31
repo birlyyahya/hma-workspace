@@ -123,7 +123,6 @@ new class extends Component {
         }
 
         $this->resetForm();
-        App(CaCache::class)->flush();
         $this->dispatch('ca-updated');
         Flux::modal('catat-pengeluaran')->close();
         Toaster::success($isEdit ? 'Pengeluaran diperbarui.' : 'Pengeluaran tersimpan.');
