@@ -33,8 +33,8 @@ test('shows the onboarding top up UI instead of the dashboard when the user has 
     Volt::test('cashadvance.ca-index')
         ->assertSee('Anda belum memiliki Cash Advance')
         ->assertSee('Top up Pertama')
-        ->assertDontSee('Total Balance')
-        ->assertDontSee('Recent Transaction');
+        ->assertDontSee('Saldo aktif')
+        ->assertDontSee('Transaksi Terbaru');
 });
 
 test('shows the dashboard instead of the onboarding UI when the user has a CA', function () {
@@ -43,7 +43,7 @@ test('shows the dashboard instead of the onboarding UI when the user has a CA', 
     $this->actingAs(User::factory()->create());
 
     Volt::test('cashadvance.ca-index')
-        ->assertSee('Total Balance')
+        ->assertSee('Saldo aktif')
         ->assertSee('CA-PL-01')
         ->assertDontSee('Anda belum memiliki Cash Advance');
 });

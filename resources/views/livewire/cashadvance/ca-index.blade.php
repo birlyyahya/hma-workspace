@@ -97,7 +97,7 @@ new class extends Component {
     }
 
     /**
-     * Dompet kegiatan aktif milik user (kartu sidebar ca-index).
+     * Dompet kegiatan aktif milik user (carousel kantong di ca-index).
      */
     public function loadKegiatan(): void
     {
@@ -184,16 +184,50 @@ new class extends Component {
             ->all();
     }
 
+    /**
+     * Palet warna "kantong" yang dirotasi per indeks, dipakai untuk kartu dompet
+     * kegiatan & legenda breakdown kategori supaya satu sistem warna konsisten.
+     *
+     * @return array{tint: string, dot: string, text: string}
+     */
+    private function pocketTone(int $index): array
+    {
+        $palette = [
+            ['tint' => 'bg-ca-pocket-1/10 dark:bg-ca-pocket-1/15 border-ca-pocket-1/20', 'dot' => 'bg-ca-pocket-1', 'text' => 'text-ca-pocket-1'],
+            ['tint' => 'bg-ca-pocket-2/10 dark:bg-ca-pocket-2/15 border-ca-pocket-2/20', 'dot' => 'bg-ca-pocket-2', 'text' => 'text-ca-pocket-2'],
+            ['tint' => 'bg-ca-pocket-3/10 dark:bg-ca-pocket-3/15 border-ca-pocket-3/20', 'dot' => 'bg-ca-pocket-3', 'text' => 'text-ca-pocket-3'],
+            ['tint' => 'bg-ca-pocket-4/10 dark:bg-ca-pocket-4/15 border-ca-pocket-4/20', 'dot' => 'bg-ca-pocket-4', 'text' => 'text-ca-pocket-4'],
+            ['tint' => 'bg-ca-pocket-5/10 dark:bg-ca-pocket-5/15 border-ca-pocket-5/20', 'dot' => 'bg-ca-pocket-5', 'text' => 'text-ca-pocket-5'],
+        ];
+
+        return $palette[$index % count($palette)];
+    }
+
+    /**
+     * Ikon Flux untuk kategori transaksi; dipakai pada chip ikon baris transaksi.
+     */
+    private function iconForKategori(?string $kategori): string
+    {
+        return match ($kategori) {
+            'Transport' => 'truck',
+            'Akomodasi' => 'building-office',
+            'Konsumsi' => 'shopping-bag',
+            'ATK' => 'pencil-square',
+            'Komunikasi' => 'signal',
+            default => 'ellipsis-horizontal',
+        };
+    }
+
 }; ?>
 
 <div class="space-y-4">
     @if (!$this->hasCa())
     {{-- ================= ONBOARDING: BELUM MEMILIKI CA ================= --}}
-    <div class="relative rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+    <div class="relative rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
 
         <div class="mx-auto flex max-w-lg flex-col items-center gap-5 px-6 py-20 text-center">
-            <div class="flex size-16 items-center justify-center rounded-full bg-blue-500/10 dark:bg-blue-500/20">
-                <flux:icon.wallet class="size-8 text-blue-500" />
+            <div class="flex size-16 items-center justify-center rounded-full bg-ca-copper/10 dark:bg-ca-copper/15">
+                <flux:icon.wallet class="size-8 text-ca-copper" />
             </div>
 
             <div class="space-y-2">
@@ -223,7 +257,7 @@ new class extends Component {
             </div>
 
             <flux:modal.trigger name="topup-pertama">
-                <flux:button variant="primary" icon="arrow-up-tray">Top up Pertama</flux:button>
+                <flux:button variant="primary" class="bg-ca-copper! hover:bg-ca-copper-deep!" icon="arrow-up-tray">Top up Pertama</flux:button>
             </flux:modal.trigger>
         </div>
     </div>
@@ -231,49 +265,80 @@ new class extends Component {
     <livewire:cashadvance.modals.topup-pertama />
     @else
     {{-- ================= TOP GRID ================= --}}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 lg:grid-cols-3 lg:items-start gap-4">
 
-        {{-- ===== LEFT: BALANCE + CHART + STATS ===== --}}
-        <div class="lg:col-span-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+        {{-- ===== LEFT: MASTER WALLET CARD + CHART ===== --}}
+        <div class="lg:col-span-2 space-y-4">
 
-            {{-- BALANCE CARD --}}
-            <div class="p-6 space-y-6">
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="space-y-2">
-                        <div class="flex items-center gap-2">
-                            <p class="text-sm text-zinc-500 dark:text-zinc-400">Total Balance</p>
-                            <flux:badge size="sm" color="green">active</flux:badge>
-                            <flux:badge size="sm" color="zinc">{{ $this->caPlBalance['kode_ca'] ?? 'N/A' }}</flux:badge>
+            {{-- MASTER WALLET CARD --}}
+            <div class="relative overflow-hidden rounded-2xl bg-linear-to-br from-ca-ink-lift to-ca-ink p-6 text-white shadow-xl shadow-black/10">
+                <div class="pointer-events-none absolute inset-0 opacity-40" style="background-image: repeating-linear-gradient(115deg, rgba(255,255,255,0.06) 0 1px, transparent 1px 24px);"></div>
+
+                <div class="relative space-y-5">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-[11px] font-semibold uppercase tracking-wider text-ca-gold">CA PL &middot; Dompet Utama</p>
+                            <p class="mt-1 text-xs text-white/50">{{ $this->caPlBalance['kode_ca'] ?? 'N/A' }}</p>
                         </div>
+                        <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">
+                            <span class="size-1.5 rounded-full bg-emerald-400"></span> Aktif
+                        </span>
+                    </div>
 
-                        <h2 class="text-4xl font-semibold tabular-nums text-zinc-900 dark:text-white">
+                    <div>
+                        <p class="text-xs text-white/50">Saldo aktif</p>
+                        <h2 class="mt-1 text-4xl font-bold tabular-nums sm:text-5xl">
                             Rp {{ number_format($this->caPlBalance['saldo_akhir'] ?? 0, 0, ',', '.') }}
                         </h2>
-
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400">
-                            Dibuka {{ Carbon\Carbon::parse($this->caPlBalance['created_at'])->locale('id')->translatedFormat('D, d M Y') }}
+                        <p class="mt-1 text-xs text-white/50">
+                            Dibuka {{ Carbon\Carbon::parse($this->caPlBalance['created_at'])->locale('id')->translatedFormat('d M Y') }}
                         </p>
                     </div>
 
                     <div class="flex gap-2">
-                        <flux:button size="sm" variant="primary" icon="minus-circle"
+                        <button type="button"
+                            class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-ca-copper px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-ca-copper-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ca-gold"
                             x-on:click="$flux.modal('catat-pengeluaran').show(); $wire.dispatch('ca-new-expense')">
+                            <flux:icon name="minus-circle" class="size-4" />
                             Catat Pengeluaran
-                        </flux:button>
-
+                        </button>
                         <flux:modal.trigger name="topup-laporan">
-                            <flux:button size="sm" variant="outline" icon="arrow-up-tray">Top up</flux:button>
+                            <button type="button"
+                                class="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ca-gold">
+                                <flux:icon name="arrow-up-tray" class="size-4" />
+                                Top up
+                            </button>
                         </flux:modal.trigger>
                     </div>
-                </div>
 
-                {{-- CHART (data statik; wiring API dilakukan manual) --}}
+                    <div class="grid grid-cols-2 gap-4 border-t border-white/10 pt-4">
+                        <div>
+                            <p class="text-[11px] text-white/50">Masuk periode ini</p>
+                            <p class="mt-0.5 text-sm font-semibold tabular-nums text-emerald-300">
+                                Rp {{ number_format($this->caPlBalance['saldo_awal_priode'] ?? 0, 0, ',', '.') }}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-[11px] text-white/50">Keluar periode ini</p>
+                            <p class="mt-0.5 text-sm font-semibold tabular-nums text-orange-300">
+                                Rp {{ number_format($this->caPlBalance['total_pengeluaran'] ?? 0, 0, ',', '.') }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- TREN PENGELUARAN --}}
+            <div class="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-6">
+                <p class="text-sm font-medium text-zinc-900 dark:text-white">Tren Pengeluaran</p>
+                <p class="text-xs text-zinc-500 dark:text-zinc-400">Per bulan &mdash; periode aktif</p>
+
                 {{-- wire:key wajib: memaksa morph menyisipkan node fresh saat swap dari --}}
                 {{-- skeleton placeholder, agar Alpine menjalankan x-init & chart ter-render. --}}
                 <div wire:key="ca-chart-wrapper" wire:ignore x-data="{ chart: null }" x-init="
                         chart = new ApexCharts($refs.caChart, {
                             series: @js($this->getChart ?? []),
-                            chart: { height: 280, type: 'area', toolbar: {
+                            chart: { height: 260, type: 'area', toolbar: {
                                 show: true,
                                 tools: {
                                     download: true,
@@ -287,141 +352,106 @@ new class extends Component {
                             }, },
                             dataLabels: { enabled: false },
                             stroke: { curve: 'smooth', width: 3 },
-                            colors: ['#E91E63'],
+                            colors: ['#C2542C'],
                             xaxis: { type: 'category', categories: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] },
                             yaxis: { labels: { align: 'left', formatter: (v) => 'Rp ' + new Intl.NumberFormat('id-ID').format(v) } },
                             tooltip: { theme: 'light' },
-
                         });
                         chart.render();
                         Livewire.on('ca-chart-updated', (data) => {
                             chart.updateSeries(data.series);
                         });
                     ">
-                    <div x-ref="caChart" class="h-72 w-full"></div>
-                </div>
-            </div>
-
-            {{-- INCOME / EXPENSE --}}
-            <div class="grid grid-cols-1 sm:grid-cols-2 border-t border-zinc-200 dark:border-zinc-700">
-                <div class="p-6 sm:border-e border-zinc-200 dark:border-zinc-700">
-                    <div class="flex items-center justify-between">
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Income</p>
-                        <flux:badge size="sm" color="blue">Opening periode</flux:badge>
-                    </div>
-                    <h3 class="text-2xl font-semibold mt-2 tabular-nums text-zinc-900 dark:text-white">
-                        Rp {{ number_format($this->caPlBalance['saldo_awal_priode'] ?? 0, 0, ',', '.') }}
-                    </h3>
-                    <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Saldo awal periode aktif</p>
-                </div>
-
-                <div class="p-6 border-t sm:border-t-0 border-zinc-200 dark:border-zinc-700">
-                    <div class="flex items-center justify-between">
-                        <p class="text-sm text-zinc-500 dark:text-zinc-400">Expense</p>
-                        <flux:badge size="sm" color="red">Pengeluaran</flux:badge>
-                    </div>
-                    <h3 class="text-2xl font-semibold mt-2 tabular-nums text-zinc-900 dark:text-white">
-                        Rp {{ number_format($this->caPlBalance['total_pengeluaran'] ?? 0, 0, ',', '.') }}
-                    </h3>
-                    <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Total pengeluaran periode aktif</p>
+                    <div x-ref="caChart" class="mt-2 h-64 w-full"></div>
                 </div>
             </div>
         </div>
 
         {{-- ===== RIGHT: DOMPET KEGIATAN + BREAKDOWN ===== --}}
-        <div class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+        <div class="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
 
-            {{-- DOMPET KEGIATAN --}}
-            <div class="p-6 space-y-4 border-b border-zinc-200 dark:border-zinc-700">
+            {{-- DOMPET KEGIATAN (carousel kantong) --}}
+            <div class="p-5 space-y-3 border-b border-zinc-200 dark:border-zinc-700">
                 <div class="flex justify-between items-center">
                     <h3 class="font-semibold text-zinc-900 dark:text-white">Dompet Kegiatan</h3>
-                    <span class="text-sm text-zinc-400">{{ $this->caKegiatanBalance['jumlah_dompet'] ?? 0 }} dompet</span>
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs text-zinc-400">{{ $this->caKegiatanBalance['jumlah_dompet'] ?? 0 }} dompet</span>
+                        @if (($this->caKegiatanBalance['jumlah_dompet'] ?? 0) > 0)
+                        <flux:modal.trigger name="semua-dompet-kegiatan">
+                            <button type="button" class="text-xs font-medium text-ca-copper hover:text-ca-copper-deep">Lihat semua</button>
+                        </flux:modal.trigger>
+                        @endif
+                    </div>
                 </div>
-                <div class="space-y-1">
-                    @forelse (collect($this->caKegiatanBalance['data'] ?? [])->take(4) as $item)
-                    @php $isClosed = ($item['status'] ?? 'open') === 'closed'; @endphp
+
+                <div class="no-scrollbar -mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1 lg:mx-0 lg:grid lg:grid-cols-3 lg:snap-none lg:overflow-visible lg:px-0 lg:pb-0">
+                    @forelse (collect($this->caKegiatanBalance['data'] ?? []) as $i => $item)
+                    @php
+                        $isClosed = ($item['status'] ?? 'open') === 'closed';
+                        $tone = $this->pocketTone($i);
+                    @endphp
                     <a wire:key="dompet-{{ $item['kode_ca'] }}" href="{{ route('cashadvance.dompet-show', $item['kode_ca']) }}" wire:navigate
-                        class="flex items-center justify-between -mx-2 px-2 py-2 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition {{ $isClosed ? 'opacity-60' : '' }}">
-                        <div class="flex items-center gap-3 min-w-0">
-                            <flux:avatar :name="$item['judul_kegiatan']" :color="$isClosed ? 'zinc' : 'blue'" size="sm" />
-                            <div class="text-left min-w-0">
-                                <p class="text-sm font-medium truncate text-zinc-900 dark:text-white">{{ $item['judul_kegiatan'] }}</p>
-                                <div class="flex items-center gap-1.5">
-                                    <span class="text-xs text-zinc-500">{{ $item['kode_ca'] }}</span>
-                                    @if ($isClosed)
-                                    <flux:badge size="sm" color="zinc">closed</flux:badge>
-                                    @endif
-                                </div>
-                            </div>
+                        class="flex w-36 shrink-0 flex-col gap-6 rounded-2xl border p-3.5 snap-start transition hover:-translate-y-0.5 lg:w-auto {{ $isClosed ? 'border-zinc-200 bg-zinc-50 opacity-70 dark:border-zinc-700 dark:bg-zinc-800/60' : $tone['tint'] }}">
+                        <div class="flex items-center justify-between">
+                            <span class="size-2 rounded-full {{ $isClosed ? 'bg-zinc-400' : $tone['dot'] }}"></span>
+                            <span class="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">{{ $isClosed ? 'Ditutup' : 'Aktif' }}</span>
                         </div>
-                        <p class="text-sm font-medium tabular-nums shrink-0 {{ $item['sisa_saldo'] < 0 ? 'text-red-600' : 'text-zinc-900 dark:text-white' }}">
-                            Rp {{ number_format($item['sisa_saldo'], 0, ',', '.') }}
-                        </p>
+                        <div>
+                            <p class="text-sm font-semibold leading-tight text-zinc-900 dark:text-white line-clamp-2">{{ $item['judul_kegiatan'] }}</p>
+                            <p class="mt-1.5 text-sm font-bold tabular-nums {{ $isClosed ? 'text-zinc-400' : $tone['text'] }}">
+                                Rp {{ number_format($item['sisa_saldo'], 0, ',', '.') }}
+                            </p>
+                        </div>
                     </a>
                     @empty
-                    <p class="text-sm text-zinc-400 py-2">Belum ada dompet kegiatan.</p>
+                    <p class="w-full py-6 text-center text-sm text-zinc-400">Belum ada dompet kegiatan.</p>
                     @endforelse
+
+                    <flux:modal.trigger name="buat-kegiatan">
+                        <button type="button"
+                            class="flex w-36 shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-zinc-200 p-3.5 text-zinc-400 snap-start transition hover:border-ca-copper hover:text-ca-copper dark:border-zinc-700 lg:w-auto">
+                            <span class="flex size-8 items-center justify-center rounded-full border-2 border-current">
+                                <flux:icon name="plus" class="size-4" />
+                            </span>
+                            <span class="text-xs font-semibold">Buat Dompet</span>
+                        </button>
+                    </flux:modal.trigger>
                 </div>
-                @if (count($this->caKegiatanBalance['data'] ?? []) > 4)
-                <flux:modal.trigger name="semua-dompet-kegiatan">
-                    <button type="button" class="flex w-full justify-end mb-5 items-center gap-1 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-white">
-                        Lihat semua ({{ $this->caKegiatanBalance['jumlah_dompet'] ?? 0 }}) <flux:icon name="arrow-right" class="size-3.5" />
-                    </button>
-                </flux:modal.trigger>
-                @endif
-                <flux:modal.trigger name="buat-kegiatan">
-                    <flux:button variant="outline" class="w-full" icon="plus">Create new card</flux:button>
-                </flux:modal.trigger>
             </div>
 
             {{-- BREAKDOWN PER KATEGORI --}}
-            <div class="p-6 space-y-4">
+            <div class="p-5 space-y-4">
                 <p class="text-sm text-zinc-500 dark:text-zinc-400">Pengeluaran per kategori &mdash; periode aktif</p>
                 <h3 class="text-2xl font-semibold tabular-nums text-zinc-900 dark:text-white">
                     Rp {{ number_format($this->caPlBalance['total_pengeluaran'] ?? 0, 0, ',', '.') }}
                 </h3>
-                @php
-                // Kelas literal lengkap agar Tailwind men-generate-nya (jangan dirangkai dinamis).
-                $palette = [
-                ['bg' => 'bg-orange-500/20', 'border' => 'border-orange-500'],
-                ['bg' => 'bg-blue-500/20', 'border' => 'border-blue-500'],
-                ['bg' => 'bg-purple-500/20', 'border' => 'border-purple-500'],
-                ['bg' => 'bg-pink-500/20', 'border' => 'border-pink-500'],
-                ['bg' => 'bg-green-500/20', 'border' => 'border-green-500'],
-                ['bg' => 'bg-teal-500/20', 'border' => 'border-teal-500'],
-                ];
-                @endphp
                 @if (!empty($this->caPlBalance['total_pengeluaran']))
-                <div class="h-10 rounded bg-zinc-100 dark:bg-zinc-800 overflow-hidden flex">
+                <div class="h-2.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden flex">
                     @foreach ($this->getKategoriPengeluaran as $i => $row)
-                    @php
-                    $c = $palette[$i % count($palette)];
-                    @endphp
-                    <div class="{{ $c['bg'] }} border-l-2 {{ $c['border'] }}" style="width: {{ max($row['persentase'], 2) }}%" wire:key="bar-{{ $row['nama'] }}"></div>
+                    <div class="{{ $this->pocketTone($i)['dot'] }}" style="width: {{ max($row['persentase'], 2) }}%" wire:key="bar-{{ $row['nama'] }}"></div>
                     @endforeach
                 </div>
 
                 <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-zinc-500 dark:text-zinc-400">
                     @foreach ($this->getKategoriPengeluaran as $i => $row)
-                    <p class="border-l-2 ps-2 {{ $palette[$i % count($palette)]['border'] }}" wire:key="legend-{{ $row['nama'] }}">
-                        {{ $row['nama'] }} • {{ $row['persentase'] }}%
+                    <p class="flex items-center gap-1.5" wire:key="legend-{{ $row['nama'] }}">
+                        <span class="size-2 rounded-full {{ $this->pocketTone($i)['dot'] }}"></span>
+                        {{ $row['nama'] }} &middot; {{ $row['persentase'] }}%
                     </p>
                     @endforeach
                 </div>
                 @else
                 <p class="text-sm text-zinc-400">Belum ada pengeluaran pada periode ini.</p>
                 @endif
-
-
             </div>
         </div>
     </div>
 
     {{-- ================= RECENT TRANSACTION ================= --}}
-    <div class="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+    <div class="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
         <div class="p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-                <flux:heading class="font-bold">Recent Transaction</flux:heading>
+                <flux:heading class="font-bold">Transaksi Terbaru</flux:heading>
                 <flux:text class="text-xs">Periode #1 (aktif) saja</flux:text>
             </div>
             <div class="flex gap-2">
@@ -450,61 +480,53 @@ new class extends Component {
             </div>
         </div>
 
-        <div class="overflow-x-auto">
-            <table class="min-w-[900px] md:min-w-full text-sm text-left text-zinc-600 dark:text-zinc-300">
-                <thead class="bg-zinc-50 dark:bg-zinc-800 text-xs uppercase text-zinc-500 dark:text-zinc-400">
-                    <tr>
-                        <th class="px-3 py-3 md:px-6 font-normal whitespace-nowrap">Deskripsi</th>
-                        <th class="px-3 py-3 md:px-6 font-normal whitespace-nowrap">Kategori</th>
-                        <th class="px-3 py-3 md:px-6 font-normal whitespace-nowrap">Tanggal</th>
-                        <th class="px-3 py-3 md:px-6 font-normal whitespace-nowrap">Jenis</th>
-                        <th class="px-3 py-3 md:px-6 font-normal text-right whitespace-nowrap">Jumlah</th>
-                        <th class="px-3 py-3 md:px-6 font-normal text-right whitespace-nowrap">Saldo Setelah</th>
-                        <th class="px-3 py-3 md:px-6 font-normal text-center whitespace-nowrap">Bukti</th>
-                        <th class="px-3 py-3 md:px-6 font-normal text-center whitespace-nowrap">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody wire:loading.class="opacity-50" wire:target="performSearch">
-                    @forelse ($this->transaksiCaPl ?? [] as $trx)
-                    <tr wire:key="trx-{{ $trx['id_transaksi'] }}" class="border-t border-zinc-100 dark:border-zinc-800">
-                        <td class="px-3 py-3 md:px-6 whitespace-nowrap text-zinc-900 dark:text-white">{{ $trx['deskripsi'] }}</td>
-                        <td class="px-3 py-3 md:px-6 whitespace-nowrap">{{ $trx['kategori'] ?? '-' }}</td>
-                        <td class="px-3 py-3 md:px-6 whitespace-nowrap">{{ \Carbon\Carbon::parse($trx['created_at'])->translatedFormat('d/m/Y h:i') }}</td>
-                        <td class="px-3 py-3 md:px-6 whitespace-nowrap">
-                            <flux:badge size="sm" :color="$trx['jenis'] === 'pemasukan' ? 'green' : 'red'">
-                                {{ ucfirst($trx['jenis']) }}
-                            </flux:badge>
-                        </td>
-                        <td class="px-3 py-3 md:px-6 text-right whitespace-nowrap tabular-nums {{ $trx['jenis'] === 'pemasukan' ? 'text-green-600' : 'text-red-600' }}">
-                            {{ $trx['jenis'] === 'pemasukan' ? '+' : '−' }} Rp {{ number_format($trx['jumlah'], 0, ',', '.') }}
-                        </td>
-                        <td class="px-3 py-3 md:px-6 text-right whitespace-nowrap tabular-nums {{ $trx['saldo_setelah'] < 0 ? 'text-red-600' : '' }}">
-                            Rp {{ number_format($trx['saldo_setelah'], 0, ',', '.') }}
-                        </td>
-                        <td class="px-3 py-3 md:px-6 text-center whitespace-nowrap">
-                            @if ($trx['bukti_url'] ?? false)
-                            <flux:button size="sm" variant="ghost" icon="paper-clip" type="button"
-                                x-on:click="$dispatch('preview-bukti', { url: '{{ $trx['bukti_url'] }}', title: '{{ addslashes($trx['deskripsi'] ?? 'Bukti Transaksi') }}' }); $flux.modal('bukti-preview').show()" />
-                            @else
-                            <span class="text-zinc-300">-</span>
-                            @endif
-                        </td>
-                        <td class="px-3 py-3 md:px-6 text-center whitespace-nowrap">
-                            <div class="flex items-center justify-center gap-1">
-                                <flux:button size="sm" variant="ghost" icon="pencil-square" type="button"
-                                    x-on:click="$flux.modal('catat-pengeluaran').show(); $wire.dispatch('ca-edit-expense', { id: {{ $trx['id_transaksi'] }} })" />
-                                <flux:button size="sm" variant="ghost" icon="trash" class="text-red-600" type="button"
-                                    x-on:click="$flux.modal('hapus-pengeluaran').show(); $wire.dispatch('ca-confirm-delete', { id: {{ $trx['id_transaksi'] }} })" />
-                            </div>
-                        </td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="8" class="px-6 py-8 text-center text-zinc-400">Belum ada transaksi pada periode aktif</td>
-                    </tr>
-                    @endforelse
-                </tbody>
-            </table>
+        <div wire:loading.class="opacity-50" wire:target="performSearch" class="divide-y divide-zinc-100 dark:divide-zinc-800 border-t border-zinc-100 dark:border-zinc-800">
+            @forelse ($this->transaksiCaPl ?? [] as $trx)
+            @php $isIn = ($trx['jenis'] ?? null) === 'pemasukan'; @endphp
+            <div wire:key="trx-{{ $trx['id_transaksi'] }}" class="flex items-center gap-3 px-4 py-3 md:px-6">
+                <span class="flex size-10 shrink-0 items-center justify-center rounded-xl {{ $isIn ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-ca-copper/10 text-ca-copper-deep dark:text-ca-copper' }}">
+                    <flux:icon :name="$isIn ? 'banknotes' : $this->iconForKategori($trx['kategori'] ?? null)" class="size-5" />
+                </span>
+
+                <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-medium text-zinc-900 dark:text-white">{{ $trx['deskripsi'] }}</p>
+                    <p class="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                        {{ $trx['kategori'] ?? '-' }} &middot; {{ \Carbon\Carbon::parse($trx['created_at'])->translatedFormat('d M Y') }}
+                    </p>
+                </div>
+
+                <div class="shrink-0 text-right">
+                    <p class="text-sm font-semibold tabular-nums {{ $isIn ? 'text-emerald-600 dark:text-emerald-400' : 'text-ca-copper-deep dark:text-ca-copper' }}">
+                        {{ $isIn ? '+' : '−' }} Rp {{ number_format($trx['jumlah'], 0, ',', '.') }}
+                    </p>
+                    <p class="hidden text-xs text-zinc-400 sm:block">
+                        Saldo Rp {{ number_format($trx['saldo_setelah'], 0, ',', '.') }}
+                    </p>
+                </div>
+
+                <flux:dropdown position="bottom" align="end">
+                    <flux:button size="sm" variant="ghost" icon="ellipsis-vertical" />
+                    <flux:menu>
+                        @if ($trx['bukti_url'] ?? false)
+                        <flux:menu.item icon="paper-clip"
+                            x-on:click="$dispatch('preview-bukti', { url: '{{ $trx['bukti_url'] }}', title: '{{ addslashes($trx['deskripsi'] ?? 'Bukti Transaksi') }}' }); $flux.modal('bukti-preview').show()">
+                            Lihat Bukti
+                        </flux:menu.item>
+                        @endif
+                        <flux:menu.item icon="pencil-square"
+                            x-on:click="$flux.modal('catat-pengeluaran').show(); $wire.dispatch('ca-edit-expense', { id: {{ $trx['id_transaksi'] }} })">
+                            Edit
+                        </flux:menu.item>
+                        <flux:menu.item icon="trash" variant="danger"
+                            x-on:click="$flux.modal('hapus-pengeluaran').show(); $wire.dispatch('ca-confirm-delete', { id: {{ $trx['id_transaksi'] }} })">
+                            Hapus
+                        </flux:menu.item>
+                    </flux:menu>
+                </flux:dropdown>
+            </div>
+            @empty
+            <div class="px-6 py-10 text-center text-sm text-zinc-400">Belum ada transaksi pada periode aktif</div>
+            @endforelse
         </div>
     </div>
 

@@ -30,6 +30,29 @@
     --color-accent: var(--color-red-800);
     --color-accent-content: var(--color-red-800);
     --color-accent-foreground: var(--color-white);
+
+    /* Identitas wallet modul Cash Advance (lihat resources/views/livewire/cashadvance).
+       Turunan hangat dari merah brand, dipakai untuk kartu dompet & elemen terkait
+       supaya modul CA terasa seperti dompet digital, bukan tabel admin. */
+    --color-ca-ink: #211a17;
+    --color-ca-ink-lift: #2c2420;
+    --color-ca-copper: #c2542c;
+    --color-ca-copper-deep: #8f3a1e;
+    --color-ca-gold: #d9a054;
+    --color-ca-pocket-1: #c2542c;
+    --color-ca-pocket-2: #0f766e;
+    --color-ca-pocket-3: #7c3557;
+    --color-ca-pocket-4: #6b7a3a;
+    --color-ca-pocket-5: #3f5b75;
+}
+
+.no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
 }
 
 @layer base {
