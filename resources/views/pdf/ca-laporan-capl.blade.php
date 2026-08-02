@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>Rekap Transaksi CA PL</title>
     <style>
-        @page { size: A4 landscape; margin: 14mm; }
+        @page { size: A4 landscape; margin: 10mm 14mm; }
 
         * { box-sizing: border-box; }
 
@@ -15,7 +15,7 @@
             font-size: 12px;
         }
 
-        .rekap-title { text-align: center; margin-bottom: 18px; }
+        .rekap-title { text-align: center; margin-bottom: 10px; }
         .rekap-title p { margin: 0; font-weight: bold; text-transform: uppercase; font-size: 13px; line-height: 1.5; }
 
         table.rekap { width: 100%; border-collapse: collapse; }
@@ -42,19 +42,19 @@
 
         .neg { color: #b91c1c; }
 
-        .reimburse { margin-top: 8px; font-style: italic; font-weight: bold; font-size: 12px; }
+        .reimburse { margin-top: 6px; font-style: italic; font-weight: bold; font-size: 12px; }
 
         .signrow {
-            margin-top: 40px;
+            margin-top: 18px;
             display: flex;
             justify-content: space-between;
             text-align: center;
         }
         .signrow .col { width: 30%; }
-        .signrow .role-top { margin-bottom: 70px; }
+        .signrow .role-top { margin-bottom: 45px; }
         .signrow .name { font-weight: bold; text-decoration: underline; }
         .signrow .role { font-weight: bold; }
-        .place-date { margin-top: 28px; font-weight: bold; }
+        .place-date { margin-top: 14px; font-weight: bold; }
     </style>
 </head>
 <body>
