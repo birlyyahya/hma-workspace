@@ -36,6 +36,7 @@
             font-weight: bold;
         }
         table.rekap td.num { text-align: center; width: 32px; }
+        table.rekap td.tgl { white-space: nowrap; }
         table.rekap td.money, table.rekap th.money { text-align: right; white-space: nowrap; }
         table.rekap col.c-money { width: 150px; }
         table.rekap col.c-tgl { width: 130px; }
@@ -44,13 +45,17 @@
 
         .reimburse { margin-top: 6px; font-style: italic; font-weight: bold; font-size: 12px; }
 
-        .signrow {
+        {{-- Tabel, bukan flex: DomPDF tidak menjaga kolom flex tetap sejajar saat
+             blok ini terpotong page-break — kolom malah jadi tersusun vertikal.
+             Tabel + page-break-inside:avoid mendorong seluruh blok ke halaman
+             berikutnya sebagai satu kesatuan bila tak muat, bukan terpotong. --}}
+        table.signrow {
             margin-top: 18px;
-            display: flex;
-            justify-content: space-between;
-            text-align: center;
+            width: 100%;
+            border-collapse: collapse;
+            page-break-inside: avoid;
         }
-        .signrow .col { width: 30%; }
+        .signrow td.col { width: 33.33%; text-align: center; vertical-align: top; }
         .signrow .role-top { margin-bottom: 45px; }
         .signrow .name { font-weight: bold; text-decoration: underline; }
         .signrow .role { font-weight: bold; }
@@ -110,7 +115,7 @@
             </tr>
             <tr>
                 <td class="num">1</td>
-                <td>{{ $mulai?->translatedFormat('d F Y') ?? '—' }}</td>
+                <td class="tgl">{{ $mulai?->translatedFormat('d F Y') ?? '—' }}</td>
                 <td>Uang CA PL</td>
                 <td class="money">Rp {{ number_format($opening, 0) }}</td>
                 <td class="money"></td>
@@ -119,7 +124,7 @@
             @foreach ($penerimaan as $i => $trx)
             <tr>
                 <td class="num">{{ $i + 2 }}</td>
-                <td>{{ \Carbon\Carbon::parse($trx['tanggal'])->translatedFormat('d F Y') }}</td>
+                <td class="tgl">{{ \Carbon\Carbon::parse($trx['tanggal'])->translatedFormat('d F Y') }}</td>
                 <td>{{ $trx['deskripsi'] ?? '-' }}</td>
                 <td class="money">Rp {{ number_format((float) ($trx['jumlah'] ?? 0), 0) }}</td>
                 <td class="money"></td>
@@ -135,7 +140,7 @@
             @forelse ($pengeluaran as $i => $trx)
             <tr>
                 <td class="num">{{ $i + 1 }}</td>
-                <td>{{ \Carbon\Carbon::parse($trx['tanggal'])->translatedFormat('d F Y') }}</td>
+                <td class="tgl">{{ \Carbon\Carbon::parse($trx['tanggal'])->translatedFormat('d F Y') }}</td>
                 <td>{{ $trx['deskripsi'] ?? '-' }}</td>
                 <td class="money"></td>
                 <td class="money">Rp {{ number_format((float) ($trx['jumlah'] ?? 0), 0) }}</td>
@@ -165,22 +170,24 @@
     {{-- ================= TANDA TANGAN ================= --}}
     <p class="place-date">Jakarta, {{ now()->translatedFormat('d F Y') }}</p>
 
-    <div class="signrow">
-        <div class="col">
-            <div class="role-top">Dibuat Oleh,</div>
-            <div class="name">{{ $preparedBy }}</div>
-            <div class="role">Project Leader</div>
-        </div>
-        <div class="col">
-            <div class="role-top">Mengetahui,</div>
-            <div class="name">Andre Lukmana Budhiarto</div>
-            <div class="role">IT Manager</div>
-        </div>
-        <div class="col">
-            <div class="role-top">Menyetujui,</div>
-            <div class="name">Didik Setyo Nugroho</div>
-            <div class="role">MAP Manager</div>
-        </div>
-    </div>
+    <table class="signrow">
+        <tr>
+            <td class="col">
+                <div class="role-top">Dibuat Oleh,</div>
+                <div class="name">{{ $preparedBy }}</div>
+                <div class="role">Project Leader</div>
+            </td>
+            <td class="col">
+                <div class="role-top">Mengetahui,</div>
+                <div class="name">Andre Lukmana Budhiarto</div>
+                <div class="role">IT Manager</div>
+            </td>
+            <td class="col">
+                <div class="role-top">Menyetujui,</div>
+                <div class="name">Didik Setyo Nugroho</div>
+                <div class="role">MAP Manager</div>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>
