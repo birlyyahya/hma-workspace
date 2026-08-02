@@ -5,9 +5,11 @@ use App\Services\ProjectCache;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 
-new #[Layout('components.layouts.ca-pdf', ['title' => 'Rekap Transaksi CA Kegiatan'])]
+new #[Layout('components.layouts.app', ['title' => 'Laporan CA Kegiatan'])]
 class extends Component
 {
+    public string $kodeCa;
+
     /** @var array<string, mixed> */
     public array $wallet = [];
 
@@ -17,226 +19,113 @@ class extends Component
 
     public ?int $selectedProjectId = null;
 
-    /** @var array<int, array<string, mixed>> */
-    public array $penerimaan = [];
-
-    /** @var array<int, array<string, mixed>> */
-    public array $pengeluaran = [];
+    /**
+     * Diincrement lewat tombol "Generate Ulang" untuk memaksa iframe memuat
+     * ulang PDF (cache-buster pada URL), terpisah dari cache PDF di server
+     * yang sudah otomatis refresh sendiri saat data CA berubah.
+     */
+    public int $regenerateToken = 0;
 
     public function mount(string $kodeCa): void
     {
-        $userId = Auth::id();
+        $this->kodeCa = $kodeCa;
 
-        $this->projects = app(ProjectCache::class)->involvedProjects($userId);
+        $this->projects = app(ProjectCache::class)->involvedProjects(Auth::id());
         $this->selectedProjectId = $this->projects[0]['id'] ?? null;
 
-        $this->wallet = app(CaCache::class)->walletKegiatanByKode($kodeCa, ['tr_ca_transaction' => 'true'])['data'] ?? [];
-
-        if (! empty($this->wallet['kode_ca'])) {
-            $transaksi = collect(app(CaCache::class)->transaksiWalletKegiatan($kodeCa)['data'] ?? []);
-
-            $this->penerimaan = $transaksi->where('jenis', 'penerimaan')->values()->all();
-            $this->pengeluaran = $transaksi->where('jenis', 'pengeluaran')->values()->all();
-        }
+        $this->wallet = app(CaCache::class)->walletKegiatanByKode($kodeCa)['data'] ?? [];
     }
 
     /**
-     * Nama project terpilih untuk header; '-' bila user tak terlibat project.
+     * Nama project terpilih untuk header; fallback ke judul_kegiatan bila
+     * user tak terlibat project apa pun.
      */
     public function projectName(): string
     {
         $project = collect($this->projects)->firstWhere('id', $this->selectedProjectId);
 
-        return $project['name'] ?? '-';
+        return $project['name'] ?? ($this->wallet['judul_kegiatan'] ?? '-');
+    }
+
+    /**
+     * URL PDF yang di-embed; berubah otomatis saat project dipilih ulang
+     * (wire:model.live), dan bisa dipaksa refresh lewat tombol Generate Ulang.
+     */
+    public function pdfUrl(): ?string
+    {
+        if (empty($this->wallet['kode_ca'])) {
+            return null;
+        }
+
+        return route('cashadvance.laporan.kegiatan.pdf', $this->wallet['kode_ca']).'?'.http_build_query([
+            'project_id' => $this->selectedProjectId,
+            'v' => $this->regenerateToken,
+        ]);
+    }
+
+    public function regenerate(): void
+    {
+        $this->regenerateToken++;
+    }
+
+    /**
+     * Laporan ini bisa dibuka untuk dompet kegiatan yang masih aktif maupun
+     * yang sudah ditutup — status ditampilkan di header supaya jelas dompet
+     * mana yang sedang dilihat.
+     */
+    public function isClosed(): bool
+    {
+        return ! ($this->wallet['is_active'] ?? true);
     }
 }; ?>
 
-<div>
-    <style>
-        .rekap-title { text-align: center; margin-bottom: 18px; }
-        .rekap-title p { margin: 0; font-weight: bold; text-transform: uppercase; font-size: 13px; line-height: 1.5; }
-
-        table.rekap { width: 100%; border-collapse: collapse; }
-        table.rekap th, table.rekap td {
-            border: 1px solid #000;
-            padding: 5px 7px;
-            font-size: 11.5px;
-            vertical-align: top;
-        }
-        table.rekap thead th {
-            background: #b9c7e2;
-            text-align: center;
-            font-weight: bold;
-        }
-        table.rekap tr.section td,
-        table.rekap tr.total td {
-            background: #cdd9ec;
-            font-weight: bold;
-        }
-        table.rekap td.num { text-align: center; width: 32px; }
-        table.rekap td.money, table.rekap th.money { text-align: right; white-space: nowrap; }
-        table.rekap col.c-money { width: 130px; }
-        table.rekap col.c-tgl { width: 120px; }
-
-        .reimburse { margin-top: 8px; font-style: italic; font-weight: bold; font-size: 12px; }
-
-        .signrow {
-            margin-top: 40px;
-            display: flex;
-            justify-content: space-between;
-            text-align: center;
-        }
-        .signrow .col { width: 30%; }
-        .signrow .role-top { margin-bottom: 70px; }
-        .signrow .name { font-weight: bold; text-decoration: underline; }
-        .signrow .role { font-weight: bold; }
-        .place-date { margin-top: 28px; font-weight: bold; }
-
-        @media print {
-            .no-print { display: none; }
-        }
-    </style>
-
-    {{-- Kartu kontrol pemilihan project (tidak ikut tercetak) --}}
-    @if (count($projects) > 1)
-    <div class="no-print" style="max-width:800px;margin:0 auto 16px;">
-        <div class="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
-            <label class="mb-2 block text-xs font-medium text-zinc-500">Pilih project untuk judul laporan</label>
-            <x-search-select
-                model="selectedProjectId"
-                :live="true"
-                :options="collect($projects)->map(fn ($p) => ['value' => $p['id'], 'label' => $p['name']])->all()"
-                placeholder="Pilih project..."
-                searchPlaceholder="Cari project..." />
+<div class="mx-auto max-w-5xl space-y-4 px-2 py-4 sm:px-4 sm:py-6">
+    <div class="flex items-center gap-3 border-b border-zinc-200 pb-4 dark:border-zinc-800">
+        <flux:button :href="route('cashadvance')" wire:navigate icon="arrow-left" variant="ghost" size="sm" />
+        <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-ca-copper/10 text-ca-copper-deep dark:bg-ca-copper/15 dark:text-ca-copper">
+            <flux:icon name="document-text" class="size-5" />
+        </span>
+        <div>
+            <div class="flex items-center gap-2">
+                <flux:heading size="lg" class="font-bold">Laporan CA Kegiatan</flux:heading>
+                @if (! empty($wallet['kode_ca']))
+                @if ($this->isClosed())
+                <flux:badge size="sm" color="zinc">Ditutup</flux:badge>
+                @else
+                <flux:badge size="sm" color="green">Aktif</flux:badge>
+                @endif
+                @endif
+            </div>
+            <flux:text class="text-xs">{{ $wallet['judul_kegiatan'] ?? $kodeCa }} &middot; {{ $wallet['kode_ca'] ?? $kodeCa }}</flux:text>
         </div>
+    </div>
+
+    @if (empty($wallet['kode_ca']))
+    <div class="rounded-2xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-700 dark:bg-zinc-900">
+        <flux:icon name="exclamation-triangle" class="mx-auto size-8 text-zinc-300 dark:text-zinc-600" />
+        <p class="mt-3 text-sm text-zinc-500 dark:text-zinc-400">Dompet kegiatan tidak ditemukan.</p>
+    </div>
+    @else
+    <div class="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-900">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div class="flex-1">
+                <label class="mb-1.5 block text-xs font-medium text-zinc-500 dark:text-zinc-400">Judul laporan (pilih project)</label>
+                <x-search-select
+                    model="selectedProjectId"
+                    :live="true"
+                    :options="collect($projects)->map(fn ($p) => ['value' => $p['id'], 'label' => $p['name']])->all()"
+                    placeholder="Pilih project..."
+                    searchPlaceholder="Cari project..." />
+            </div>
+            <flux:button wire:click="regenerate" variant="primary" icon="arrow-path" size="sm" class="bg-ca-copper! hover:bg-ca-copper-deep!">
+                Generate Ulang
+            </flux:button>
+        </div>
+        <p class="mt-2 text-xs text-zinc-400">Pilih project pengeluaran terbesar sebagai judul dokumen.</p>
+    </div>
+
+    <div class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+        <iframe wire:key="ca-kegiatan-pdf-{{ $regenerateToken }}" src="{{ $this->pdfUrl() }}" class="h-[80vh] w-full" title="Laporan CA Kegiatan"></iframe>
     </div>
     @endif
-
-    <div class="sheet">
-    @php
-        $opening = (float) ($wallet['saldo_awal_priode'] ?? 0);
-        $sumPenerimaan = $opening + collect($penerimaan)->sum(fn ($t) => (float) ($t['jumlah'] ?? 0));
-        $sumPengeluaran = (float) ($wallet['total_pengeluaran'] ?? collect($pengeluaran)->sum(fn ($t) => (float) ($t['jumlah'] ?? 0)));
-        $saldoAkhir = (float) ($wallet['saldo_akhir'] ?? 0);
-
-        $mulai = ! empty($wallet['tanggal_mulai']) ? \Carbon\Carbon::parse($wallet['tanggal_mulai']) : null;
-        $selesai = ! empty($wallet['tanggal_selesai'])
-            ? \Carbon\Carbon::parse($wallet['tanggal_selesai'])
-            : collect($pengeluaran)->merge($penerimaan)->pluck('tanggal')->filter()->map(fn ($t) => \Carbon\Carbon::parse($t))->max();
-    @endphp
-
-    {{-- ================= HEADER ================= --}}
-    <div class="rekap-title">
-        <p>Rekap Transaksi Pembukuan</p>
-        <p>Pemasukan dan Pengeluaran Cash Advance</p>
-        <p>{{ $wallet['judul_kegiatan'] ?? '-' }}</p>
-        <p>{{ $this->projectName() }}</p>
-        <p>Tahun Anggaran {{ $wallet['tahun_anggaran'] ?? now()->year }}</p>
-        <p>
-            {{ $mulai?->translatedFormat('d F Y') ?? '—' }}
-            @if ($selesai) s/d {{ $selesai->translatedFormat('d F Y') }} @endif
-        </p>
-    </div>
-
-    {{-- ================= TABEL REKAP ================= --}}
-    <table class="rekap">
-        <colgroup>
-            <col style="width:32px">
-            <col class="c-tgl">
-            <col>
-            <col class="c-money">
-            <col class="c-money">
-            <col class="c-money">
-        </colgroup>
-        <thead>
-            <tr>
-                <th>No</th>
-                <th>Tanggal Laporan</th>
-                <th>Transaksi</th>
-                <th class="money">Penerimaan</th>
-                <th class="money">Pengeluaran</th>
-                <th class="money">Saldo</th>
-            </tr>
-        </thead>
-        <tbody>
-            {{-- ===== A. PENERIMAAN ===== --}}
-            <tr class="section">
-                <td class="num">A</td>
-                <td colspan="5">PENERIMAAN</td>
-            </tr>
-            <tr>
-                <td class="num">1</td>
-                <td>{{ $mulai?->translatedFormat('d F Y') ?? '—' }}</td>
-                <td>Uang CA Kegiatan</td>
-                <td class="money">Rp {{ number_format($opening, 0) }}</td>
-                <td class="money"></td>
-                <td class="money">Rp {{ number_format($opening, 0) }}</td>
-            </tr>
-            @foreach ($penerimaan as $i => $trx)
-            <tr wire:key="in-{{ $trx['id_transaksi'] }}">
-                <td class="num">{{ $i + 2 }}</td>
-                <td>{{ \Carbon\Carbon::parse($trx['tanggal'])->translatedFormat('d F Y') }}</td>
-                <td>{{ $trx['deskripsi'] ?? '-' }}</td>
-                <td class="money">Rp {{ number_format((float) ($trx['jumlah'] ?? 0), 0) }}</td>
-                <td class="money"></td>
-                <td class="money">Rp {{ number_format((float) ($trx['saldo_setelah'] ?? 0), 0) }}</td>
-            </tr>
-            @endforeach
-
-            {{-- ===== B. PENGELUARAN ===== --}}
-            <tr class="section">
-                <td class="num">B</td>
-                <td colspan="5">PENGELUARAN</td>
-            </tr>
-            @forelse ($pengeluaran as $i => $trx)
-            <tr wire:key="out-{{ $trx['id_transaksi'] }}">
-                <td class="num">{{ $i + 1 }}</td>
-                <td>{{ \Carbon\Carbon::parse($trx['tanggal'])->translatedFormat('d F Y') }}</td>
-                <td>{{ $trx['deskripsi'] ?? '-' }}</td>
-                <td class="money"></td>
-                <td class="money">Rp {{ number_format((float) ($trx['jumlah'] ?? 0), 0) }}</td>
-                <td class="money {{ ($trx['saldo_setelah'] ?? 0) < 0 ? 'neg' : '' }}">Rp {{ number_format((float) ($trx['saldo_setelah'] ?? 0), 0) }}</td>
-            </tr>
-            @empty
-            <tr>
-                <td class="num"></td>
-                <td colspan="5">Belum ada pengeluaran pada periode ini</td>
-            </tr>
-            @endforelse
-
-            {{-- ===== JUMLAH TOTAL ===== --}}
-            <tr class="total">
-                <td colspan="3" style="text-align:center">JUMLAH TOTAL</td>
-                <td class="money">Rp {{ number_format($sumPenerimaan, 0) }}</td>
-                <td class="money">Rp {{ number_format($sumPengeluaran, 0) }}</td>
-                <td class="money {{ $saldoAkhir < 0 ? 'neg' : '' }}">Rp {{ number_format($saldoAkhir, 0) }}</td>
-            </tr>
-        </tbody>
-    </table>
-
-    @if ($saldoAkhir < 0)
-    <p class="reimburse">*reimbursement Kegiatan Rp {{ number_format(abs($saldoAkhir), 0) }}</p>
-    @endif
-
-    {{-- ================= TANDA TANGAN ================= --}}
-    <p class="place-date">Jakarta, {{ now()->translatedFormat('d F Y') }}</p>
-
-    <div class="signrow">
-        <div class="col">
-            <div class="role-top">Dibuat Oleh,</div>
-            <div class="name">{{ Auth::user()->name }}</div>
-            <div class="role">Project Leader</div>
-        </div>
-        <div class="col">
-            <div class="role-top">Mengetahui,</div>
-            <div class="name">Andre Lukmana Budhiarto</div>
-            <div class="role">IT Manager</div>
-        </div>
-        <div class="col">
-            <div class="role-top">Menyetujui,</div>
-            <div class="name">Didik Setyo Nugroho</div>
-            <div class="role">MAP Manager</div>
-        </div>
-    </div>
-    </div>{{-- /.sheet --}}
 </div>

@@ -50,6 +50,7 @@ Route::middleware('auth')->group(function () {
     Volt::route('cashadvance/laporan/ca-pl/{kodeCa?}', 'cashadvance.laporan-capl')->name('cashadvance.laporan.capl');
     Route::get('cashadvance/laporan/ca-pl/{kodeCa}/pdf', \App\Http\Controllers\CaLaporanPlPdfController::class)->name('cashadvance.laporan.capl.pdf');
     Volt::route('cashadvance/laporan/kegiatan/{kodeCa}', 'cashadvance.laporan-kegiatan')->name('cashadvance.laporan.kegiatan');
+    Route::get('cashadvance/laporan/kegiatan/{kodeCa}/pdf', \App\Http\Controllers\CaLaporanKegiatanPdfController::class)->name('cashadvance.laporan.kegiatan.pdf');
     // Volt::route('cashadvance', 'maintenance/comingsoon')->name('cashadvance');
 
     // Pengajuan Barang

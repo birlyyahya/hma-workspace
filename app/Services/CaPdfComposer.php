@@ -9,8 +9,9 @@ use setasign\Fpdi\Fpdi;
 use setasign\Fpdi\PdfParser\StreamReader;
 
 /**
- * Menyusun PDF laporan Cash Advance (rekap transaksi CA PL) sebagai file PDF
- * asli via DomPDF — bukan sekadar halaman HTML yang di-print browser.
+ * Menyusun PDF laporan Cash Advance (rekap transaksi CA PL & dompet kegiatan)
+ * sebagai file PDF asli via DomPDF — bukan sekadar halaman HTML yang di-print
+ * browser.
  *
  * Fase 1: rekap tabel (halaman utama).
  * Fase 2: lampiran bukti tiap transaksi yang punya bukti, satu bukti satu
@@ -40,6 +41,33 @@ class CaPdfComposer
             'preparedBy' => $preparedBy,
         ])->setPaper('a4', 'landscape')->output();
 
+        return $this->withAttachments($base, $penerimaan, $pengeluaran);
+    }
+
+    /**
+     * @param  array<string, mixed>  $wallet
+     * @param  array<int, array<string, mixed>>  $penerimaan
+     * @param  array<int, array<string, mixed>>  $pengeluaran
+     */
+    public function renderCaKegiatan(array $wallet, array $penerimaan, array $pengeluaran, string $projectName, string $preparedBy): string
+    {
+        $base = Pdf::loadView('pdf.ca-laporan-kegiatan', [
+            'wallet' => $wallet,
+            'penerimaan' => $penerimaan,
+            'pengeluaran' => $pengeluaran,
+            'projectName' => $projectName,
+            'preparedBy' => $preparedBy,
+        ])->setPaper('a4', 'landscape')->output();
+
+        return $this->withAttachments($base, $penerimaan, $pengeluaran);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $penerimaan
+     * @param  array<int, array<string, mixed>>  $pengeluaran
+     */
+    private function withAttachments(string $base, array $penerimaan, array $pengeluaran): string
+    {
         $attachments = $this->collectAttachments($penerimaan, $pengeluaran);
 
         if (empty($attachments)) {
