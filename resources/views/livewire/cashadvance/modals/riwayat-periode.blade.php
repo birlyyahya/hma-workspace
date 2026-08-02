@@ -32,7 +32,7 @@ new class extends Component {
             return $path;
         }
 
-        return config('services.aws_url').'cashadvance/'.$path;
+        return Storage::disk('s3_cashadvance')->temporaryUrl($path, now()->addMinutes(60), ['ResponseContentDisposition' => 'inline; filename="'.basename($path).'"']);
     }
 }; ?>
 
