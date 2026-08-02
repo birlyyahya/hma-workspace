@@ -67,7 +67,7 @@ new class extends Component {
             return $path;
         }
 
-        return config('services.aws_url').'cashadvance/'.$path;
+        return Storage::disk('s3_cashadvance')->temporaryUrl($path, now()->addMinutes(60), ['ResponseContentDisposition' => 'inline; filename="'.basename($path).'"']);
     }
 
     #[On('ca-updated')]
@@ -505,7 +505,7 @@ new class extends Component {
                     <flux:menu>
                         @if ($trx['bukti_url'] ?? false)
                         <flux:menu.item icon="paper-clip"
-                            x-on:click="$dispatch('preview-bukti', { url: '{{ $trx['bukti_url'] }}', title: '{{ addslashes($trx['deskripsi'] ?? 'Bukti Transaksi') }}' }); $flux.modal('bukti-preview').show()">
+                            x-on:click="$dispatch('preview-bukti', {!! \Illuminate\Support\Js::from(['url' => $trx['bukti_url'], 'title' => $trx['deskripsi'] ?? 'Bukti Transaksi']) !!}); $flux.modal('bukti-preview').show()">
                             Lihat Bukti
                         </flux:menu.item>
                         @endif

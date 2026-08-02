@@ -77,7 +77,7 @@ new class extends Component {
                         <div class="flex gap-1">
                             @if ($url = $this->buktiSetorUrl($dompet['bukti'] ?? null))
                             <flux:button size="xs" variant="ghost" icon="paper-clip" type="button"
-                                x-on:click="$dispatch('preview-bukti', { url: '{{ $url }}', title: 'Bukti Setor {{ $dompet['kode_ca'] }}' }); $flux.modal('bukti-preview').show()">
+                                x-on:click="$dispatch('preview-bukti', {!! \Illuminate\Support\Js::from(['url' => $url, 'title' => 'Bukti Setor '.$dompet['kode_ca']]) !!}); $flux.modal('bukti-preview').show()">
                                 Bukti
                             </flux:button>
                             @endif

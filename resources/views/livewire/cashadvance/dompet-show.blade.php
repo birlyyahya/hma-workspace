@@ -144,7 +144,7 @@ class extends Component {
     /**
      * URL publik MinIO untuk path bukti dari API CA (bucket: cashadvance).
      */
-    private function buktiUrl(?string $path): ?string
+     private function buktiUrl(?string $path): ?string
     {
         if (blank($path)) {
             return null;
@@ -154,7 +154,7 @@ class extends Component {
             return $path;
         }
 
-        return config('services.aws_url').'cashadvance/'.$path;
+        return Storage::disk('s3_cashadvance')->temporaryUrl($path, now()->addMinutes(60), ['ResponseContentDisposition' => 'inline; filename="'.basename($path).'"']);
     }
 
     /**
@@ -352,7 +352,7 @@ class extends Component {
                         <span class="text-zinc-500 dark:text-zinc-400">Bukti pencairan</span>
                         @if ($wallet['bukti'] ?? null)
                         <flux:button size="sm" variant="ghost" icon="paper-clip" type="button" class="text-ca-copper! hover:text-ca-copper-deep!"
-                            x-on:click="$dispatch('preview-bukti', { url: '{{ $this->buktiUrl($wallet['bukti']) }}', title: 'Bukti Pencairan' }); $flux.modal('bukti-preview').show()" />
+                            x-on:click="$dispatch('preview-bukti', {!! \Illuminate\Support\Js::from(['url' => $this->buktiUrl($wallet['bukti']), 'title' => 'Bukti Pencairan']) !!}); $flux.modal('bukti-preview').show()" />
                         @else
                         <span class="text-zinc-300">-</span>
                         @endif
@@ -361,7 +361,7 @@ class extends Component {
                     <div class="flex items-center justify-between text-sm">
                         <span class="text-zinc-500 dark:text-zinc-400">Bukti setor balik</span>
                         <flux:button size="sm" variant="ghost" icon="paper-clip" type="button" class="text-ca-copper! hover:text-ca-copper-deep!"
-                            x-on:click="$dispatch('preview-bukti', { url: '{{ $this->buktiUrl($wallet['bukti_setor']) }}', title: 'Bukti Setor Balik' }); $flux.modal('bukti-preview').show()" />
+                            x-on:click="$dispatch('preview-bukti', {!! \Illuminate\Support\Js::from(['url' => $this->buktiUrl($wallet['bukti_setor']), 'title' => 'Bukti Setor Balik']) !!}); $flux.modal('bukti-preview').show()" />
                     </div>
                     @endif
                 </div>
@@ -475,13 +475,12 @@ class extends Component {
                             Saldo Rp {{ number_format($trx['saldo_setelah'], 0, ',', '.') }}
                         </p>
                     </div>
-
                     <flux:dropdown position="bottom" align="end">
                         <flux:button size="sm" variant="ghost" icon="ellipsis-vertical" />
                         <flux:menu>
                             @if ($trx['bukti_url'] ?? false)
                             <flux:menu.item icon="paper-clip"
-                                x-on:click="$dispatch('preview-bukti', { url: '{{ $trx['bukti_url'] }}', title: '{{ addslashes($trx['deskripsi'] ?? 'Bukti Transaksi') }}' }); $flux.modal('bukti-preview').show()">
+                                x-on:click="$dispatch('preview-bukti', {!! \Illuminate\Support\Js::from(['url' => $this->buktiUrl($trx['bukti']), 'title' => $trx['deskripsi'] ?? 'Bukti Transaksi']) !!}); $flux.modal('bukti-preview').show()">
                                 Lihat Bukti
                             </flux:menu.item>
                             @endif
