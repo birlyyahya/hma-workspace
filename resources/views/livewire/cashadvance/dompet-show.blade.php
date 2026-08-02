@@ -196,20 +196,24 @@ class extends Component {
     <div class="py-4 space-y-4">
 
         {{-- HEADER --}}
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex flex-col gap-4 border-b border-zinc-200 pb-4 dark:border-zinc-800 sm:flex-row sm:items-center sm:justify-between">
             <div class="flex items-center gap-3">
                 <flux:button :href="route('cashadvance')" wire:navigate icon="arrow-left" variant="ghost" size="sm" />
+                <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-ca-copper/10 text-ca-copper-deep dark:bg-ca-copper/15 dark:text-ca-copper">
+                    <flux:icon name="briefcase" class="size-5" />
+                </span>
                 <div>
                     <div class="flex items-center gap-2">
-                        <flux:heading class="font-bold text-xl">{{ $wallet['judul_kegiatan'] ?? 'Detail Dompet Kegiatan' }}</flux:heading>
+                        <flux:heading size="lg" class="font-bold">{{ $wallet['judul_kegiatan'] ?? 'Detail Dompet Kegiatan' }}</flux:heading>
                         @if ($this->isClosed())
                         <flux:badge size="sm" color="zinc">Ditutup</flux:badge>
                         @else
                         <flux:badge size="sm" color="green">Aktif</flux:badge>
                         @endif
                     </div>
-                    <flux:text>
-                        Dibuka {{ isset($wallet['tanggal_mulai']) ? \Carbon\Carbon::parse($wallet['tanggal_mulai'])->locale('id')->translatedFormat('d M Y') : '—' }}
+                    <flux:text class="text-xs">
+                        {{ $wallet['kode_ca'] ?? '' }}
+                        &middot; Dibuka {{ isset($wallet['tanggal_mulai']) ? \Carbon\Carbon::parse($wallet['tanggal_mulai'])->locale('id')->translatedFormat('d M Y') : '—' }}
                         @if ($wallet['tanggal_selesai'] ?? null)
                         &middot; Ditutup {{ \Carbon\Carbon::parse($wallet['tanggal_selesai'])->locale('id')->translatedFormat('d M Y') }}
                         @endif
@@ -217,7 +221,7 @@ class extends Component {
                 </div>
             </div>
 
-            <div class="flex flex-wrap gap-2">
+            <div class="flex flex-wrap gap-2 pl-13 sm:pl-0">
                 <flux:button :href="route('cashadvance.laporan.kegiatan', $kodeCa)" target="_blank" variant="ghost" icon="document-arrow-down" size="sm" class="text-ca-copper! hover:text-ca-copper-deep!">Export PDF</flux:button>
             </div>
         </div>
