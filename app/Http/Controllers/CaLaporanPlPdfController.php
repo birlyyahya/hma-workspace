@@ -16,6 +16,13 @@ use Illuminate\Support\Facades\Cache;
  */
 class CaLaporanPlPdfController extends Controller
 {
+    /**
+     * Naikkan tiap kali logika render CaPdfComposer berubah secara berarti
+     * (mis. Fase 2 menambah lampiran bukti) — otomatis membuat cache lama
+     * usang tanpa perlu Cache::forget manual saat deploy.
+     */
+    private const CACHE_VERSION = 2;
+
     public function __invoke(
         string $kodeCa,
         Request $request,
@@ -36,7 +43,19 @@ class CaLaporanPlPdfController extends Controller
         $projectName = collect($projects)->firstWhere('id', $projectId)['name']
             ?? ($wallet['judul_kegiatan'] ?? '-');
 
-        $cacheKey = 'ca-pdf-capl-'.$kodeCa.'-'.$projectId.'-'.md5((string) json_encode([$wallet, $penerimaan, $pengeluaran]));
+        // Token "v" dari tombol Generate Ulang ikut jadi bagian key: tiap klik
+        // memakai nilai baru yang belum pernah ada di cache, jadi dijamin
+        // render ulang fresh, bukan sekadar reload iframe di browser.
+        $regenerateToken = $request->integer('v');
+
+        $cacheKey = sprintf(
+            'ca-pdf-capl-v%d-%s-%s-%d-%s',
+            self::CACHE_VERSION,
+            $kodeCa,
+            $projectId,
+            $regenerateToken,
+            md5((string) json_encode([$wallet, $penerimaan, $pengeluaran])),
+        );
 
         $bytes = Cache::remember($cacheKey, now()->addMinutes(15), fn (): string => $composer->renderCaPl(
             $wallet,
