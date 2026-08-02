@@ -259,6 +259,55 @@ class CaWriter
     }
 
     /**
+     * Tambah kolaborator ke dompet kegiatan.
+     *
+     * @param  array{dompet_id: int, user_id: int, username: string}  $payload
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function addCollaborator(array $payload): array
+    {
+        try {
+            $response = $this->externalWrite()->post($this->apiBase.'/tambah-collaborator', $payload);
+
+            $body = (array) $response->json();
+            $ok = $response->successful() || (bool) ($body['success'] ?? false);
+
+            return $this->result($ok, $body, $response->status(), [
+                'name' => 'ca',
+                'event' => 'created',
+                'description' => "Tambah kolaborator user_id={$payload['user_id']} ke dompet_id={$payload['dompet_id']}",
+                'properties' => $payload,
+            ], scope: 'kegiatan');
+        } catch (\Throwable $e) {
+            return $this->fail('addCollaborator', $e, $payload);
+        }
+    }
+
+    /**
+     * Hapus kolaborator dari dompet kegiatan.
+     *
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function deleteCollaborator(int $id): array
+    {
+        try {
+            $response = $this->externalWrite()->delete($this->apiBase.'/delete-collaborator/'.$id);
+
+            $body = (array) $response->json();
+            $ok = $response->successful() || (bool) ($body['success'] ?? false);
+
+            return $this->result($ok, $body, $response->status(), [
+                'name' => 'ca',
+                'event' => 'deleted',
+                'description' => "Hapus kolaborator id={$id}",
+                'properties' => ['id' => $id],
+            ], scope: 'kegiatan');
+        } catch (\Throwable $e) {
+            return $this->fail('deleteCollaborator', $e, ['id' => $id]);
+        }
+    }
+
+    /**
      * Eksekusi top up CA PL (restore ke float). Wajib menyertakan bukti_setor:
      * bukti TF penyelesaian dokumen resmi, atau bukti TF reimbursement dari
      * management bila saldo akhir periode berjalan minus.

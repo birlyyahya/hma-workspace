@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\User;
 use App\Services\CaCache;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
@@ -190,6 +191,30 @@ class extends Component {
             default => 'ellipsis-horizontal',
         };
     }
+
+    /**
+     * Kolaborator dompet kegiatan; payload API cuma menyertakan username, jadi
+     * user_id di-lookup ke DB lokal (batch, hindari N+1) untuk nama & inisial.
+     *
+     * @return array<int, array{collab_id: int, user_id: int, nama: string, inisial: string}>
+     */
+    public function collaborators(): array
+    {
+        $raw = collect($this->wallet['collaborators'] ?? []);
+
+        $users = User::whereIn('id', $raw->pluck('user_id'))->get()->keyBy('id');
+
+        return $raw->map(function (array $c) use ($users): array {
+            $user = $users->get((int) $c['user_id']);
+
+            return [
+                'collab_id' => $c['id'],
+                'user_id' => (int) $c['user_id'],
+                'nama' => $user->name ?? $c['username'],
+                'inisial' => $user?->initials() ?? strtoupper(substr($c['username'], 0, 2)),
+            ];
+        })->values()->all();
+    }
 }; ?>
 
 <div class="max-h-screen overflow-auto px-2 py-4">
@@ -366,30 +391,29 @@ class extends Component {
                     @endif
                 </div>
 
-                {{-- ================= KOLABORATOR (placeholder — belum tersambung backend) ================= --}}
-                {{-- Opsi A (avatar stack) di mobile, Opsi B (list detail) di desktop; sesuai preview yang disetujui. --}}
-                @php
-                    $collaborators = [
-                        ['nama' => 'Andre Lukmana', 'inisial' => 'AL', 'role' => 'Editor'],
-                        ['nama' => 'Budi Santoso', 'inisial' => 'BS', 'role' => 'Viewer'],
-                        ['nama' => 'Citra Dewi', 'inisial' => 'CD', 'role' => 'Editor'],
-                        ['nama' => 'Dedi Firmansyah', 'inisial' => 'DF', 'role' => 'Viewer'],
-                    ];
-                @endphp
+                {{-- ================= KOLABORATOR ================= --}}
+                {{-- Opsi A (avatar stack) di mobile, Opsi B (list detail) di desktop. --}}
+                @php $collaborators = $this->collaborators(); @endphp
                 <div class="pt-2 border-t border-zinc-200 dark:border-zinc-700 space-y-3">
                     <div class="flex items-center justify-between">
                         <p class="text-sm text-zinc-500 dark:text-zinc-400 sm:hidden">Kolaborator</p>
                         <p class="hidden text-sm text-zinc-500 dark:text-zinc-400 sm:block">Kolaborator &middot; {{ count($collaborators) }}</p>
-                        <button type="button" class="inline-flex items-center gap-1 text-xs font-semibold text-ca-copper hover:text-ca-copper-deep">
+                        @unless ($this->isClosed())
+                        <button type="button" class="inline-flex items-center gap-1 text-xs font-semibold text-ca-copper hover:text-ca-copper-deep"
+                            x-on:click="$flux.modal('tambah-kolaborator').show()">
                             <flux:icon name="plus" class="size-3.5" /> Undang
                         </button>
+                        @endunless
                     </div>
 
+                    @if (empty($collaborators))
+                    <p class="text-sm text-zinc-400">Belum ada kolaborator pada dompet ini.</p>
+                    @else
                     {{-- Mobile: avatar stack ringkas --}}
                     <div class="sm:hidden">
                         <div class="flex items-center">
                             @foreach (array_slice($collaborators, 0, 3) as $i => $person)
-                            <span wire:key="collab-avatar-{{ $i }}"
+                            <span wire:key="collab-avatar-{{ $person['collab_id'] }}"
                                 class="flex size-8 items-center justify-center rounded-full text-[11px] font-bold text-white ring-2 ring-white dark:ring-zinc-900 {{ $this->pocketTone($i)['dot'] }} {{ $i > 0 ? '-ml-2' : '' }}">
                                 {{ $person['inisial'] }}
                             </span>
@@ -409,18 +433,19 @@ class extends Component {
                     {{-- Desktop: list detail per anggota --}}
                     <div class="hidden sm:block sm:space-y-1">
                         @foreach ($collaborators as $i => $person)
-                        <div wire:key="collab-row-{{ $i }}" class="flex items-center gap-3 py-1">
+                        <div wire:key="collab-row-{{ $person['collab_id'] }}" class="flex items-center gap-3 py-1">
                             <span class="flex size-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white {{ $this->pocketTone($i)['dot'] }}">
                                 {{ $person['inisial'] }}
                             </span>
                             <p class="min-w-0 flex-1 truncate text-sm font-medium text-zinc-900 dark:text-white">{{ $person['nama'] }}</p>
-                            <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide {{ $person['role'] === 'Editor' ? 'bg-ca-copper/10 text-ca-copper-deep dark:bg-ca-copper/15 dark:text-ca-copper' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' }}">
-                                {{ $person['role'] }}
-                            </span>
-                            <flux:button size="sm" variant="ghost" icon="ellipsis-vertical" />
+                            @unless ($this->isClosed())
+                            <flux:button size="sm" variant="ghost" icon="trash" type="button"
+                                x-on:click="$wire.dispatch('ca-confirm-delete-collaborator', { id: {{ $person['collab_id'] }}, name: {!! \Illuminate\Support\Js::from($person['nama']) !!} }); $flux.modal('hapus-kolaborator').show()" />
+                            @endunless
                         </div>
                         @endforeach
                     </div>
+                    @endif
                 </div>
             </div>
         </div>
@@ -507,6 +532,8 @@ class extends Component {
         <livewire:cashadvance.modals.catat-transaksi-kegiatan :kode-ca="$kodeCa" :categories="$categories" />
         <livewire:cashadvance.modals.hapus-transaksi-kegiatan :kode-ca="$kodeCa" />
         <livewire:cashadvance.modals.tutup-kegiatan :wallet="$wallet" />
+        <livewire:cashadvance.modals.tambah-kolaborator :wallet="$wallet" />
+        <livewire:cashadvance.modals.hapus-kolaborator />
 
         {{-- ================= MODAL: PREVIEW BUKTI ================= --}}
         <flux:modal name="bukti-preview" class="w-2xl"
