@@ -74,12 +74,15 @@ class extends Component
 }; ?>
 
 <div class="mx-auto max-w-5xl space-y-4 px-2 py-4 sm:px-4 sm:py-6">
-    <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3 border-b border-zinc-200 pb-4 dark:border-zinc-800">
+        <flux:button :href="route('cashadvance')" wire:navigate icon="arrow-left" variant="ghost" size="sm" />
+        <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-ca-copper/10 text-ca-copper-deep dark:bg-ca-copper/15 dark:text-ca-copper">
+            <flux:icon name="document-text" class="size-5" />
+        </span>
         <div>
-            <flux:heading size="lg">Laporan CA PL</flux:heading>
-            <flux:text class="mt-1">{{ $balance['kode_ca'] ?? '—' }}</flux:text>
+            <flux:heading size="lg" class="font-bold">Laporan CA PL</flux:heading>
+            <flux:text class="text-xs">{{ $balance['kode_ca'] ?? '—' }}</flux:text>
         </div>
-        <flux:button :href="route('cashadvance')" wire:navigate variant="ghost" icon="arrow-left" size="sm">Kembali</flux:button>
     </div>
 
     @if (empty($balance['kode_ca']))
