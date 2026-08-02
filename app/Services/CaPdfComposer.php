@@ -5,7 +5,6 @@ namespace App\Services;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use setasign\Fpdi\Fpdi;
 use setasign\Fpdi\PdfParser\StreamReader;
 
@@ -166,19 +165,27 @@ class CaPdfComposer
     private function drawLabel(Fpdi $fpdi, array $item): void
     {
         $width = $fpdi->GetPageWidth();
+        $margin = 4;
+        $usableWidth = $width - $margin * 2;
+        $lineHeight = 5;
 
         // FPDF (dasar FPDI) tidak mendukung UTF-8 pada font bawaan (Helvetica) —
         // konversi ke Latin-1 dengan transliterasi agar karakter non-ASCII pada
-        // deskripsi tidak tampil rusak (mojibake).
-        $text = 'No. '.$item['label'].' - '.Str::limit($item['title'], 90);
+        // deskripsi tidak tampil rusak (mojibake). Deskripsi tidak dipotong —
+        // pakai MultiCell yang wrap ke beberapa baris, tinggi bar putihnya
+        // dihitung dari estimasi jumlah baris supaya teks tidak tertutup.
+        $text = 'No. '.$item['label'].' - '.$item['title'];
         $text = mb_convert_encoding($text, 'ISO-8859-1', 'UTF-8');
 
-        $fpdi->SetFillColor(255, 255, 255);
-        $fpdi->Rect(0, 0, $width, 9, 'F');
-        $fpdi->SetTextColor(17, 17, 17);
         $fpdi->SetFont('Helvetica', 'B', 10);
-        $fpdi->SetXY(4, 2);
-        $fpdi->Cell($width - 8, 6, $text, 0, 0, 'L');
+        $lines = max(1, (int) ceil($fpdi->GetStringWidth($text) / $usableWidth));
+        $barHeight = $lines * $lineHeight + 4;
+
+        $fpdi->SetFillColor(255, 255, 255);
+        $fpdi->Rect(0, 0, $width, $barHeight, 'F');
+        $fpdi->SetTextColor(17, 17, 17);
+        $fpdi->SetXY($margin, 2);
+        $fpdi->MultiCell($usableWidth, $lineHeight, $text, 0, 'L');
     }
 
     private function isPdfUrl(string $url): bool
