@@ -71,6 +71,16 @@ class extends Component
     {
         $this->regenerateToken++;
     }
+
+    /**
+     * Laporan ini bisa dibuka untuk periode aktif (dari ca-index) maupun
+     * periode yang sudah tersegel (dari Riwayat Periode) — status ditampilkan
+     * di header supaya jelas periode mana yang sedang dilihat.
+     */
+    public function isClosed(): bool
+    {
+        return ! ($this->balance['is_active'] ?? true);
+    }
 }; ?>
 
 <div class="mx-auto max-w-5xl space-y-4 px-2 py-4 sm:px-4 sm:py-6">
@@ -80,7 +90,16 @@ class extends Component
             <flux:icon name="document-text" class="size-5" />
         </span>
         <div>
-            <flux:heading size="lg" class="font-bold">Laporan CA PL</flux:heading>
+            <div class="flex items-center gap-2">
+                <flux:heading size="lg" class="font-bold">Laporan CA PL</flux:heading>
+                @if (! empty($balance['kode_ca']))
+                @if ($this->isClosed())
+                <flux:badge size="sm" color="zinc">Ditutup</flux:badge>
+                @else
+                <flux:badge size="sm" color="green">Aktif</flux:badge>
+                @endif
+                @endif
+            </div>
             <flux:text class="text-xs">{{ $balance['kode_ca'] ?? '—' }}</flux:text>
         </div>
     </div>
