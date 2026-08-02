@@ -48,6 +48,7 @@ Route::middleware('auth')->group(function () {
     Route::view('cashadvance', 'cashadvance')->name('cashadvance');
     Volt::route('cashadvance/dompet/{kodeCa}', 'cashadvance.dompet-show')->name('cashadvance.dompet-show');
     Volt::route('cashadvance/laporan/ca-pl/{kodeCa?}', 'cashadvance.laporan-capl')->name('cashadvance.laporan.capl');
+    Route::get('cashadvance/laporan/ca-pl/{kodeCa}/pdf', \App\Http\Controllers\CaLaporanPlPdfController::class)->name('cashadvance.laporan.capl.pdf');
     Volt::route('cashadvance/laporan/kegiatan/{kodeCa}', 'cashadvance.laporan-kegiatan')->name('cashadvance.laporan.kegiatan');
     // Volt::route('cashadvance', 'maintenance/comingsoon')->name('cashadvance');
 
