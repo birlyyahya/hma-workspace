@@ -34,6 +34,23 @@ class extends Component
         $this->selectedProjectId = $this->projects[0]['id'] ?? null;
 
         $this->wallet = app(CaCache::class)->walletKegiatanByKode($kodeCa)['data'] ?? [];
+
+        abort_if(empty($this->wallet), 404);
+        abort_unless($this->canView(), 403);
+    }
+
+    /**
+     * Pemilik, kolaborator, atau role dengan scope cashadvance 'all' (mis.
+     * finance) boleh membuka laporan dompet kegiatan ini.
+     */
+    private function canView(): bool
+    {
+        $isOwner = (int) ($this->wallet['user_id'] ?? 0) === (int) Auth::id();
+
+        $isCollaborator = collect($this->wallet['collaborators'] ?? [])
+            ->contains(fn (array $c): bool => (int) $c['user_id'] === (int) Auth::id());
+
+        return $isOwner || $isCollaborator || Auth::user()->viewScopeFor('cashadvance') === 'all';
     }
 
     /**

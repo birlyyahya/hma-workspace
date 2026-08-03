@@ -59,8 +59,24 @@ new class extends Component {
         return $query->limit(50)->get();
     }
 
+    /**
+     * Cuma pemilik dompet (atau role scope cashadvance 'all') yang boleh
+     * menambah kolaborator baru.
+     */
+    private function canManageWallet(): bool
+    {
+        return (int) ($this->wallet['user_id'] ?? 0) === (int) Auth::id()
+            || Auth::user()->viewScopeFor('cashadvance') === 'all';
+    }
+
     public function invite(int $userId): void
     {
+        if (! $this->canManageWallet()) {
+            Toaster::error('Hanya pemilik dompet yang dapat menambah kolaborator.');
+
+            return;
+        }
+
         $user = User::findOrFail($userId);
 
         $result = app(CaWriter::class)->addCollaborator([
@@ -172,7 +188,7 @@ new class extends Component {
                         <p class="truncate text-xs font-medium text-zinc-900 dark:text-white">{{ $person['nama'] }}</p>
                     </div>
                     <flux:button size="xs" variant="ghost" icon="trash" type="button"
-                        x-on:click="$wire.dispatch('ca-confirm-delete-collaborator', { id: {{ $person['collab_id'] }}, name: {!! \Illuminate\Support\Js::from($person['nama']) !!} }); $flux.modal('hapus-kolaborator').show()" />
+                        x-on:click="$wire.dispatch('ca-confirm-delete-collaborator', { id: {{ $person['collab_id'] }}, name: {!! \Illuminate\Support\Js::from($person['nama']) !!}, ownerId: {{ (int) ($wallet['user_id'] ?? 0) }} }); $flux.modal('hapus-kolaborator').show()" />
                 </div>
                 @endforeach
             </div>

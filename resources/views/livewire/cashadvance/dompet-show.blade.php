@@ -21,6 +21,8 @@ class extends Component {
     {
         $this->kodeCa = $kodeCa;
         $this->loadWallet();
+        abort_if(empty($this->wallet), 404);
+        abort_unless($this->canView(), 403);
     }
 
     public function loadWallet(): void
@@ -28,6 +30,35 @@ class extends Component {
         $response = app(CaCache::class)->walletKegiatanByKode($this->kodeCa, ['tr_ca_transaction' => 'true']);
 
         $this->wallet = $response['data'] ?? [];
+    }
+
+    public function isOwner(): bool
+    {
+        return (int) ($this->wallet['user_id'] ?? 0) === (int) Auth::id();
+    }
+
+    public function isCollaborator(): bool
+    {
+        return collect($this->wallet['collaborators'] ?? [])
+            ->contains(fn (array $c): bool => (int) $c['user_id'] === (int) Auth::id());
+    }
+
+    /**
+     * Pemilik, kolaborator, atau role dengan scope cashadvance 'all' (mis.
+     * finance) boleh melihat dompet kegiatan ini.
+     */
+    public function canView(): bool
+    {
+        return $this->isOwner() || $this->isCollaborator() && Auth::user()->hasPermission('ca.edit') || Auth::user()->viewScopeFor('cashadvance') === 'all';
+    }
+
+    /**
+     * Hanya pemilik (atau scope 'all') yang boleh menutup kegiatan &
+     * mengelola daftar kolaborator — kolaborator cuma boleh catat transaksi.
+     */
+    public function canManageWallet(): bool
+    {
+        return $this->isOwner() || Auth::user()->viewScopeFor('cashadvance') === 'all';
     }
 
     public function performSearch(): void
@@ -313,12 +344,14 @@ class extends Component {
                                     x-on:click="$flux.modal('catat-transaksi-kegiatan').show(); $wire.dispatch('ca-kegiatan-new-transaksi')">
                                     Catat Transaksi
                                 </flux:button>
+                                @if ($this->canManageWallet())
                                 <flux:modal.trigger name="tutup-kegiatan">
                                     <button variant="outline"  class="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ca-gold"
                                      icon="lock-closed" size="sm">
                                       <flux:icon name="lock-closed" class="size-4" />
                                      Tutup Kegiatan</button>
                                 </flux:modal.trigger>
+                                @endif
                                 @endunless
                             </div>
                         </div>
@@ -398,12 +431,12 @@ class extends Component {
                     <div class="flex items-center justify-between">
                         <p class="text-sm text-zinc-500 dark:text-zinc-400 sm:hidden">Kolaborator</p>
                         <p class="hidden text-sm text-zinc-500 dark:text-zinc-400 sm:block">Kolaborator &middot; {{ count($collaborators) }}</p>
-                        @unless ($this->isClosed())
+                        @if (! $this->isClosed() && $this->canManageWallet())
                         <button type="button" class="inline-flex items-center gap-1 text-xs font-semibold text-ca-copper hover:text-ca-copper-deep"
                             x-on:click="$flux.modal('tambah-kolaborator').show()">
                             <flux:icon name="plus" class="size-3.5" /> Undang
                         </button>
-                        @endunless
+                        @endif
                     </div>
 
                     @if (empty($collaborators))

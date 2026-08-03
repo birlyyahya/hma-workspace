@@ -62,6 +62,9 @@ new class extends Component {
                     <div class="flex items-center gap-2">
                         <p class="text-sm font-semibold truncate text-zinc-900 dark:text-white">{{ $item['judul_kegiatan'] }}</p>
                         <flux:badge size="sm" :color="$isClosed ? 'zinc' : 'green'">{{ $isClosed ? 'Ditutup' : 'Aktif' }}</flux:badge>
+                        @if ((int) ($item['user_id'] ?? 0) !== (int) Auth::id())
+                        <flux:badge size="sm" color="zinc" variant="pill">Kolaborator</flux:badge>
+                        @endif
                     </div>
                     <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{{ $item['kode_ca'] }}</p>
                     <p class="mt-1 flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">

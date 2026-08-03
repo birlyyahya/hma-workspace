@@ -23,8 +23,24 @@ new class extends Component {
         ];
     }
 
+    /**
+     * Cuma pemilik dompet (atau role scope cashadvance 'all') yang boleh
+     * menutup kegiatan — kolaborator hanya diizinkan catat transaksi.
+     */
+    private function canManageWallet(): bool
+    {
+        return (int) ($this->wallet['user_id'] ?? 0) === (int) Auth::id()
+            || Auth::user()->viewScopeFor('cashadvance') === 'all';
+    }
+
     public function close(): void
     {
+        if (! $this->canManageWallet()) {
+            Toaster::error('Hanya pemilik dompet yang dapat menutup kegiatan.');
+
+            return;
+        }
+
         $this->validate();
 
         $payload = ['id' => $this->wallet['id']];

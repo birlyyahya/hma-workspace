@@ -112,6 +112,9 @@ new class extends Component {
                     'judul_kegiatan' => $item['judul_kegiatan'],
                     'status' => ($item['is_active'] ?? 1) ? 'open' : 'closed',
                     'sisa_saldo' => (float) ($item['saldo_akhir'] ?? 0),
+                    // true bila dompet ini bukan milik user (dia muncul di
+                    // daftar karena jadi kolaborator, bukan pemegang CA).
+                    'is_collaborator' => (int) ($item['user_id'] ?? 0) !== (int) Auth::id(),
                 ])
                 ->all(),
         ];
@@ -263,6 +266,27 @@ new class extends Component {
     </div>
 
     <livewire:cashadvance.modals.topup-pertama />
+
+    @if (! empty($this->caKegiatanBalance['data']))
+    {{-- ================= DOMPET KEGIATAN: KOLABORATOR TANPA CA PL SENDIRI ================= --}}
+    {{-- User ini belum punya CA PL sendiri, tapi jadi kolaborator di dompet kegiatan --}}
+    {{-- orang lain — tetap tampilkan supaya dia tidak kehilangan akses. --}}
+    <div class="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+        <div class="space-y-3 p-5">
+            <div class="flex items-center justify-between">
+                <h3 class="font-semibold text-zinc-900 dark:text-white">Dompet Kegiatan</h3>
+                <span class="text-xs text-zinc-400">{{ $this->caKegiatanBalance['jumlah_dompet'] ?? 0 }} dompet</span>
+            </div>
+
+            <div class="no-scrollbar -mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1 lg:mx-0 lg:grid lg:grid-cols-4 lg:snap-none lg:overflow-visible lg:px-0 lg:pb-0">
+                @foreach (collect($this->caKegiatanBalance['data'] ?? [])->take(8) as $i => $item)
+                @php $tone = $this->pocketTone($i); @endphp
+                @include('livewire.cashadvance.partials.kegiatan-card', ['item' => $item, 'tone' => $tone])
+                @endforeach
+            </div>
+        </div>
+    </div>
+    @endif
     @else
     {{-- ================= TOP GRID ================= --}}
     <div class="grid grid-cols-1 lg:flex gap-4">
@@ -367,23 +391,8 @@ new class extends Component {
 
                 <div class="no-scrollbar -mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1 lg:mx-0 lg:grid lg:grid-cols-3 lg:snap-none lg:overflow-visible lg:px-0 lg:pb-0">
                     @forelse (collect($this->caKegiatanBalance['data'] ?? [])->take(5) as $i => $item)
-                    @php
-                        $isClosed = ($item['status'] ?? 'open') === 'closed';
-                        $tone = $this->pocketTone($i);
-                    @endphp
-                    <a wire:key="dompet-{{ $item['kode_ca'] }}" href="{{ route('cashadvance.dompet-show', $item['kode_ca']) }}" wire:navigate
-                        class="flex w-36 shrink-0 flex-col gap-3 rounded-2xl border p-3.5 snap-start transition hover:-translate-y-0.5 lg:w-auto {{ $isClosed ? 'border-zinc-200 bg-zinc-50 opacity-70 dark:border-zinc-700 dark:bg-zinc-800/60' : $tone['tint'] }}">
-                        <div class="flex items-center justify-between">
-                            <flux:icon :name="$isClosed ? 'lock-closed' : 'briefcase'" class="size-4 {{ $isClosed ? 'text-zinc-400' : $tone['text'] }}" />
-                            <span class="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">{{ $isClosed ? 'Ditutup' : 'Aktif' }}</span>
-                        </div>
-                        <div>
-                            <p class="text-sm font-semibold leading-tight text-zinc-900 dark:text-white line-clamp-2">{{ $item['judul_kegiatan'] }}</p>
-                            <p class="mt-1.5 text-xs font-bold tabular-nums {{ $isClosed ? 'text-zinc-400' : $tone['text'] }}">
-                                Rp {{ number_format($item['sisa_saldo'], 0, ',', '.') }}
-                            </p>
-                        </div>
-                    </a>
+                    @php $tone = $this->pocketTone($i); @endphp
+                    @include('livewire.cashadvance.partials.kegiatan-card', ['item' => $item, 'tone' => $tone])
                     @empty
                     <p class="w-full py-6 text-center text-sm text-zinc-400">Belum ada dompet kegiatan.</p>
                     @endforelse

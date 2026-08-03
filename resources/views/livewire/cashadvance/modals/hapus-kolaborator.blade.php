@@ -12,21 +12,35 @@ new class extends Component {
     public ?string $deleteCollaboratorName = null;
 
     /**
+     * user_id pemilik dompet yang kolaboratornya hendak dihapus; ikut
+     * dikirim dari pemicu supaya modal ini (tanpa akses ke $wallet penuh)
+     * tetap bisa memverifikasi hanya pemilik yang boleh menghapus.
+     */
+    public ?int $ownerId = null;
+
+    /**
      * Simpan kolaborator yang hendak dihapus; modal dibuka dari sisi pemicu
      * (baris desktop di dompet-show, atau daftar "Sudah Ditambahkan" di modal
      * tambah-kolaborator).
      */
     #[On('ca-confirm-delete-collaborator')]
-    public function confirm(int $id, string $name): void
+    public function confirm(int $id, string $name, int $ownerId): void
     {
         $this->deleteCollaboratorId = $id;
         $this->deleteCollaboratorName = $name;
+        $this->ownerId = $ownerId;
     }
 
     public function removeCollaborator(): void
     {
         if (! $this->deleteCollaboratorId) {
             Toaster::error('Kolaborator tidak valid.');
+
+            return;
+        }
+
+        if ((int) $this->ownerId !== (int) Auth::id() && Auth::user()->viewScopeFor('cashadvance') !== 'all') {
+            Toaster::error('Hanya pemilik dompet yang dapat menghapus kolaborator.');
 
             return;
         }
@@ -39,7 +53,7 @@ new class extends Component {
             return;
         }
 
-        $this->reset('deleteCollaboratorId', 'deleteCollaboratorName');
+        $this->reset('deleteCollaboratorId', 'deleteCollaboratorName', 'ownerId');
         $this->dispatch('ca-updated');
         Flux::modal('hapus-kolaborator')->close();
         Toaster::success('Kolaborator berhasil dihapus.');

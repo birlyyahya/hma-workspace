@@ -31,6 +31,7 @@ class CaLaporanKegiatanPdfController extends Controller
         $wallet = $caCache->walletKegiatanByKode($kodeCa, ['tr_ca_transaction' => 'true'])['data'] ?? [];
 
         abort_if(! $wallet, 404);
+        abort_unless($this->canView($wallet, $request), 403);
 
         $transaksi = collect($caCache->transaksiWalletKegiatan($kodeCa)['data'] ?? []);
         $penerimaan = $transaksi->where('jenis', 'penerimaan')->values()->all();
@@ -67,5 +68,23 @@ class CaLaporanKegiatanPdfController extends Controller
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="Laporan-CA-Kegiatan-'.$kodeCa.'.pdf"',
         ]);
+    }
+
+    /**
+     * Pemilik, kolaborator, atau role dengan scope cashadvance 'all' (mis.
+     * finance) boleh mengunduh/melihat PDF dompet kegiatan ini.
+     *
+     * @param  array<string, mixed>  $wallet
+     */
+    private function canView(array $wallet, Request $request): bool
+    {
+        $userId = (int) $request->user()->id;
+
+        $isOwner = (int) ($wallet['user_id'] ?? 0) === $userId;
+
+        $isCollaborator = collect($wallet['collaborators'] ?? [])
+            ->contains(fn (array $c): bool => (int) $c['user_id'] === $userId);
+
+        return $isOwner || $isCollaborator || $request->user()->viewScopeFor('cashadvance') === 'all';
     }
 }
