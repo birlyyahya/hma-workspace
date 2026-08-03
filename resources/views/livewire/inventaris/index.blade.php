@@ -1,6 +1,9 @@
 <?php
 
 use App\Services\InventarisDummy;
+use App\Services\ProjectCache;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
@@ -14,21 +17,55 @@ class extends Component {
     public string $filter = '';
 
     /**
+     * Daftar project asli (BEPM) digabung ringkasan progres inventaris (masih dummy
+     * per-project sampai API inventaris tersambung). Scope mengikuti aturan yang sama
+     * dengan sidebar: view scope 'all' melihat seluruh project, selain itu hanya
+     * project di mana user jadi leader atau anggota tim (ProjectCache::involvedProjects).
+     *
      * @return array<int, array<string, mixed>>
      */
     #[Computed]
     public function projects(): array
     {
-        $projects = app(InventarisDummy::class)->projects();
+        $inventaris = app(InventarisDummy::class);
+        $projectCache = app(ProjectCache::class);
+        $user = Auth::user();
 
-        if ($this->filter === '') {
-            return $projects;
+        $catalog = collect($projectCache->allProjects())
+            ->keyBy(fn (array $p) => (int) ($p['id'] ?? 0));
+
+        if ($user->viewScopeFor('project') === 'all') {
+            $source = $catalog->values();
+        } else {
+            $source = collect($projectCache->involvedProjects($user->id))
+                ->map(fn (array $p) => $catalog->get((int) ($p['id'] ?? 0)))
+                ->filter()
+                ->values();
         }
 
-        return array_values(array_filter(
-            $projects,
-            fn (array $p) => str_contains(strtolower($p['name'].' '.$p['company']), strtolower($this->filter)),
-        ));
+        $projects = $source->map(function (array $p) use ($inventaris) {
+            $id = (int) ($p['id'] ?? 0);
+
+            return [
+                'id' => $id,
+                'name' => $p['name'] ?? '-',
+                'company' => $p['client'] ?? '-',
+                'last_activity' => ! empty($p['updated_at'])
+                    ? Carbon::parse($p['updated_at'])->translatedFormat('j M Y')
+                    : '-',
+                ...$inventaris->summaryFor($id),
+            ];
+        });
+
+        if ($this->filter !== '') {
+            $needle = strtolower($this->filter);
+
+            $projects = $projects->filter(
+                fn (array $p) => str_contains(strtolower($p['name'].' '.$p['company']), $needle),
+            );
+        }
+
+        return $projects->values()->all();
     }
 
     /**

@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\InventarisDummy;
+use App\Services\ProjectCache;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
@@ -16,21 +17,84 @@ class extends Component {
     }
 
     /**
+     * Identitas project dari data asli (BEPM); ringkasan progres inventaris masih
+     * dummy per-project sampai API inventaris tersambung.
+     *
      * @return array<string, mixed>|null
      */
     #[Computed]
     public function project(): ?array
     {
-        return app(InventarisDummy::class)->project($this->projectId);
+        $project = app(ProjectCache::class)->projectFor($this->projectId);
+
+        if (empty($project)) {
+            return null;
+        }
+
+        return [
+            'name' => $project['name'] ?? 'Project',
+            'company' => $project['client'] ?? '-',
+            ...app(InventarisDummy::class)->summaryFor($this->projectId),
+        ];
     }
 
     /**
      * @return array<int, array<string, mixed>>
      */
+    /**
+     * Daftar spektek asli (BEPM) untuk project ini, digabung progres generate/SN
+     * per sub-item dari state dummy (belum tersambung API inventaris).
+     *
+     * @return array<int, array<string, mixed>>
+     */
     #[Computed]
     public function spekteks(): array
     {
-        return app(InventarisDummy::class)->spekteksForProject($this->projectId);
+        $inventaris = app(InventarisDummy::class);
+
+        return collect(app(ProjectCache::class)->spectechFor($this->projectId))
+            ->map(fn (array $s) => $this->mapSpektek($s, $inventaris))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function mapSpektek(array $data, InventarisDummy $inventaris): array
+    {
+        $subs = $data['sub_spekteks'] ?? [];
+
+        if (empty($subs)) {
+            $subs = [[
+                'id' => $data['id'],
+                'name' => $data['name'] ?? '-',
+                'qty_total' => $data['qty_total'] ?? 0,
+            ]];
+        }
+
+        $subItems = collect($subs)
+            ->map(function (array $sub) use ($inventaris) {
+                $subId = (int) ($sub['id'] ?? 0);
+
+                return [
+                    'id' => $subId,
+                    'name' => $sub['name'] ?? '-',
+                    'unit' => 'item',
+                    'qty_total' => (int) ($sub['qty_total'] ?? 0),
+                    ...$inventaris->progressForSubItem($subId),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return [
+            'id' => (int) ($data['id'] ?? 0),
+            'name' => $data['name'] ?? '-',
+            'composite' => count($subItems) > 1,
+            'sub_items' => $subItems,
+        ];
     }
 } ?>
 

@@ -170,6 +170,36 @@ class InventarisDummy
     }
 
     /**
+     * Ringkasan progres inventaris (spektek/unit/SN) untuk sebuah project id.
+     * Dipakai saat identitas project (nama, perusahaan) berasal dari sumber lain
+     * (mis. ProjectCache), sehingga hanya angka progres yang diambil dari sini.
+     * Project tanpa data spektek/unit dummy mengembalikan ringkasan kosong ("Belum mulai").
+     *
+     * @return array{spektek_count: int, total_units: int, generated_units: int, sn_units: int, status_label: string, status_color: string}
+     */
+    public function summaryFor(int $projectId): array
+    {
+        return $this->projectSummary($this->state(), $projectId);
+    }
+
+    /**
+     * Progres generate/SN untuk sebuah sub-item id, terlepas dari sumber definisi
+     * sub-item (dummy atau real via ProjectCache::spectechFor). Sub-item id yang
+     * belum pernah di-generate mengembalikan angka nol, bukan error.
+     *
+     * @return array{generated: int, sn_assigned: int}
+     */
+    public function progressForSubItem(int $subItemId): array
+    {
+        $state = $this->state();
+
+        return [
+            'generated' => $this->generatedCount($state, $subItemId),
+            'sn_assigned' => $this->snCount($state, fn (array $u) => $u['sub_item_id'] === $subItemId),
+        ];
+    }
+
+    /**
      * Spektek sebuah project + progres tiap sub-item & agregat spektek.
      *
      * @return array<int, array<string, mixed>>

@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\InventarisDummy;
+use App\Services\ProjectCache;
 use Flux\Flux;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -34,12 +35,52 @@ class extends Component {
     }
 
     /**
+     * Spektek asli (BEPM) untuk project ini, digabung progres generate/SN per
+     * sub-item dari state dummy (belum tersambung API inventaris).
+     *
      * @return array<string, mixed>|null
      */
     #[Computed]
     public function spektek(): ?array
     {
-        return app(InventarisDummy::class)->spektek($this->spektekId);
+        $data = collect(app(ProjectCache::class)->spectechFor($this->projectId))
+            ->firstWhere('id', $this->spektekId);
+
+        if ($data === null) {
+            return null;
+        }
+
+        $inventaris = app(InventarisDummy::class);
+        $subs = $data['sub_spekteks'] ?? [];
+
+        if (empty($subs)) {
+            $subs = [[
+                'id' => $data['id'],
+                'name' => $data['name'] ?? '-',
+                'qty_total' => $data['qty_total'] ?? 0,
+            ]];
+        }
+
+        $subItems = collect($subs)
+            ->map(function (array $sub) use ($inventaris) {
+                $subId = (int) ($sub['id'] ?? 0);
+
+                return [
+                    'id' => $subId,
+                    'name' => $sub['name'] ?? '-',
+                    'unit' => 'item',
+                    'qty_total' => (int) ($sub['qty_total'] ?? 0),
+                    ...$inventaris->progressForSubItem($subId),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return [
+            'id' => (int) ($data['id'] ?? 0),
+            'name' => $data['name'] ?? '-',
+            'sub_items' => $subItems,
+        ];
     }
 
     /**
@@ -54,7 +95,7 @@ class extends Component {
     #[Computed]
     public function projectName(): string
     {
-        return app(InventarisDummy::class)->project($this->projectId)['name'] ?? 'Project';
+        return app(ProjectCache::class)->projectFor($this->projectId)['name'] ?? 'Project';
     }
 
     public function openGenerate(int $subItemId): void
