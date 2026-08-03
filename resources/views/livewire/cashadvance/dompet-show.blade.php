@@ -49,7 +49,7 @@ class extends Component {
      */
     public function canView(): bool
     {
-        return $this->isOwner() || $this->isCollaborator() && Auth::user()->hasPermission('ca.edit') || Auth::user()->viewScopeFor('cashadvance') === 'all';
+        return $this->isOwner() || $this->isCollaborator() || Auth::user()->viewScopeFor('cashadvance') === 'all';
     }
 
     /**
@@ -471,7 +471,7 @@ class extends Component {
                                 {{ $person['inisial'] }}
                             </span>
                             <p class="min-w-0 flex-1 truncate text-sm font-medium text-zinc-900 dark:text-white">{{ $person['nama'] }}</p>
-                            @unless ($this->isClosed())
+                            @unless ($this->isClosed() || (int) $person['user_id'] === (int) Auth::id())
                             <flux:button size="sm" variant="ghost" icon="trash" type="button"
                                 x-on:click="$wire.dispatch('ca-confirm-delete-collaborator', { id: {{ $person['collab_id'] }}, name: {!! \Illuminate\Support\Js::from($person['nama']) !!} }); $flux.modal('hapus-kolaborator').show()" />
                             @endunless
