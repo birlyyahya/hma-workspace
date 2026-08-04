@@ -57,7 +57,7 @@ new class extends Component {
         <div class="bg-white rounded-2xl border border-zinc-200 p-5 sm:p-6">
             <div class="flex items-start justify-between gap-3 flex-wrap">
                 <div>
-                    <h2 class="text-base font-semibold text-zinc-900">Progress Tahapan</h2>
+                    <h2 class="text-base font-semibold text-zinc-900">Progress Timeline</h2>
                     <p class="mt-0.5 text-xs text-zinc-500">
                         @if ($summary['current_title'])
                             Sedang berjalan: <span class="font-medium text-blue-600">{{ $summary['current_title'] }}</span>

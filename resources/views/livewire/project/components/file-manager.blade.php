@@ -655,9 +655,9 @@ new class extends Component
     }
 
     /**
-     * Saran keyword untuk modal edit: judul timeline project didahulukan
-     * (dokumen yang keyword-nya cocok dengan timeline akan bisa tampil di
-     * timeline progress), lalu keyword dokumen lain di project ini.
+     * Saran keyword untuk modal edit: nama-nama timeline project ini saja,
+     * agar dokumen yang keyword-nya cocok dengan timeline bisa ikut tampil
+     * di timeline progress.
      *
      * @return array<int, string>
      */
@@ -670,11 +670,7 @@ new class extends Component
             $timelineTitles = collect();
         }
 
-        $docKeywords = collect($this->allDocs())
-            ->flatMap(fn (array $doc) => (array) ($doc['keyword'] ?? []))
-            ->map(fn ($keyword) => trim((string) $keyword));
-
-        return $timelineTitles->merge($docKeywords)
+        return $timelineTitles
             ->filter()
             ->unique(fn (string $keyword) => mb_strtolower($keyword))
             ->take(15)
@@ -1410,7 +1406,7 @@ new class extends Component
 
             @if($this->keywordSuggestions !== [])
                 <div class="space-y-1.5">
-                    <flux:text class="text-xs font-medium text-zinc-500 dark:text-zinc-400">Rekomendasi (nama timeline & keyword lain):</flux:text>
+                    <flux:text class="text-xs font-medium text-zinc-500 dark:text-zinc-400">Rekomendasi (nama timeline):</flux:text>
                     <div class="flex flex-wrap gap-1.5">
                         @foreach($this->keywordSuggestions as $suggestion)
                             <button type="button" x-show="! has(@js($suggestion))" @click="add(@js($suggestion))"
