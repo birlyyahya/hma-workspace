@@ -228,13 +228,27 @@ new class extends Component {
                 {{-- (terutama Safari iOS) hanya membuka kamera langsung untuk klik asli --}}
                 {{-- pengguna, bukan klik yang di-trigger via JS. $wire.upload() dipanggil --}}
                 {{-- manual dari event change murni supaya capture tetap jalan. --}}
+                {{-- Set "uploading" langsung di sini + pakai callback finish/error/cancel --}}
+                {{-- dari $wire.upload: event livewire-upload-* untuk upload programatik --}}
+                {{-- terpancar di root komponen (leluhur form), jadi TIDAK menetes turun --}}
+                {{-- ke listener form seperti pada input wire:model — makanya loading --}}
+                {{-- kamera harus di-drive manual, bukan mengandalkan event yang menetes. --}}
                 <label :class="uploading ? 'pointer-events-none opacity-60' : ''"
                     class="flex shrink-0 cursor-pointer items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-zinc-500 transition hover:border-ca-copper/40 hover:text-ca-copper dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
                     title="Ambil foto langsung">
                     <flux:icon name="camera" class="size-5" x-show="! uploading" />
                     <flux:icon name="arrow-path" class="size-5 animate-spin" x-show="uploading" x-cloak />
                     <input type="file" accept="image/*" capture="environment" class="sr-only"
-                        x-on:change="$event.target.files.length && $wire.upload('bukti', $event.target.files[0])" />
+                        x-on:change="
+                            if (! $event.target.files.length) return;
+                            uploading = true;
+                            $wire.upload('bukti', $event.target.files[0],
+                                () => uploading = false,
+                                () => uploading = false,
+                                () => {},
+                                () => uploading = false,
+                            );
+                        " />
                 </label>
             </div>
             <flux:error name="bukti" />
