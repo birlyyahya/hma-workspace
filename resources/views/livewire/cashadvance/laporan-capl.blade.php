@@ -129,7 +129,7 @@ class extends Component
     </div>
 
     <div class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
-        <iframe wire:key="ca-pl-pdf-{{ $regenerateToken }}" src="{{ $this->pdfUrl() }}" class="h-[80vh] w-full" title="Laporan CA PL"></iframe>
+        <iframe wire:key="ca-pl-pdf-{{ $regenerateToken }}" src="{{ $this->pdfUrl() }}" class="h-[90vh] w-full" title="Laporan CA PL"></iframe>
     </div>
     @endif
 </div>

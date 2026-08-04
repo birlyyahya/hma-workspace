@@ -46,8 +46,8 @@ class CaWriter
             return $this->result($ok, $body, $response->status(), [
                 'name' => 'ca',
                 'event' => 'created',
-                'description' => "Topup CA PL {$payload['user_id']}",
-                'properties' => ['total_penerimaan' => $payload['total_penerimaan']],
+                'description' => "Topup pertama CA PL oleh user_id={$payload['user_id']} sebesar Rp".number_format((float) ($payload['total_penerimaan'] ?? 0), 0, ',', '.'),
+                'properties' => Arr::except($payload, ['bukti_setor']),
             ], scope: 'pl');
         } catch (\Throwable $e) {
             return $this->fail('topupCaPL', $e, ['user_id' => $payload['user_id']]);
@@ -71,8 +71,8 @@ class CaWriter
             return $this->result($ok, $body, $response->status(), [
                 'name' => 'ca',
                 'event' => 'created',
-                'description' => "Mencatat pengeluaran CA PL {$kode}",
-                'properties' => ['kode' => $kode],
+                'description' => "Mencatat pengeluaran CA PL {$kode}: {$payload['kategori']} Rp".number_format((float) ($payload['jumlah'] ?? 0), 0, ',', '.'),
+                'properties' => ['kode' => $kode, ...Arr::except($payload, ['bukti'])],
             ], scope: 'pl');
         } catch (\Throwable $e) {
             return $this->fail('createTransactionCaPl', $e, ['kode' => $kode]);
@@ -84,9 +84,13 @@ class CaWriter
      * NON-idempotent — POST + _method=PUT (bukti opsional, hanya dikirim bila diganti).
      *
      * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $original  Snapshot transaksi sebelum diedit (dari caller,
+     *                                          sudah ada di memori saat startEdit) — dipakai untuk
+     *                                          membangun diff before/after pada activity log, tanpa
+     *                                          perlu fetch ulang ke API.
      * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
      */
-    public function updateTransactionCaPl(string $kode, int $id, array $payload): array
+    public function updateTransactionCaPl(string $kode, int $id, array $payload, array $original = []): array
     {
         try {
             $response = $this->sendTransaction(
@@ -97,18 +101,26 @@ class CaWriter
             $body = (array) $response->json();
             $ok = $response->successful() || (bool) ($body['success'] ?? false);
 
+            $changes = $this->diffFields($original, $payload, ['jumlah', 'kategori', 'deskripsi', 'tanggal']);
+            $buktiDiganti = isset($payload['bukti']);
+
             return $this->result($ok, $body, $response->status(), [
                 'name' => 'ca',
                 'event' => 'updated',
-                'description' => "Memperbarui transaksi CA PL {$kode} #{$id}",
-                'properties' => ['kode' => $kode, 'id' => $id],
+                'description' => $this->describeUpdate("Memperbarui transaksi CA PL {$kode} #{$id}", $changes, $buktiDiganti),
+                'properties' => ['kode' => $kode, 'id' => $id, 'changes' => $changes, 'bukti_diganti' => $buktiDiganti],
             ], scope: 'pl');
         } catch (\Throwable $e) {
             return $this->fail('updateTransactionCaPl', $e, ['kode' => $kode, 'id' => $id]);
         }
     }
 
-    public function deleteTransactionCaPL(string $kode, int $id)
+    /**
+     * @param  array<string, mixed>  $original  Snapshot transaksi yang dihapus (dari caller) —
+     *                                          dicatat di log supaya jejak audit tahu apa yang hilang,
+     *                                          bukan cuma id-nya.
+     */
+    public function deleteTransactionCaPL(string $kode, int $id, array $original = [])
     {
         try {
             $response = $this->externalWrite()->delete($this->apiBase."/ca/{$kode}/transaksi/{$id}");
@@ -119,8 +131,8 @@ class CaWriter
             return $this->result($ok, $body, $response->status(), [
                 'name' => 'ca',
                 'event' => 'deleted',
-                'description' => "Delete transaksi CA PL {$kode} #{$id}",
-                'properties' => ['kode' => $kode, 'id' => $id],
+                'description' => $this->describeDelete("Menghapus transaksi CA PL {$kode} #{$id}", $original),
+                'properties' => ['kode' => $kode, 'id' => $id, ...Arr::only($original, ['jumlah', 'kategori', 'deskripsi', 'tanggal'])],
             ], scope: 'pl');
         } catch (\Throwable $e) {
             return $this->fail('deleteTransaction', $e, ['kode' => $kode, 'id' => $id]);
@@ -146,8 +158,8 @@ class CaWriter
             return $this->result($ok, $body, $response->status(), [
                 'name' => 'ca',
                 'event' => 'created',
-                'description' => "Buat dompet kegiatan {$kodeCa}",
-                'properties' => ['user_id' => $payload['user_id'] ?? null],
+                'description' => "Buat dompet kegiatan {$kodeCa}: {$payload['judul_kegiatan']} dana cair Rp".number_format((float) ($payload['total_penerimaan'] ?? 0), 0, ',', '.'),
+                'properties' => Arr::except($payload, ['bukti']),
             ], scope: 'kegiatan');
         } catch (\Throwable $e) {
             return $this->fail('createDompetKegiatan', $e, ['user_id' => $payload['user_id'] ?? null]);
@@ -172,8 +184,8 @@ class CaWriter
             return $this->result($ok, $body, $response->status(), [
                 'name' => 'ca',
                 'event' => 'created',
-                'description' => "Mencatat transaksi dompet kegiatan {$kode}",
-                'properties' => ['kode' => $kode],
+                'description' => "Mencatat transaksi dompet kegiatan {$kode}: {$payload['jenis']} {$payload['kategori']} Rp".number_format((float) ($payload['jumlah'] ?? 0), 0, ',', '.'),
+                'properties' => ['kode' => $kode, ...Arr::except($payload, ['bukti'])],
             ], scope: 'kegiatan');
         } catch (\Throwable $e) {
             return $this->fail('createTransaksiKegiatan', $e, ['kode' => $kode]);
@@ -185,9 +197,11 @@ class CaWriter
      * NON-idempotent — POST + _method=PUT (bukti opsional, hanya dikirim bila diganti).
      *
      * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $original  Snapshot transaksi sebelum diedit (dari caller) —
+     *                                          dipakai untuk diff before/after pada activity log.
      * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
      */
-    public function updateTransaksiKegiatan(string $kode, int $id, array $payload): array
+    public function updateTransaksiKegiatan(string $kode, int $id, array $payload, array $original = []): array
     {
         try {
             $response = $this->sendTransaction(
@@ -198,11 +212,14 @@ class CaWriter
             $body = (array) $response->json();
             $ok = $response->successful() || (bool) ($body['success'] ?? false);
 
+            $changes = $this->diffFields($original, $payload, ['jenis', 'jumlah', 'kategori', 'deskripsi', 'tanggal']);
+            $buktiDiganti = isset($payload['bukti']);
+
             return $this->result($ok, $body, $response->status(), [
                 'name' => 'ca',
                 'event' => 'updated',
-                'description' => "Memperbarui transaksi dompet kegiatan {$kode} #{$id}",
-                'properties' => ['kode' => $kode, 'id' => $id],
+                'description' => $this->describeUpdate("Memperbarui transaksi dompet kegiatan {$kode} #{$id}", $changes, $buktiDiganti),
+                'properties' => ['kode' => $kode, 'id' => $id, 'changes' => $changes, 'bukti_diganti' => $buktiDiganti],
             ], scope: 'kegiatan');
         } catch (\Throwable $e) {
             return $this->fail('updateTransaksiKegiatan', $e, ['kode' => $kode, 'id' => $id]);
@@ -210,9 +227,10 @@ class CaWriter
     }
 
     /**
+     * @param  array<string, mixed>  $original  Snapshot transaksi yang dihapus (dari caller).
      * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
      */
-    public function deleteTransaksiKegiatan(string $kode, int $id): array
+    public function deleteTransaksiKegiatan(string $kode, int $id, array $original = []): array
     {
         try {
             $response = $this->externalWrite()->delete($this->apiBase."/kegiatan/{$kode}/transaksi/{$id}");
@@ -223,8 +241,8 @@ class CaWriter
             return $this->result($ok, $body, $response->status(), [
                 'name' => 'ca',
                 'event' => 'deleted',
-                'description' => "Delete transaksi dompet kegiatan {$kode} #{$id}",
-                'properties' => ['kode' => $kode, 'id' => $id],
+                'description' => $this->describeDelete("Menghapus transaksi dompet kegiatan {$kode} #{$id}", $original),
+                'properties' => ['kode' => $kode, 'id' => $id, ...Arr::only($original, ['jenis', 'jumlah', 'kategori', 'deskripsi', 'tanggal'])],
             ], scope: 'kegiatan');
         } catch (\Throwable $e) {
             return $this->fail('deleteTransaksiKegiatan', $e, ['kode' => $kode, 'id' => $id]);
@@ -236,9 +254,12 @@ class CaWriter
      * NON-idempotent — multipart upload bukti, timeout diperpanjang.
      *
      * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $context  Info dompet untuk log saja (kode_ca, judul_kegiatan,
+     *                                         saldo_akhir) — tidak ikut dikirim ke API, sudah ada di
+     *                                         memori caller lewat prop $wallet.
      * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
      */
-    public function closeKegiatan(array $payload): array
+    public function closeKegiatan(array $payload, array $context = []): array
     {
         try {
             $response = $this->sendTransaction($this->apiBase.'/close-kegiatan', $payload, fileField: 'bukti_setor');
@@ -246,12 +267,13 @@ class CaWriter
             $body = (array) $response->json();
             $ok = $response->successful() || (bool) ($body['success'] ?? false);
             $id = $payload['id'] ?? null;
+            $kodeCa = $context['kode_ca'] ?? null;
 
             return $this->result($ok, $body, $response->status(), [
                 'name' => 'ca',
                 'event' => 'updated',
-                'description' => "Tutup dompet kegiatan id={$id}",
-                'properties' => ['id' => $id],
+                'description' => 'Tutup dompet kegiatan '.($kodeCa ?? "id={$id}").' (saldo akhir Rp'.number_format((float) ($context['saldo_akhir'] ?? 0), 0, ',', '.').')',
+                'properties' => ['id' => $id, ...Arr::only($context, ['kode_ca', 'judul_kegiatan', 'saldo_akhir']), 'bukti_setor_diunggah' => isset($payload['bukti_setor'])],
             ], scope: 'kegiatan');
         } catch (\Throwable $e) {
             return $this->fail('closeKegiatan', $e, ['id' => $payload['id'] ?? null]);
@@ -275,7 +297,7 @@ class CaWriter
             return $this->result($ok, $body, $response->status(), [
                 'name' => 'ca',
                 'event' => 'created',
-                'description' => "Tambah kolaborator user_id={$payload['user_id']} ke dompet_id={$payload['dompet_id']}",
+                'description' => "Tambah kolaborator {$payload['username']} (user_id={$payload['user_id']}) ke dompet_id={$payload['dompet_id']}",
                 'properties' => $payload,
             ], scope: 'kegiatan');
         } catch (\Throwable $e) {
@@ -288,7 +310,7 @@ class CaWriter
      *
      * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
      */
-    public function deleteCollaborator(int $id): array
+    public function deleteCollaborator(int $id, ?string $name = null): array
     {
         try {
             $response = $this->externalWrite()->delete($this->apiBase.'/delete-collaborator/'.$id);
@@ -299,8 +321,8 @@ class CaWriter
             return $this->result($ok, $body, $response->status(), [
                 'name' => 'ca',
                 'event' => 'deleted',
-                'description' => "Hapus kolaborator id={$id}",
-                'properties' => ['id' => $id],
+                'description' => 'Hapus kolaborator '.($name ?? "id={$id}"),
+                'properties' => ['id' => $id, 'name' => $name],
             ], scope: 'kegiatan');
         } catch (\Throwable $e) {
             return $this->fail('deleteCollaborator', $e, ['id' => $id]);
@@ -327,8 +349,8 @@ class CaWriter
             return $this->result($ok, $body, $response->status(), [
                 'name' => 'ca',
                 'event' => 'created',
-                'description' => "topup ca PL {$payload['tahun_anggaran']}",
-                'properties' => ['payload' => Arr::except($payload, ['bukti_setor'])],
+                'description' => "Topup CA PL oleh user_id={$payload['user_id']} sebesar Rp".number_format((float) ($payload['total_penerimaan'] ?? 0), 0, ',', '.'),
+                'properties' => Arr::except($payload, ['bukti_setor']),
             ], scope: 'pl');
         } catch (\Throwable $e) {
             return $this->fail('topupCaPL', $e, ['user_id' => $payload['user_id']]);
@@ -399,6 +421,72 @@ class CaWriter
             ->event($log['event'])
             ->withProperties($log['properties'] ?? [])
             ->log($log['description']);
+    }
+
+    /**
+     * Bandingkan snapshot lama vs payload baru per field, hanya field yang
+     * benar-benar berubah yang masuk hasil — dipakai activity log update
+     * supaya jelas apa yang diubah user, bukan cuma "berhasil diperbarui".
+     *
+     * @param  array<string, mixed>  $original
+     * @param  array<string, mixed>  $payload
+     * @param  array<int, string>  $fields
+     * @return array<string, array{from: mixed, to: mixed}>
+     */
+    private function diffFields(array $original, array $payload, array $fields): array
+    {
+        $changes = [];
+
+        foreach ($fields as $field) {
+            if (! array_key_exists($field, $payload)) {
+                continue;
+            }
+
+            $from = $original[$field] ?? null;
+            $to = $payload[$field];
+
+            if ((string) $from !== (string) $to) {
+                $changes[$field] = ['from' => $from, 'to' => $to];
+            }
+        }
+
+        return $changes;
+    }
+
+    /**
+     * Susun deskripsi activity log update: sebutkan field yang berubah bila
+     * ada, supaya deskripsi di daftar log langsung informatif tanpa perlu
+     * membuka detail properties.
+     *
+     * @param  array<string, array{from: mixed, to: mixed}>  $changes
+     */
+    private function describeUpdate(string $base, array $changes, bool $buktiDiganti): string
+    {
+        $parts = array_keys($changes);
+
+        if ($buktiDiganti) {
+            $parts[] = 'bukti';
+        }
+
+        return $parts === [] ? "{$base} (tidak ada perubahan data)" : "{$base}: ".implode(', ', $parts);
+    }
+
+    /**
+     * Susun deskripsi activity log delete dengan ringkasan transaksi yang
+     * hilang (nominal & kategori), bila snapshot-nya tersedia dari caller.
+     *
+     * @param  array<string, mixed>  $original
+     */
+    private function describeDelete(string $base, array $original): string
+    {
+        if (! isset($original['jumlah'])) {
+            return $base;
+        }
+
+        $kategori = $original['kategori'] ?? null;
+        $jumlah = 'Rp'.number_format((float) $original['jumlah'], 0, ',', '.');
+
+        return $kategori ? "{$base}: {$kategori} {$jumlah}" : "{$base}: {$jumlah}";
     }
 
     /**

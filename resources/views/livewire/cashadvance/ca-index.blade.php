@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\CaCache;
+use App\Services\CaKategoriPengeluaran;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
@@ -89,7 +90,7 @@ new class extends Component {
 
         $this->caPlBalance = collect($reponse)->where('is_active', 1)->first() ?? [];
 
-        $this->categories = $response['categories'] ?? ['Transport', 'Akomodasi', 'Konsumsi', 'ATK', 'Komunikasi', 'Lain-lain'];
+        $this->categories = $response['categories'] ?? CaKategoriPengeluaran::labels();
 
         $this->loadKegiatan();
 
@@ -211,14 +212,7 @@ new class extends Component {
      */
     private function iconForKategori(?string $kategori): string
     {
-        return match ($kategori) {
-            'Transport' => 'truck',
-            'Akomodasi' => 'building-office',
-            'Konsumsi' => 'shopping-bag',
-            'ATK' => 'pencil-square',
-            'Komunikasi' => 'signal',
-            default => 'ellipsis-horizontal',
-        };
+        return CaKategoriPengeluaran::iconForLabel($kategori);
     }
 
 }; ?>
@@ -540,7 +534,7 @@ new class extends Component {
                             Edit
                         </flux:menu.item>
                         <flux:menu.item icon="trash" variant="danger"
-                            x-on:click="$flux.modal('hapus-pengeluaran').show(); $wire.dispatch('ca-confirm-delete', { id: {{ $trx['id_transaksi'] }} })">
+                            x-on:click="$flux.modal('hapus-pengeluaran').show(); $wire.dispatch('ca-confirm-delete', {!! \Illuminate\Support\Js::from(['id' => $trx['id_transaksi'], 'jumlah' => $trx['jumlah'], 'kategori' => $trx['kategori'] ?? null, 'deskripsi' => $trx['deskripsi'] ?? null, 'tanggal' => $trx['tanggal'] ?? null]) !!})">
                             Hapus
                         </flux:menu.item>
                     </flux:menu>

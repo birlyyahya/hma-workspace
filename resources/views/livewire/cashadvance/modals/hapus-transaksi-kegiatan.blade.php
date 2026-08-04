@@ -11,18 +11,28 @@ new class extends Component {
 
     public ?int $deleteTransactionId = null;
 
+    /**
+     * Snapshot transaksi yang hendak dihapus, dikirim dari baris pemicu
+     * (sudah ada di memori sana) supaya activity log deletion mencatat apa
+     * yang hilang, bukan cuma id-nya.
+     *
+     * @var array<string, mixed>
+     */
+    public array $deleteTransactionOriginal = [];
+
     public function mount(string $kodeCa = ''): void
     {
         $this->kodeCa = $kodeCa;
     }
 
     /**
-     * Simpan id transaksi yang hendak dihapus; modal dibuka dari sisi pemicu.
+     * Simpan transaksi yang hendak dihapus; modal dibuka dari sisi pemicu.
      */
     #[On('ca-kegiatan-confirm-delete')]
-    public function confirm(int $id): void
+    public function confirm(int $id, ?string $jenis = null, ?float $jumlah = null, ?string $kategori = null, ?string $deskripsi = null, ?string $tanggal = null): void
     {
         $this->deleteTransactionId = $id;
+        $this->deleteTransactionOriginal = compact('jenis', 'jumlah', 'kategori', 'deskripsi', 'tanggal');
     }
 
     public function deleteTransaction(): void
@@ -33,7 +43,7 @@ new class extends Component {
             return;
         }
 
-        $result = app(CaWriter::class)->deleteTransaksiKegiatan($this->kodeCa, $this->deleteTransactionId);
+        $result = app(CaWriter::class)->deleteTransaksiKegiatan($this->kodeCa, $this->deleteTransactionId, $this->deleteTransactionOriginal);
 
         if (! $result['ok']) {
             Toaster::error($result['error'] ?? ($result['body']['message'] ?? 'Gagal menghapus transaksi.'));
@@ -41,7 +51,7 @@ new class extends Component {
             return;
         }
 
-        $this->reset('deleteTransactionId');
+        $this->reset('deleteTransactionId', 'deleteTransactionOriginal');
         $this->dispatch('ca-updated');
         Flux::modal('hapus-transaksi-kegiatan')->close();
         Toaster::success('Transaksi berhasil dihapus.');

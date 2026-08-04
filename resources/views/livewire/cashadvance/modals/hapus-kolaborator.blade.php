@@ -45,7 +45,7 @@ new class extends Component {
             return;
         }
 
-        $result = app(CaWriter::class)->deleteCollaborator($this->deleteCollaboratorId);
+        $result = app(CaWriter::class)->deleteCollaborator($this->deleteCollaboratorId, $this->deleteCollaboratorName);
 
         if (! $result['ok']) {
             Toaster::error($result['error'] ?? ($result['body']['message'] ?? 'Gagal menghapus kolaborator.'));

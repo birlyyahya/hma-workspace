@@ -3,6 +3,7 @@
 use App\Services\CaCache;
 use App\Services\CaWriter;
 use Flux\Flux;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
@@ -16,6 +17,9 @@ new class extends Component {
     /** @var array<int, string> */
     public array $categories = [];
 
+    /** @var array<int, string> */
+    public array $categoriesPemasukan = [];
+
     public ?int $editingId = null;
     public string $jenis = 'pengeluaran';
     public $jumlah;
@@ -25,12 +29,44 @@ new class extends Component {
     public $bukti;
 
     /**
-     * @param  array<int, string>  $categories
+     * Snapshot transaksi asal sebelum diedit, dipakai CaWriter untuk mencatat
+     * diff before/after pada activity log (lihat startEdit/saveExpense).
+     *
+     * @var array<string, mixed>
      */
-    public function mount(string $kodeCa = '', array $categories = []): void
+    public array $original = [];
+
+    /**
+     * @param  array<int, string>  $categories
+     * @param  array<int, string>  $categoriesPemasukan
+     */
+    public function mount(string $kodeCa = '', array $categories = [], array $categoriesPemasukan = []): void
     {
         $this->kodeCa = $kodeCa;
         $this->categories = $categories;
+        $this->categoriesPemasukan = $categoriesPemasukan;
+    }
+
+    /**
+     * Daftar kategori yang ditawarkan berganti mengikuti arah transaksi:
+     * kategori belanja untuk pengeluaran, kategori sumber dana untuk pemasukan.
+     *
+     * @return array<int, string>
+     */
+    public function kategoriOptions(): array
+    {
+        return $this->jenis === 'penerimaan' ? $this->categoriesPemasukan : $this->categories;
+    }
+
+    /**
+     * Kategori terpilih bisa jadi tak berlaku lagi di daftar baru begitu arah
+     * transaksi diganti (mis. "Transport" saat pindah ke arah Masuk).
+     */
+    public function updatedJenis(): void
+    {
+        if (! in_array($this->kategori, $this->kategoriOptions(), true)) {
+            $this->kategori = null;
+        }
     }
 
     /**
@@ -63,6 +99,7 @@ new class extends Component {
         $this->deskripsi = $trx['deskripsi'] ?? '';
         $this->tanggal = \Carbon\Carbon::parse($trx['tanggal'])->format('Y-m-d');
         $this->bukti = null;
+        $this->original = $trx;
     }
 
     /**
@@ -84,7 +121,7 @@ new class extends Component {
         return [
             'jenis' => ['required', 'in:penerimaan,pengeluaran'],
             'jumlah' => ['required', 'integer', 'min:1'],
-            'kategori' => ['required', 'string'],
+            'kategori' => ['required', 'string', Rule::in($this->kategoriOptions())],
             'deskripsi' => ['nullable', 'string'],
             'tanggal' => ['required', 'date'],
             'bukti' => [$this->editingId ? 'nullable' : 'required', 'file', 'mimes:jpg,png,pdf', 'max:2048'],
@@ -113,7 +150,7 @@ new class extends Component {
         $isEdit = $this->editingId !== null;
 
         $result = $isEdit
-            ? app(CaWriter::class)->updateTransaksiKegiatan($this->kodeCa, $this->editingId, $payload)
+            ? app(CaWriter::class)->updateTransaksiKegiatan($this->kodeCa, $this->editingId, $payload, $this->original)
             : app(CaWriter::class)->createTransaksiKegiatan($this->kodeCa, $payload);
 
         if (! $result['ok']) {
@@ -130,7 +167,7 @@ new class extends Component {
 
     public function resetForm(): void
     {
-        $this->reset(['editingId', 'jenis', 'jumlah', 'kategori', 'deskripsi', 'tanggal', 'bukti']);
+        $this->reset(['editingId', 'jenis', 'jumlah', 'kategori', 'deskripsi', 'tanggal', 'bukti', 'original']);
         $this->jenis = 'pengeluaran';
         $this->resetValidation();
     }
@@ -146,7 +183,7 @@ new class extends Component {
             <flux:text class="mt-1">Dana cair dicatat sebagai pemasukan, belanja sebagai pengeluaran.</flux:text>
         </div>
 
-        <flux:radio.group wire:model="jenis" label="Arah" variant="segmented">
+        <flux:radio.group wire:model.live="jenis" label="Arah" variant="segmented">
             <flux:radio value="pengeluaran" label="Keluar" />
             <flux:radio value="penerimaan" label="Masuk" />
         </flux:radio.group>
@@ -159,7 +196,7 @@ new class extends Component {
 
         <flux:select wire:model="kategori" label="Kategori" placeholder="Pilih kategori">
             <flux:select.option>Pilih Kategori</flux:select.option>
-            @foreach ($categories as $cat)
+            @foreach ($this->kategoriOptions() as $cat)
                 <flux:select.option value="{{ $cat }}">{{ $cat }}</flux:select.option>
             @endforeach
         </flux:select>

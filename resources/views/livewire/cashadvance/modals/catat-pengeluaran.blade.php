@@ -24,6 +24,14 @@ new class extends Component {
     public $bukti;
 
     /**
+     * Snapshot transaksi asal sebelum diedit, dipakai CaWriter untuk mencatat
+     * diff before/after pada activity log (lihat startEdit/saveExpense).
+     *
+     * @var array<string, mixed>
+     */
+    public array $original = [];
+
+    /**
      * @param  array<int, string>  $categories
      */
     public function mount(string $kodeCa = '', array $categories = []): void
@@ -63,6 +71,7 @@ new class extends Component {
         $this->deskripsi = $trx['deskripsi'] ?? '';
         $this->tanggal = \Carbon\Carbon::parse($trx['tanggal'])->format('Y-m-d');
         $this->bukti = null;
+        $this->original = $trx;
     }
 
     /**
@@ -71,6 +80,16 @@ new class extends Component {
     public function transaksiCaPl(): array
     {
         return app(CaCache::class)->transaksiCaPlActive($this->kodeCa) ?? [];
+    }
+
+    /**
+     * Validasi ulang begitu file baru selesai diunggah, agar pesan error lama
+     * (mis. "lebih dari 2MB") langsung hilang saat pengguna mengunggah ulang
+     * dengan file yang valid, tanpa harus menekan tombol simpan dulu.
+     */
+    public function updatedBukti(): void
+    {
+        $this->validateOnly('bukti');
     }
 
     /**
@@ -87,6 +106,19 @@ new class extends Component {
             'deskripsi' => ['nullable', 'string'],
             'tanggal' => ['required', 'date'],
             'bukti' => [$this->editingId ? 'nullable' : 'required', 'file', 'mimes:jpg,png,pdf', 'max:2048'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function messages(): array
+    {
+        return [
+            'bukti.required' => 'Unggah bukti transaksi terlebih dahulu.',
+            'bukti.file' => 'Berkas bukti tidak valid.',
+            'bukti.mimes' => 'Bukti harus berupa file JPG, PNG, atau PDF.',
+            'bukti.max' => 'Ukuran bukti maksimal 2 MB. Kompres atau pilih file lain.',
         ];
     }
 
@@ -113,7 +145,7 @@ new class extends Component {
         $isEdit = $this->editingId !== null;
 
         $result = $isEdit
-            ? app(CaWriter::class)->updateTransactionCaPl($this->kodeCa, $this->editingId, $payload)
+            ? app(CaWriter::class)->updateTransactionCaPl($this->kodeCa, $this->editingId, $payload, $this->original)
             : app(CaWriter::class)->createTransactionCaPl($this->kodeCa, $payload);
 
         if (! $result['ok']) {
@@ -130,7 +162,7 @@ new class extends Component {
 
     public function resetForm(): void
     {
-        $this->reset(['editingId', 'jumlah', 'kategori', 'deskripsi', 'tanggal', 'bukti']);
+        $this->reset(['editingId', 'jumlah', 'kategori', 'deskripsi', 'tanggal', 'bukti', 'original']);
         $this->resetValidation();
     }
 }; ?>

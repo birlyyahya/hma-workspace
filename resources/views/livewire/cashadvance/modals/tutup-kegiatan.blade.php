@@ -52,7 +52,11 @@ new class extends Component {
             ];
         }
 
-        $result = app(CaWriter::class)->closeKegiatan($payload);
+        $result = app(CaWriter::class)->closeKegiatan($payload, [
+            'kode_ca' => $this->wallet['kode_ca'] ?? null,
+            'judul_kegiatan' => $this->wallet['judul_kegiatan'] ?? null,
+            'saldo_akhir' => $this->wallet['saldo_akhir'] ?? 0,
+        ]);
 
         if (! $result['ok']) {
             Toaster::error($result['error'] ?? ($result['body']['message'] ?? 'Gagal menutup kegiatan.'));

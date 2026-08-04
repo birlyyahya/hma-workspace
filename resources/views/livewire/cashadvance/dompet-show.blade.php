@@ -2,6 +2,8 @@
 
 use App\Models\User;
 use App\Services\CaCache;
+use App\Services\CaKategoriPemasukanKegiatan;
+use App\Services\CaKategoriPengeluaran;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
@@ -15,11 +17,16 @@ class extends Component {
     public string $search = '';
 
     /** @var array<int, string> */
-    public array $categories = ['Transport', 'Akomodasi', 'Konsumsi', 'ATK', 'Komunikasi', 'Lain-lain'];
+    public array $categories = [];
+
+    /** @var array<int, string> */
+    public array $categoriesPemasukan = [];
 
     public function mount(string $kodeCa): void
     {
         $this->kodeCa = $kodeCa;
+        $this->categories = CaKategoriPengeluaran::labels();
+        $this->categoriesPemasukan = CaKategoriPemasukanKegiatan::labels();
         $this->loadWallet();
         abort_if(empty($this->wallet), 404);
         abort_unless($this->canView(), 403);
@@ -213,14 +220,7 @@ class extends Component {
      */
     private function iconForKategori(?string $kategori): string
     {
-        return match ($kategori) {
-            'Transport' => 'truck',
-            'Akomodasi' => 'building-office',
-            'Konsumsi' => 'shopping-bag',
-            'ATK' => 'pencil-square',
-            'Komunikasi' => 'signal',
-            default => 'ellipsis-horizontal',
-        };
+        return CaKategoriPengeluaran::iconForLabel($kategori);
     }
 
     /**
@@ -548,7 +548,7 @@ class extends Component {
                                 Edit
                             </flux:menu.item>
                             <flux:menu.item icon="trash" variant="danger"
-                                x-on:click="$flux.modal('hapus-transaksi-kegiatan').show(); $wire.dispatch('ca-kegiatan-confirm-delete', { id: {{ $trx['id_transaksi'] }} })">
+                                x-on:click="$flux.modal('hapus-transaksi-kegiatan').show(); $wire.dispatch('ca-kegiatan-confirm-delete', {!! \Illuminate\Support\Js::from(['id' => $trx['id_transaksi'], 'jenis' => $trx['jenis'] ?? null, 'jumlah' => $trx['jumlah'], 'kategori' => $trx['kategori'] ?? null, 'deskripsi' => $trx['deskripsi'] ?? null, 'tanggal' => $trx['tanggal'] ?? null]) !!})">
                                 Hapus
                             </flux:menu.item>
                             @endunless
@@ -562,7 +562,7 @@ class extends Component {
         </div>
 
         {{-- ================= MODAL COMPONENTS ================= --}}
-        <livewire:cashadvance.modals.catat-transaksi-kegiatan :kode-ca="$kodeCa" :categories="$categories" />
+        <livewire:cashadvance.modals.catat-transaksi-kegiatan :kode-ca="$kodeCa" :categories="$categories" :categories-pemasukan="$categoriesPemasukan" />
         <livewire:cashadvance.modals.hapus-transaksi-kegiatan :kode-ca="$kodeCa" />
         <livewire:cashadvance.modals.tutup-kegiatan :wallet="$wallet" />
         <livewire:cashadvance.modals.tambah-kolaborator :wallet="$wallet" />

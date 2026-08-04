@@ -102,6 +102,40 @@ test('startEdit ignores an unknown transaction id', function () {
         ->assertSet('editingId', null);
 });
 
+test('bukti larger than 2MB fails validation with an Indonesian message', function () {
+    $this->actingAs(User::factory()->create());
+
+    $bukti = UploadedFile::fake()->create('nota.pdf', 3000, 'application/pdf');
+
+    catatPengeluaran()
+        ->set('jumlah', 50_000)
+        ->set('kategori', 'Transport')
+        ->set('tanggal', '2026-07-01')
+        ->set('bukti', $bukti)
+        ->call('saveExpense')
+        ->assertHasErrors(['bukti' => 'max'])
+        ->assertSee('Ukuran bukti maksimal 2 MB');
+});
+
+test('re-uploading a valid bukti clears the stale max-size error', function () {
+    $this->actingAs(User::factory()->create());
+
+    $tooBig = UploadedFile::fake()->create('nota.pdf', 3000, 'application/pdf');
+    $valid = UploadedFile::fake()->create('nota.pdf', 100, 'application/pdf');
+
+    $component = catatPengeluaran()
+        ->set('jumlah', 50_000)
+        ->set('kategori', 'Transport')
+        ->set('tanggal', '2026-07-01')
+        ->set('bukti', $tooBig)
+        ->call('saveExpense')
+        ->assertHasErrors(['bukti' => 'max']);
+
+    $component
+        ->set('bukti', $valid)
+        ->assertHasNoErrors('bukti');
+});
+
 test('saveExpense allows editing without re-uploading a bukti and calls the update endpoint', function () {
     $this->actingAs(User::factory()->create());
 
