@@ -54,27 +54,27 @@ new class extends Component {
 
                     <div class="min-w-0 flex-1">
                         <div class="flex items-center gap-2">
-                            <p class="truncate text-sm font-semibold text-zinc-900 dark:text-white">{{ $dompet['judul_kegiatan'] ?? 'CA PL' }}</p>
-                            <flux:badge size="sm" color="zinc">Ditutup</flux:badge>
+                            <p class="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-900 dark:text-white">{{ $dompet['judul_kegiatan'] ?? 'CA PL' }}</p>
+                            <flux:badge size="sm" color="zinc" class="shrink-0">Ditutup</flux:badge>
                         </div>
                         <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{{ $dompet['kode_ca'] }}</p>
-                        <p class="mt-1 flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        <p class="mt-1 flex flex-wrap items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
                             <flux:icon name="calendar" class="size-3.5 shrink-0" />
-                            {{ \Carbon\Carbon::parse($dompet['tanggal_mulai'])->translatedFormat('d M Y') }}
-                            &ndash; {{ \Carbon\Carbon::parse($dompet['tanggal_selesai'])->translatedFormat('d M Y') }}
+                            <span class="whitespace-nowrap">{{ \Carbon\Carbon::parse($dompet['tanggal_mulai'])->translatedFormat('d M Y') }}</span>
+                            <span class="whitespace-nowrap">&ndash; {{ \Carbon\Carbon::parse($dompet['tanggal_selesai'])->translatedFormat('d M Y') }}</span>
                         </p>
                     </div>
 
-                    <div class="flex items-center flex-col text-right gap-1.5">
-                        <div class="block w-full justify-end">
-                            <p class="text-sm text-right font-bold tabular-nums {{ $dompet['saldo_akhir'] < 0 ? 'text-red-600' : 'text-zinc-900 dark:text-white' }}">
+                    <div class="flex shrink-0 flex-col items-end gap-1.5 text-right">
+                        <div class="block w-full">
+                            <p class="whitespace-nowrap text-right text-sm font-bold tabular-nums {{ $dompet['saldo_akhir'] < 0 ? 'text-red-600' : 'text-zinc-900 dark:text-white' }}">
                                 Rp {{ number_format($dompet['saldo_akhir'], 0, ',', '.') }}
                             </p>
-                            <p class="mt-0.5 text-right text-xs font-medium text-ca-copper-deep dark:text-ca-copper">
+                            <p class="mt-0.5 whitespace-nowrap text-right text-xs font-medium text-ca-copper-deep dark:text-ca-copper">
                                 &minus; Rp {{ number_format($dompet['total_pengeluaran'], 0, ',', '.') }}
                             </p>
                         </div>
-                        <div class="flex gap-1">
+                        <div class="flex flex-wrap justify-end gap-1">
                             @if ($url = $this->buktiSetorUrl($dompet['bukti'] ?? null))
                             <flux:button size="xs" variant="ghost" icon="paper-clip" type="button"
                                 x-on:click="$dispatch('preview-bukti', {!! \Illuminate\Support\Js::from(['url' => $url, 'title' => 'Bukti Setor '.$dompet['kode_ca']]) !!}); $flux.modal('bukti-preview').show()">

@@ -113,7 +113,19 @@ new class extends Component {
 
         <flux:field>
             <flux:label>{{ $this->isReimbursement() ? 'Bukti TF Penyelesaian Reimbursement dari Management' : 'Bukti TF Penyelesaian Dokumen Resmi' }}</flux:label>
-            <flux:input wire:model="buktiSetor" type="file" accept=".jpg,.jpeg,.png,.pdf" />
+            {{-- Nama file native <input type=file> tidak bisa di-truncate via CSS (bukan --}}
+            {{-- text node biasa) — sembunyikan input asli, tampilkan nama file lewat span --}}
+            {{-- sendiri yang bisa di-truncate. dir=rtl + text-left = ellipsis di depan, --}}
+            {{-- akhir nama file (termasuk ekstensi) tetap terlihat. --}}
+            <label class="flex w-full min-w-0 max-w-full cursor-pointer items-center gap-3 overflow-hidden rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm transition hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-zinc-600">
+                <span class="shrink-0 rounded-md bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700 dark:bg-zinc-700 dark:text-zinc-100">
+                    Pilih File
+                </span>
+                <span class="block min-w-0 flex-1 overflow-hidden text-left text-ellipsis whitespace-nowrap text-zinc-600 dark:text-zinc-300" dir="rtl">
+                    {{ $buktiSetor?->getClientOriginalName() ?? 'Belum ada file dipilih' }}
+                </span>
+                <input wire:model="buktiSetor" type="file" accept=".jpg,.jpeg,.png,.pdf" class="sr-only" />
+            </label>
             <flux:text class="mt-1 text-xs">
                 @if ($this->isReimbursement())
                     Unggah bukti transfer reimbursement dari management (jpg, png, pdf &mdash; maks 2MB).
@@ -127,15 +139,17 @@ new class extends Component {
             <flux:error name="buktiSetor" />
         </flux:field>
 
-        <div class="flex justify-between gap-2">
-            <flux:button :href="route('cashadvance.laporan.capl', $balance['kode_ca'])" target="_blank" variant="ghost" icon="document-arrow-down" class="text-ca-copper! hover:text-ca-copper-deep!">
+        {{-- Stack vertikal di mobile — tiga aksi (Lihat Laporan, Batal, Eksekusi) --}}
+        {{-- tidak muat berdampingan di layar sempit. --}}
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <flux:button :href="route('cashadvance.laporan.capl', $balance['kode_ca'])" target="_blank" variant="ghost" icon="document-arrow-down" class="w-full text-ca-copper! hover:text-ca-copper-deep! sm:w-auto">
                 Lihat Laporan PDF
             </flux:button>
-            <div class="flex gap-2">
+            <div class="flex flex-col gap-2 sm:flex-row">
                 <flux:modal.close>
-                    <flux:button variant="ghost">Batal</flux:button>
+                    <flux:button variant="ghost" class="w-full sm:w-auto">Batal</flux:button>
                 </flux:modal.close>
-                <flux:button variant="primary" wire:click='topup' icon="check" class="bg-ca-copper! hover:bg-ca-copper-deep!"
+                <flux:button variant="primary" wire:click='topup' icon="check" class="w-full bg-ca-copper! hover:bg-ca-copper-deep! sm:w-auto"
                     wire:loading.attr="disabled" wire:target="buktiSetor,topup">
                     <span wire:loading.remove wire:target="buktiSetor,topup">Verifikasi &amp; Eksekusi Top up</span>
                     <span wire:loading wire:target="buktiSetor" class="animate-pulse">Menunggu unggahan&hellip;</span>

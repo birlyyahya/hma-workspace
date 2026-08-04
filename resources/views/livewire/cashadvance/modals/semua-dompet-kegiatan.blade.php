@@ -59,18 +59,18 @@ new class extends Component {
                 </span>
 
                 <div class="min-w-0 flex-1">
-                    <div class="flex items-center gap-2">
-                        <p class="text-sm font-semibold truncate text-zinc-900 dark:text-white">{{ $item['judul_kegiatan'] }}</p>
-                        <flux:badge size="sm" :color="$isClosed ? 'zinc' : 'green'">{{ $isClosed ? 'Ditutup' : 'Aktif' }}</flux:badge>
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <p class="min-w-0 flex-1 truncate text-sm font-semibold text-zinc-900 dark:text-white">{{ $item['judul_kegiatan'] }}</p>
+                        <flux:badge size="sm" class="shrink-0" :color="$isClosed ? 'zinc' : 'green'">{{ $isClosed ? 'Ditutup' : 'Aktif' }}</flux:badge>
                         @if ((int) ($item['user_id'] ?? 0) !== (int) Auth::id())
-                        <flux:badge size="sm" color="zinc" variant="pill">Kolaborator</flux:badge>
+                        <flux:badge size="sm" color="zinc" variant="pill" class="shrink-0">Kolaborator</flux:badge>
                         @endif
                     </div>
                     <p class="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{{ $item['kode_ca'] }}</p>
-                    <p class="mt-1 flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    <p class="mt-1 flex flex-wrap items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
                         <flux:icon name="calendar" class="size-3.5 shrink-0" />
-                        {{ isset($item['tanggal_mulai']) ? \Carbon\Carbon::parse($item['tanggal_mulai'])->translatedFormat('d M Y') : '—' }}
-                        &ndash; {{ isset($item['tanggal_selesai']) ? \Carbon\Carbon::parse($item['tanggal_selesai'])->translatedFormat('d M Y') : 'sekarang' }}
+                        <span class="whitespace-nowrap">{{ isset($item['tanggal_mulai']) ? \Carbon\Carbon::parse($item['tanggal_mulai'])->translatedFormat('d M Y') : '—' }}</span>
+                        <span class="whitespace-nowrap">&ndash; {{ isset($item['tanggal_selesai']) ? \Carbon\Carbon::parse($item['tanggal_selesai'])->translatedFormat('d M Y') : 'sekarang' }}</span>
                     </p>
                 </div>
 

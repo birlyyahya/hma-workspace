@@ -91,7 +91,7 @@ new class extends Component {
 
             <div class="relative space-y-4">
                 <div class="flex items-center justify-between gap-3">
-                    <p class="truncate text-[11px] font-semibold uppercase tracking-wider text-ca-gold">{{ $wallet['judul_kegiatan'] ?? $wallet['kode_ca'] ?? 'Dompet Kegiatan' }}</p>
+                    <p class="min-w-0 flex-1 truncate text-[11px] font-semibold uppercase tracking-wider text-ca-gold">{{ $wallet['judul_kegiatan'] ?? $wallet['kode_ca'] ?? 'Dompet Kegiatan' }}</p>
                     <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white/70">
                         <flux:icon name="lock-closed" class="size-3" /> Akan disegel
                     </span>
