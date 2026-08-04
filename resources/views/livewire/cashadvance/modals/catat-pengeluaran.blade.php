@@ -213,13 +213,18 @@ new class extends Component {
                     <input wire:model="bukti" type="file" accept=".jpg,.jpeg,.png,.pdf" class="sr-only" />
                 </label>
 
-                {{-- capture="environment" membuka kamera belakang langsung di HP --}}
-                {{-- (bukan pilih dari galeri) — hasil jepretan langsung jadi nilai --}}
-                {{-- $bukti lewat wire:model yang sama dengan input Pilih File. --}}
+                {{-- capture="environment" membuka kamera belakang langsung di HP (bukan --}}
+                {{-- galeri/file browser). Sengaja TIDAK pakai wire:model di sini (beda --}}
+                {{-- dari input Pilih File) — dua input dengan wire:model sama pernah --}}
+                {{-- bikin klik ke-intercept JS Livewire, dan sebagian browser mobile --}}
+                {{-- (terutama Safari iOS) hanya membuka kamera langsung untuk klik asli --}}
+                {{-- pengguna, bukan klik yang di-trigger via JS. $wire.upload() dipanggil --}}
+                {{-- manual dari event change murni supaya capture tetap jalan. --}}
                 <label class="flex shrink-0 cursor-pointer items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-zinc-500 transition hover:border-ca-copper/40 hover:text-ca-copper dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
                     title="Ambil foto langsung">
                     <flux:icon name="camera" class="size-5" />
-                    <input wire:model="bukti" type="file" accept="image/*" capture="environment" class="sr-only" />
+                    <input type="file" accept="image/*" capture="environment" class="sr-only"
+                        x-on:change="$event.target.files.length && $wire.upload('bukti', $event.target.files[0])" />
                 </label>
             </div>
             <flux:error name="bukti" />
