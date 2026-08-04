@@ -226,11 +226,24 @@ new class extends Component {
 <div class="space-y-4">
     @if (!$this->hasCa())
     {{-- ================= ONBOARDING: BELUM MEMILIKI CA ================= --}}
-    <div class="relative rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+    @php
+        $onboardingSteps = [
+            ['icon' => 'banknotes', 'title' => 'Ajukan top up', 'desc' => 'Isi nominal & bukti transfer'],
+            ['icon' => 'clock', 'title' => 'Menunggu Verifikasi', 'desc' => 'Pengecekan data'],
+            ['icon' => 'check-circle', 'title' => 'CA aktif', 'desc' => 'Dompet siap mencatat pengeluaran'],
+        ];
+    @endphp
+    <div class="relative overflow-hidden rounded-2xl border-2 border-dashed border-ca-copper/25 bg-linear-to-b from-ca-copper/4 to-transparent dark:border-ca-copper/20 dark:from-ca-copper/6 dark:bg-zinc-900">
 
-        <div class="mx-auto flex max-w-lg flex-col items-center gap-5 px-6 py-20 text-center">
-            <div class="flex size-16 items-center justify-center rounded-full bg-ca-copper/10 dark:bg-ca-copper/15">
-                <flux:icon.wallet class="size-8 text-ca-copper" />
+        <div class="relative mx-auto flex max-w-lg flex-col items-center gap-6 px-6 py-16 text-center">
+            {{-- SIGNATURE: dompet kosong &mdash; koin menunggu untuk "dijatuhkan" ke dalamnya --}}
+            <div class="relative flex h-24 w-24 items-center justify-center">
+                <span class="absolute left-0 top-0 flex size-8 items-center justify-center rounded-full bg-ca-gold/20 text-[11px] font-bold text-ca-copper-deep shadow-sm animate-ca-coin-bob dark:bg-ca-gold/15 dark:text-ca-gold">Rp</span>
+                <span class="absolute right-0 top-7 flex size-6 items-center justify-center rounded-full bg-ca-gold/20 text-[10px] font-bold text-ca-copper-deep shadow-sm animate-ca-coin-bob [animation-delay:0.8s] dark:bg-ca-gold/15 dark:text-ca-gold">Rp</span>
+
+                <div class="flex size-16 items-center justify-center rounded-full border-2 border-dashed border-ca-copper/30 bg-ca-copper/10 dark:border-ca-copper/25 dark:bg-ca-copper/15">
+                    <flux:icon.wallet class="size-8 text-ca-copper" />
+                </div>
             </div>
 
             <div class="space-y-2">
@@ -241,26 +254,30 @@ new class extends Component {
                 </flux:text>
             </div>
 
-            <div class="grid w-full grid-cols-1 gap-3 sm:grid-cols-3 text-left">
-                <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">
-                    <flux:icon.banknotes class="size-5 text-zinc-400 mb-1.5" />
-                    <p class="text-xs font-medium text-zinc-900 dark:text-white">1. Ajukan top up</p>
-                    <p class="text-xs text-zinc-500 dark:text-zinc-400">Isi nominal &amp; bukti transfer</p>
+            {{-- TRACK 3 LANGKAH: urutan proses nyata, jadi simpul yang terhubung, bukan kartu lepas --}}
+            <div class="flex w-full items-start">
+                @foreach ($onboardingSteps as $i => $step)
+                <div class="flex flex-1 flex-col items-center gap-2 px-1">
+                    <span @class([
+                        'flex size-10 shrink-0 items-center justify-center rounded-full transition',
+                        'bg-ca-copper text-white animate-ca-pulse-ring' => $i === 0,
+                        'border-2 border-dashed border-zinc-200 text-zinc-400 dark:border-zinc-700' => $i !== 0,
+                    ])>
+                        <flux:icon :name="$step['icon']" class="size-4" />
+                    </span>
+                    <div>
+                        <p class="text-[11px] font-semibold text-zinc-900 dark:text-white">{{ $i + 1 }}. {{ $step['title'] }}</p>
+                        <p class="text-[11px] text-zinc-500 dark:text-zinc-400">{{ $step['desc'] }}</p>
+                    </div>
                 </div>
-                <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">
-                    <flux:icon.clock class="size-5 text-zinc-400 mb-1.5" />
-                    <p class="text-xs font-medium text-zinc-900 dark:text-white">2. Menunggu verifikasi</p>
-                    <p class="text-xs text-zinc-500 dark:text-zinc-400">Finance memverifikasi pengajuan</p>
-                </div>
-                <div class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">
-                    <flux:icon.check-circle class="size-5 text-zinc-400 mb-1.5" />
-                    <p class="text-xs font-medium text-zinc-900 dark:text-white">3. CA aktif</p>
-                    <p class="text-xs text-zinc-500 dark:text-zinc-400">Dompet siap mencatat pengeluaran</p>
-                </div>
+                @if (!$loop->last)
+                <div class="mt-5 h-px flex-1 border-t-2 border-dashed border-zinc-200 dark:border-zinc-700"></div>
+                @endif
+                @endforeach
             </div>
 
             <flux:modal.trigger name="topup-pertama">
-                <flux:button variant="primary" class="bg-ca-copper! hover:bg-ca-copper-deep!" icon="arrow-up-tray">Top up Pertama</flux:button>
+                <flux:button variant="primary" class="bg-ca-copper! transition-transform hover:-translate-y-0.5 hover:bg-ca-copper-deep!" icon="arrow-up-tray">Top up Pertama</flux:button>
             </flux:modal.trigger>
         </div>
     </div>

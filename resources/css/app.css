@@ -179,6 +179,33 @@ li[data-list="bullet"] {
     animation: marquee 10s linear infinite;
 }
 
+/* Onboarding "dompet kosong" di ca-index: koin melayang & nadi langkah aktif. */
+@keyframes ca-coin-bob {
+    0%, 100% { transform: translateY(0) rotate(-6deg); }
+    50% { transform: translateY(-10px) rotate(6deg); }
+}
+
+@keyframes ca-pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(194, 84, 44, 0.35); }
+    70% { box-shadow: 0 0 0 10px rgba(194, 84, 44, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(194, 84, 44, 0); }
+}
+
+.animate-ca-coin-bob {
+    animation: ca-coin-bob 3s ease-in-out infinite;
+}
+
+.animate-ca-pulse-ring {
+    animation: ca-pulse-ring 2.2s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .animate-ca-coin-bob,
+    .animate-ca-pulse-ring {
+        animation: none;
+    }
+}
+
 /* container */
 .select2-container--default .select2-selection--multiple {
     min-height: 40px;
