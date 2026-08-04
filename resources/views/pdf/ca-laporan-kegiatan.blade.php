@@ -29,6 +29,7 @@
             background: #b9c7e2;
             text-align: center;
             font-weight: bold;
+            white-space: nowrap;
         }
         table.rekap tr.section td,
         table.rekap tr.total td {
@@ -39,7 +40,7 @@
         table.rekap td.tgl { white-space: nowrap; }
         table.rekap td.money, table.rekap th.money { text-align: right; white-space: nowrap; }
         table.rekap col.c-money { width: 150px; }
-        table.rekap col.c-tgl { width: 130px; }
+        table.rekap col.c-tgl { width: 150px; }
 
         .neg { color: #b91c1c; }
 
@@ -77,9 +78,7 @@
 
     {{-- ================= HEADER ================= --}}
     <div class="rekap-title">
-        <p>Rekap Transaksi Pembukuan</p>
-        <p>Pemasukan dan Pengeluaran Cash Advance</p>
-        <p>{{ $wallet['judul_kegiatan'] ?? '-' }}</p>
+        <p>Laporan Penggunaan Dana Kegiatan {{ $wallet['judul_kegiatan'] ?? '-' }}</p>
         <p>{{ $projectName }}</p>
         <p>Tahun Anggaran {{ $wallet['tahun_anggaran'] ?? now()->year }}</p>
         <p>
