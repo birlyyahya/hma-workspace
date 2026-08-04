@@ -61,7 +61,7 @@ new class extends Component {
         $this->jumlah = (int) $trx['jumlah'];
         $this->kategori = $trx['kategori'] ?? '';
         $this->deskripsi = $trx['deskripsi'] ?? '';
-        $this->tanggal = \Carbon\Carbon::parse($trx['created_at'])->format('Y-m-d');
+        $this->tanggal = \Carbon\Carbon::parse($trx['tanggal'])->format('Y-m-d');
         $this->bukti = null;
     }
 

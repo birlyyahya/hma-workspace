@@ -496,7 +496,7 @@ new class extends Component {
 
                 {{-- Tanggal: kolom tersendiri di sm+, digabung ke meta deskripsi di mobile --}}
                 <div class="hidden w-24 shrink-0 text-sm text-zinc-500 dark:text-white/50 sm:block">
-                    {{ \Carbon\Carbon::parse($trx['created_at'])->translatedFormat('d M Y') }}
+                    {{ \Carbon\Carbon::parse($trx['tanggal'])->translatedFormat('d M Y') }}
                 </div>
 
                 {{-- Kategori: kolom tersendiri di sm+ --}}
