@@ -202,15 +202,26 @@ new class extends Component {
             {{-- text node biasa) — sembunyikan input asli, tampilkan nama file lewat span --}}
             {{-- sendiri yang bisa di-truncate. dir=rtl + text-left = ellipsis di depan, --}}
             {{-- akhir nama file (termasuk ekstensi) tetap terlihat. --}}
-            <label class="flex w-full min-w-0 max-w-full cursor-pointer items-center gap-3 overflow-hidden rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm transition hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-zinc-600">
-                <span class="shrink-0 rounded-md bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700 dark:bg-zinc-700 dark:text-zinc-100">
-                    Pilih File
-                </span>
-                <span class="block min-w-0 flex-1 overflow-hidden text-left text-ellipsis whitespace-nowrap text-zinc-600 dark:text-zinc-300" dir="rtl">
-                    {{ $bukti?->getClientOriginalName() ?? 'Belum ada file dipilih' }}
-                </span>
-                <input wire:model="bukti" type="file" accept=".jpg,.jpeg,.png,.pdf" class="sr-only" />
-            </label>
+            <div class="flex items-stretch gap-2">
+                <label class="flex min-w-0 flex-1 max-w-full cursor-pointer items-center gap-3 overflow-hidden rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm transition hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-zinc-600">
+                    <span class="shrink-0 rounded-md bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700 dark:bg-zinc-700 dark:text-zinc-100">
+                        Pilih File
+                    </span>
+                    <span class="block min-w-0 flex-1 overflow-hidden text-left text-ellipsis whitespace-nowrap text-zinc-600 dark:text-zinc-300" dir="rtl">
+                        {{ $bukti?->getClientOriginalName() ?? 'Belum ada file dipilih' }}
+                    </span>
+                    <input wire:model="bukti" type="file" accept=".jpg,.jpeg,.png,.pdf" class="sr-only" />
+                </label>
+
+                {{-- capture="environment" membuka kamera belakang langsung di HP --}}
+                {{-- (bukan pilih dari galeri) — hasil jepretan langsung jadi nilai --}}
+                {{-- $bukti lewat wire:model yang sama dengan input Pilih File. --}}
+                <label class="flex shrink-0 cursor-pointer items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-zinc-500 transition hover:border-ca-copper/40 hover:text-ca-copper dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
+                    title="Ambil foto langsung">
+                    <flux:icon name="camera" class="size-5" />
+                    <input wire:model="bukti" type="file" accept="image/*" capture="environment" class="sr-only" />
+                </label>
+            </div>
             <flux:error name="bukti" />
             <span wire:loading wire:target="bukti" class="mt-1 block text-xs text-zinc-500 animate-pulse">
                 Mengunggah bukti&hellip;
