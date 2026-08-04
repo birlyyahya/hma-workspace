@@ -529,9 +529,10 @@ new class extends Component {
                         </flux:menu.item>
                     </flux:menu>
                 </flux:dropdown>
-                <flux:button :href="route('cashadvance.laporan.capl', ['kodeCa' => $this->caPlBalance['kode_ca']])" target="_blank" icon="document-arrow-down" variant="ghost" class="text-ca-copper! hover:text-ca-copper-deep!">
-                    <span class="hidden sm:inline">Export PDF</span>
-                </flux:button>
+                <flux:tooltip content="Unduh laporan transaksi periode aktif" placement="top">
+                    <flux:button :href="route('cashadvance.laporan.capl', ['kodeCa' => $this->caPlBalance['kode_ca']])" target="_blank" icon="document-arrow-down" variant="ghost" class="text-ca-copper! hover:text-ca-copper-deep!">
+                    </flux:button>
+                </flux:tooltip>
             </div>
         </div>
 
