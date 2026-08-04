@@ -338,40 +338,40 @@ class extends Component {
                             ">
                             <div x-ref="kegiatanChart" class="-mx-2 h-52 w-[calc(100%+1rem)]"></div>
 
-                            <div class="flex gap-2">
+                            <div class="flex flex-col gap-2 sm:flex-row">
                                 @unless ($this->isClosed())
-                                <flux:button variant="primary" icon="plus" size="sm" class="bg-ca-copper! items-center! flex-1  py-2.5! rounded-xl hover:bg-ca-copper-deep!"
+                                <flux:button variant="primary" icon="plus" size="sm" class="bg-ca-copper! items-center! flex-1 py-2.5! rounded-xl hover:bg-ca-copper-deep!"
                                     x-on:click="$flux.modal('catat-transaksi-kegiatan').show(); $wire.dispatch('ca-kegiatan-new-transaksi')">
                                     Catat Transaksi
                                 </flux:button>
                                 @if ($this->canManageWallet())
                                 <flux:modal.trigger name="tutup-kegiatan">
-                                    <button variant="outline"  class="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ca-gold"
-                                     icon="lock-closed" size="sm">
-                                      <flux:icon name="lock-closed" class="size-4" />
-                                     Tutup Kegiatan</button>
+                                    <button type="button" class="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ca-gold">
+                                        <flux:icon name="lock-closed" class="size-4" />
+                                        Tutup Kegiatan
+                                    </button>
                                 </flux:modal.trigger>
                                 @endif
                                 @endunless
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-3 gap-4 border-t border-white/10 pt-4">
-                            <div>
-                                <p class="text-[11px] text-white/50">Saldo Awal</p>
-                                <p class="mt-0.5 text-sm font-semibold tabular-nums text-white">
+                        <div class="grid grid-cols-3 gap-3 border-t border-white/10 pt-4 sm:gap-4">
+                            <div class="min-w-0">
+                                <p class="truncate text-[11px] text-white/50">Saldo Awal</p>
+                                <p class="truncate text-xs font-semibold tabular-nums text-white sm:text-sm">
                                     Rp {{ number_format($wallet['saldo_awal_priode'] ?? 0, 0, ',', '.') }}
                                 </p>
                             </div>
-                            <div>
-                                <p class="text-[11px] text-white/50">Total Masuk</p>
-                                <p class="mt-0.5 text-sm font-semibold tabular-nums text-emerald-300">
+                            <div class="min-w-0">
+                                <p class="truncate text-[11px] text-white/50">Total Masuk</p>
+                                <p class="truncate text-xs font-semibold tabular-nums text-emerald-300 sm:text-sm">
                                     Rp {{ number_format($wallet['total_penerimaan'] ?? 0, 0, ',', '.') }}
                                 </p>
                             </div>
-                            <div>
-                                <p class="text-[11px] text-white/50">Total Keluar</p>
-                                <p class="mt-0.5 text-sm font-semibold tabular-nums text-orange-300">
+                            <div class="min-w-0">
+                                <p class="truncate text-[11px] text-white/50">Total Keluar</p>
+                                <p class="truncate text-xs font-semibold tabular-nums text-orange-300 sm:text-sm">
                                     Rp {{ number_format($wallet['total_pengeluaran'] ?? 0, 0, ',', '.') }}
                                 </p>
                             </div>
@@ -516,20 +516,22 @@ class extends Component {
                     </div>
 
                     <div class="min-w-0 flex-1">
-                        <p class="line-champ-2 text-xs sm:text-sm md:text-md lg:text-md font-normal text-zinc-900 dark:text-white">{{ $trx['deskripsi'] }}</p>
-                        <div class="mt-1 flex items-center gap-2 sm:hidden">
-                            <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                        <p class="line-clamp-2 text-xs sm:text-sm font-normal text-zinc-900 dark:text-white">{{ $trx['deskripsi'] }}</p>
+                        <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 sm:hidden">
+                            <span class="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
                                 {{ $isIn ? 'Pemasukan' : ($trx['kategori'] ?? '-') }}
                             </span>
-                            <span class="text-xs text-zinc-400">{{ \Carbon\Carbon::parse($trx['tanggal'])->translatedFormat('d M Y') }}</span>
+                            <span class="shrink-0 whitespace-nowrap text-xs text-zinc-400">{{ \Carbon\Carbon::parse($trx['tanggal'])->translatedFormat('d M Y') }}</span>
                         </div>
                     </div>
 
+                    {{-- Saldo disembunyikan di mobile — string terpanjang di blok ini, --}}
+                    {{-- paling memakan lebar & menyempitkan kolom deskripsi di layar sempit. --}}
                     <div class="shrink-0 text-right">
-                        <p class="text-sm font-semibold tabular-nums {{ $isIn ? 'text-emerald-600 dark:text-emerald-400' : 'text-ca-copper-deep dark:text-ca-copper' }}">
+                        <p class="whitespace-nowrap text-sm font-semibold tabular-nums {{ $isIn ? 'text-emerald-600 dark:text-emerald-400' : 'text-ca-copper-deep dark:text-ca-copper' }}">
                             {{ $isIn ? '+' : '−' }} Rp {{ number_format($trx['jumlah'], 0, ',', '.') }}
                         </p>
-                        <p class="text-xs text-zinc-400 {{ $trx['saldo_setelah'] < 0 ? 'text-red-500' : '' }}">
+                        <p class="hidden whitespace-nowrap text-xs text-zinc-400 sm:block {{ $trx['saldo_setelah'] < 0 ? 'text-red-500' : '' }}">
                             Saldo Rp {{ number_format($trx['saldo_setelah'], 0, ',', '.') }}
                         </p>
                     </div>
