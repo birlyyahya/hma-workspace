@@ -50,14 +50,20 @@ class CaCache
         }
     }
 
+    /**
+     * Endpoint ini paginated di sisi API; kita minta per_page besar supaya
+     * seluruh transaksi periode aktif termuat sekaligus dan filter/pencarian
+     * di ca-index bisa jalan client-side terhadap dataset lengkap, bukan
+     * cuma halaman pertama.
+     */
     public function transaksiCaPlActive(string $kode, array $param = []): array
     {
         $url = $this->apiBase.'/transaksi-wallet-pl/'.$kode;
-        $query = array_filter($param);
+        $query = array_filter(['per_page' => 1000000, ...$param]);
         $key = 'ca:transaksi-ca-pl:'.$kode.':'.md5(serialize($query));
 
         return $this->rememberFlexible([self::TAG, self::TAG_PL], $key, [self::TTL_DETAIL, self::TTL_DETAIL * 4], function () use ($url, $query) {
-           $response = $this->externalRead(timeout: 15)->get($url, $query);
+            $response = $this->externalRead(timeout: 15)->get($url, $query);
 
             if ($response->failed()) {
                 throw new \RuntimeException('status '.$response->status());
@@ -139,7 +145,10 @@ class CaCache
     }
 
     /**
-     * Transaksi pada satu dompet kegiatan.
+     * Transaksi pada satu dompet kegiatan. Endpoint ini paginated di sisi
+     * API; kita minta per_page besar supaya seluruh transaksi dompet termuat
+     * sekaligus dan filter/pencarian di dompet-show bisa jalan client-side
+     * terhadap dataset lengkap, bukan cuma halaman pertama.
      *
      * @param  array<string, mixed>  $param
      */
@@ -154,7 +163,7 @@ class CaCache
                     return $e instanceof \Illuminate\Http\Client\ConnectionException
                         || (method_exists($e, 'response') && optional($e->response)->serverError());
                 }, throw: false)
-                ->get($url, array_filter($param));
+                ->get($url, array_filter(['per_page' => 1000000, ...$param]));
 
             if ($response->failed()) {
                 throw new \RuntimeException('status '.$response->status());
