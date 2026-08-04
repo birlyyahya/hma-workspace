@@ -167,7 +167,7 @@ new class extends Component {
     }
 }; ?>
 
-<flux:modal name="catat-pengeluaran" class="w-lg" @close="$wire.resetForm()">
+<flux:modal name="catat-pengeluaran" class="w-full max-w-lg" @close="$wire.resetForm()">
     <form wire:submit.prevent="saveExpense" class="space-y-6">
         <div>
             <p class="text-[11px] font-semibold uppercase tracking-wider text-ca-copper">CA PL</p>

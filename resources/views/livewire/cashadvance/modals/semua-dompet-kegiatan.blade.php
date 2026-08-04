@@ -36,7 +36,7 @@ new class extends Component {
     }
 }; ?>
 
-<flux:modal name="semua-dompet-kegiatan" class="w-xl" flyout>
+<flux:modal name="semua-dompet-kegiatan" class="w-full max-w-xl" flyout>
     <div class="space-y-6">
         <div>
             <p class="text-[11px] font-semibold uppercase tracking-wider text-ca-copper">Dompet Kegiatan</p>

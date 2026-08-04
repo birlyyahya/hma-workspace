@@ -71,7 +71,7 @@ new class extends Component {
     }
 }; ?>
 
-<flux:modal name="tutup-kegiatan" class="w-lg">
+<flux:modal name="tutup-kegiatan" class="w-full max-w-lg">
     <div class="space-y-6">
         <div class="flex items-start gap-3">
             <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-ca-copper/10 text-ca-copper-deep dark:bg-ca-copper/15 dark:text-ca-copper">

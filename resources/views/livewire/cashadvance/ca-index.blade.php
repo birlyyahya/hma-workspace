@@ -614,7 +614,7 @@ new class extends Component {
 
     {{-- ================= MODAL: PREVIEW BUKTI ================= --}}
     {{-- Satu modal dipakai bersama semua baris; url & judul diisi lewat event Alpine dari tombol paper-clip. --}}
-    <flux:modal name="bukti-preview" class="w-2xl"
+    <flux:modal name="bukti-preview" class="w-full max-w-2xl"
         x-data="{
             url: '',
             title: 'Bukti Transaksi',

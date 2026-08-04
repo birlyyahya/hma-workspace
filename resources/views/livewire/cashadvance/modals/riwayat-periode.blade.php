@@ -36,7 +36,7 @@ new class extends Component {
     }
 }; ?>
 
-<flux:modal name="riwayat-periode" class="w-xl" flyout>
+<flux:modal name="riwayat-periode" class="w-full max-w-xl" flyout>
     <div class="space-y-6">
         <div>
             <p class="text-[11px] font-semibold uppercase tracking-wider text-ca-copper">Riwayat Periode</p>

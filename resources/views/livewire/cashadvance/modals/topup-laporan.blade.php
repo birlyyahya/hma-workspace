@@ -79,7 +79,7 @@ new class extends Component {
     }
 }; ?>
 
-<flux:modal name="topup-laporan" class="w-xl" @close="$wire.resetForm()">
+<flux:modal name="topup-laporan" class="w-full max-w-xl" @close="$wire.resetForm()">
     <div class="space-y-6">
         <div>
             <p class="text-[11px] font-semibold uppercase tracking-wider text-ca-copper">Top Up CA PL</p>

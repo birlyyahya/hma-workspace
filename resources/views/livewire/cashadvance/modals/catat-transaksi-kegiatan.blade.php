@@ -173,7 +173,7 @@ new class extends Component {
     }
 }; ?>
 
-<flux:modal name="catat-transaksi-kegiatan" class="w-lg" @close="$wire.resetForm()">
+<flux:modal name="catat-transaksi-kegiatan" class="w-full max-w-lg" @close="$wire.resetForm()">
     <form wire:submit.prevent="saveExpense" class="space-y-6">
         <div>
             <flux:heading size="lg">

@@ -569,7 +569,7 @@ class extends Component {
         <livewire:cashadvance.modals.hapus-kolaborator />
 
         {{-- ================= MODAL: PREVIEW BUKTI ================= --}}
-        <flux:modal name="bukti-preview" class="w-2xl"
+        <flux:modal name="bukti-preview" class="w-full max-w-2xl"
             x-data="{
                 url: '',
                 title: 'Bukti Transaksi',

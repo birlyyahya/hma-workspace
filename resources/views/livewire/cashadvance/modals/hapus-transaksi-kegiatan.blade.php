@@ -58,7 +58,7 @@ new class extends Component {
     }
 }; ?>
 
-<flux:modal name="hapus-transaksi-kegiatan" class="w-md">
+<flux:modal name="hapus-transaksi-kegiatan" class="w-full max-w-md">
     <div class="space-y-6">
         <div>
             <flux:heading size="lg">Hapus Transaksi</flux:heading>

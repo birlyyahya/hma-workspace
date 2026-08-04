@@ -64,7 +64,7 @@ new class extends Component {
     }
 }; ?>
 
-<flux:modal name="topup-pertama" class="w-lg" @close="$wire.resetForm()">
+<flux:modal name="topup-pertama" class="w-full max-w-lg" @close="$wire.resetForm()">
     <form wire:submit.prevent="submitInitialTopup" class="space-y-6">
         <div>
             <p class="text-[11px] font-semibold uppercase tracking-wider text-ca-copper">Cash Advance</p>

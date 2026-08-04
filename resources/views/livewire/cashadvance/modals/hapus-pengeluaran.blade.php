@@ -58,7 +58,7 @@ new class extends Component {
     }
 }; ?>
 
-<flux:modal name="hapus-pengeluaran" class="w-md">
+<flux:modal name="hapus-pengeluaran" class="w-full max-w-md">
     <div class="space-y-6">
         <div class="flex items-start gap-3">
             <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-red-500/10 text-red-600 dark:text-red-400">
