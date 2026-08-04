@@ -196,16 +196,29 @@ new class extends Component {
         <flux:input wire:model="tanggal" type="date" label="Tanggal" />
         <flux:error name="tanggal" />
 
-        <div>
-            <flux:input wire:model="bukti" type="file" accept=".jpg,.jpeg,.png,.pdf"
-                label="Bukti (jpg, png, pdf &mdash; maks 2MB)" />
+        <flux:field>
+            <flux:label>Bukti (jpg, png, pdf &mdash; maks 2MB)</flux:label>
+            {{-- Nama file native <input type=file> tidak bisa di-truncate via CSS (bukan --}}
+            {{-- text node biasa) — sembunyikan input asli, tampilkan nama file lewat span --}}
+            {{-- sendiri yang bisa di-truncate. dir=rtl + text-left = ellipsis di depan, --}}
+            {{-- akhir nama file (termasuk ekstensi) tetap terlihat. --}}
+            <label class="flex w-full min-w-0 max-w-full cursor-pointer items-center gap-3 overflow-hidden rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm transition hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:border-zinc-600">
+                <span class="shrink-0 rounded-md bg-zinc-100 px-2.5 py-1 text-xs font-semibold text-zinc-700 dark:bg-zinc-700 dark:text-zinc-100">
+                    Pilih File
+                </span>
+                <span class="block min-w-0 flex-1 overflow-hidden text-left text-ellipsis whitespace-nowrap text-zinc-600 dark:text-zinc-300" dir="rtl">
+                    {{ $bukti?->getClientOriginalName() ?? 'Belum ada file dipilih' }}
+                </span>
+                <input wire:model="bukti" type="file" accept=".jpg,.jpeg,.png,.pdf" class="sr-only" />
+            </label>
+            <flux:error name="bukti" />
             <span wire:loading wire:target="bukti" class="mt-1 block text-xs text-zinc-500 animate-pulse">
                 Mengunggah bukti&hellip;
             </span>
             <flux:text x-show="$wire.editingId" x-cloak class="mt-1 text-xs">
                 Kosongkan bila tidak mengganti bukti.
             </flux:text>
-        </div>
+        </flux:field>
 
         <flux:button type="submit" variant="primary" class="w-full bg-ca-copper! hover:bg-ca-copper-deep!"
             wire:loading.attr="disabled" wire:target="bukti,saveExpense">

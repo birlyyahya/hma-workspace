@@ -33,9 +33,14 @@ class CaLaporanKegiatanPdfController extends Controller
         abort_if(! $wallet, 404);
         abort_unless($this->canView($wallet, $request), 403);
 
+        // Diurutkan kronologis (lama -> baru) supaya kolom Saldo di rekap
+        // berjalan turun/naik secara logis mengikuti waktu transaksi — lihat
+        // catatan yang sama di CaLaporanPlPdfController.
+        $byTanggal = fn (array $trx) => \Carbon\Carbon::parse($trx['tanggal'] ?? $trx['created_at'] ?? 'now');
+
         $transaksi = collect($caCache->transaksiWalletKegiatan($kodeCa)['data'] ?? []);
-        $penerimaan = $transaksi->where('jenis', 'penerimaan')->values()->all();
-        $pengeluaran = $transaksi->where('jenis', 'pengeluaran')->values()->all();
+        $penerimaan = $transaksi->where('jenis', 'penerimaan')->sortBy($byTanggal)->values()->all();
+        $pengeluaran = $transaksi->where('jenis', 'pengeluaran')->sortBy($byTanggal)->values()->all();
 
         $projects = $projectCache->involvedProjects($request->user()->id);
         $projectId = $request->integer('project_id') ?: ($projects[0]['id'] ?? null);

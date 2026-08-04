@@ -34,9 +34,15 @@ class CaLaporanPlPdfController extends Controller
 
         abort_if(! $wallet, 404);
 
+        // Diurutkan kronologis (lama -> baru) supaya kolom Saldo di rekap
+        // berjalan turun/naik secara logis mengikuti waktu transaksi —
+        // transaksiCaPlActive mengembalikan urutan "terbaru dulu" (untuk
+        // daftar di ca-index), yang salah arah untuk laporan pembukuan.
+        $byTanggal = fn (array $trx) => \Carbon\Carbon::parse($trx['tanggal'] ?? $trx['created_at'] ?? 'now');
+
         $transaksi = collect($caCache->transaksiCaPlActive($kodeCa)['data'] ?? []);
-        $penerimaan = $transaksi->where('jenis', 'pemasukan')->values()->all();
-        $pengeluaran = $transaksi->where('jenis', 'pengeluaran')->values()->all();
+        $penerimaan = $transaksi->where('jenis', 'pemasukan')->sortBy($byTanggal)->values()->all();
+        $pengeluaran = $transaksi->where('jenis', 'pengeluaran')->sortBy($byTanggal)->values()->all();
 
         $projects = $projectCache->involvedProjects($request->user()->id);
         $projectId = $request->integer('project_id') ?: ($projects[0]['id'] ?? null);

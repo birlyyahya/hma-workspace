@@ -121,15 +121,25 @@ class extends Component
                     placeholder="Pilih project..."
                     searchPlaceholder="Cari project..." />
             </div>
-            <flux:button wire:click="regenerate" variant="primary" icon="arrow-path" size="sm" class="bg-ca-copper! hover:bg-ca-copper-deep!">
-                Generate Ulang
+            <flux:button wire:click="regenerate" variant="primary" icon="arrow-path" size="sm" class="bg-ca-copper! hover:bg-ca-copper-deep!"
+                wire:loading.attr="disabled" wire:target="regenerate">
+                <span wire:loading.remove wire:target="regenerate">Generate Ulang</span>
+                <span wire:loading wire:target="regenerate">Memuat&hellip;</span>
             </flux:button>
         </div>
         <p class="mt-2 text-xs text-zinc-400">Pilih project pengeluaran terbesar sebagai judul dokumen.</p>
     </div>
 
-    <div class="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
-        <iframe wire:key="ca-pl-pdf-{{ $regenerateToken }}" src="{{ $this->pdfUrl() }}" class="h-[90vh] w-full" title="Laporan CA PL"></iframe>
+    {{-- wire:key di wrapper (bukan cuma iframe) supaya x-data ikut fresh --}}
+    {{-- setiap Generate Ulang, jadi spinner otomatis muncul lagi. --}}
+    <div wire:key="ca-pl-pdf-{{ $regenerateToken }}" x-data="{ loading: true }"
+        class="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+        <div x-show="loading" x-transition:leave="transition ease-in duration-200" x-transition:leave-end="opacity-0"
+            class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white/90 dark:bg-zinc-900/90">
+            <span class="size-8 animate-spin rounded-full border-2 border-ca-copper/25 border-t-ca-copper"></span>
+            <p class="text-xs text-zinc-500 dark:text-zinc-400">Menyusun laporan PDF&hellip;</p>
+        </div>
+        <iframe x-on:load="loading = false" src="{{ $this->pdfUrl() }}" class="h-[90vh] w-full" title="Laporan CA PL"></iframe>
     </div>
     @endif
 </div>
