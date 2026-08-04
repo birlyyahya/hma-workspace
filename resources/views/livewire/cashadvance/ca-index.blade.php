@@ -277,7 +277,7 @@ new class extends Component {
     @endphp
     <div class="relative overflow-hidden rounded-2xl border-2 border-dashed border-ca-copper/25 bg-linear-to-b from-ca-copper/4 to-transparent dark:border-ca-copper/20 dark:from-ca-copper/6 dark:bg-zinc-900">
 
-        <div class="relative mx-auto flex max-w-lg flex-col items-center gap-6 px-6 py-16 text-center">
+        <div class="relative mx-auto flex max-w-lg flex-col items-center gap-6 py-16 text-center">
             {{-- SIGNATURE: dompet kosong &mdash; koin menunggu untuk "dijatuhkan" ke dalamnya --}}
             <div class="relative flex h-24 w-24 items-center justify-center">
                 <span class="absolute left-0 top-0 flex size-8 items-center justify-center rounded-full bg-ca-gold/20 text-[11px] font-bold text-ca-copper-deep shadow-sm animate-ca-coin-bob dark:bg-ca-gold/15 dark:text-ca-gold">Rp</span>
@@ -397,7 +397,7 @@ new class extends Component {
                         <div x-ref="caChart" class="-mx-2 h-32 w-[calc(100%+1rem)]"></div>
                     </div>
 
-                    <div class="flex gap-2">
+                    <div class="flex flex-col sm:flex-row gap-2">
                         <button type="button"
                             class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-ca-copper px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-ca-copper-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ca-gold"
                             x-on:click="$flux.modal('catat-pengeluaran').show(); $wire.dispatch('ca-new-expense')">
@@ -524,11 +524,14 @@ new class extends Component {
                         <flux:menu.item keep-open>
                             <flux:input wire:model.live="endDate" label="Sampai tanggal" type="date" />
                         </flux:menu.item>
-                        <flux:menu.separator />
-                        <flux:menu.item icon="x-mark" wire:click="resetDateFilter">Reset filter tanggal</flux:menu.item>
+                        <flux:menu.item wire:click="resetDateFilter">
+                            <flux:button class="w-full" size="sm">Reset</flux:button>
+                        </flux:menu.item>
                     </flux:menu>
                 </flux:dropdown>
-                <flux:button :href="route('cashadvance.laporan.capl', ['kodeCa' => $this->caPlBalance['kode_ca']])" target="_blank" icon="document-arrow-down" variant="ghost" class="text-ca-copper! hover:text-ca-copper-deep!">Export PDF</flux:button>
+                <flux:button :href="route('cashadvance.laporan.capl', ['kodeCa' => $this->caPlBalance['kode_ca']])" target="_blank" icon="document-arrow-down" variant="ghost" class="text-ca-copper! hover:text-ca-copper-deep!">
+                    <span class="hidden sm:inline">Export PDF</span>
+                </flux:button>
             </div>
         </div>
 
@@ -554,20 +557,23 @@ new class extends Component {
 
                 <div class="min-w-0 flex-1">
                     <p class="truncate text-sm font-medium text-zinc-900 dark:text-white">{{ $trx['deskripsi'] }}</p>
-                    <div class="mt-1 flex items-center gap-2 sm:hidden">
-                        <span class="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-600 dark:bg-white/10 dark:text-white/70">
+                    <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 sm:hidden">
+                        <span class="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-600 dark:bg-white/10 dark:text-white/70">
                             {{ $isIn ? 'Pemasukan' : ($trx['kategori'] ?? '-') }}
                         </span>
-                        <span class="text-xs text-zinc-400 dark:text-white/40">{{ \Carbon\Carbon::parse($trx['created_at'])->translatedFormat('d M Y') }}</span>
+                        <span class="shrink-0 whitespace-nowrap text-xs text-zinc-400 dark:text-white/40">{{ \Carbon\Carbon::parse($trx['created_at'])->translatedFormat('d M Y') }}</span>
                     </div>
                 </div>
 
-                {{-- Pengeluaran + sisa saldo --}}
+                {{-- Pengeluaran + sisa saldo. Saldo disembunyikan di mobile (bukan --}}
+                {{-- di-nowrap) supaya kolom ini tidak jadi lebar & menyempitkan --}}
+                {{-- ruang judul — baris "Saldo Rp ..." adalah string terpanjang di --}}
+                {{-- sini, jadi ini yang paling memakan lebar pada layar sempit. --}}
                 <div class="shrink-0 text-right">
-                    <p class="text-sm font-semibold tabular-nums {{ $isIn ? 'text-emerald-600 dark:text-emerald-300' : 'text-ca-copper-deep dark:text-ca-copper' }}">
+                    <p class="whitespace-nowrap text-sm font-semibold tabular-nums {{ $isIn ? 'text-emerald-600 dark:text-emerald-300' : 'text-ca-copper-deep dark:text-ca-copper' }}">
                         {{ $isIn ? '+' : '−' }} Rp {{ number_format($trx['jumlah'], 0, ',', '.') }}
                     </p>
-                    <p class="text-xs text-zinc-400 dark:text-white/40">
+                    <p class="hidden whitespace-nowrap text-xs text-zinc-400 dark:text-white/40 sm:block">
                         Saldo Rp {{ number_format($trx['saldo_setelah'], 0, ',', '.') }}
                     </p>
                 </div>
