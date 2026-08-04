@@ -516,13 +516,16 @@ class extends Component {
                     </div>
 
                     <div class="min-w-0 flex-1">
-                        <p class="line-clamp-2 text-xs sm:text-sm font-normal text-zinc-900 dark:text-white">{{ $trx['deskripsi'] }}</p>
-                        <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 sm:hidden">
-                            <span class="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                                {{ $isIn ? 'Pemasukan' : ($trx['kategori'] ?? '-') }}
-                            </span>
-                            <span class="shrink-0 whitespace-nowrap text-xs text-zinc-400">{{ \Carbon\Carbon::parse($trx['tanggal'])->translatedFormat('d M Y') }}</span>
-                        </div>
+                        <p class="truncate text-sm font-medium text-zinc-900 dark:text-white">{{ $trx['deskripsi'] }}</p>
+                        {{-- Mobile: kategori + tanggal digabung jadi satu baris teks polos --}}
+                        {{-- (bukan dua pill terpisah) supaya selalu satu baris & tidak --}}
+                        {{-- jatuh ke bawah saat ruang sempit — truncate sebagai jaring --}}
+                        {{-- pengaman terakhir bila kombinasinya tetap kepanjangan. --}}
+                        <p class="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400 sm:hidden">
+                            {{ $isIn ? 'Pemasukan' : ($trx['kategori'] ?? '-') }}
+                            <span class="text-zinc-300 dark:text-zinc-600">&middot;</span>
+                            {{ \Carbon\Carbon::parse($trx['tanggal'])->translatedFormat('d M Y') }}
+                        </p>
                     </div>
 
                     {{-- Saldo disembunyikan di mobile — string terpanjang di blok ini, --}}
