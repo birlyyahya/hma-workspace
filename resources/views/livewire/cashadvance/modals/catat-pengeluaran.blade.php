@@ -168,7 +168,15 @@ new class extends Component {
 }; ?>
 
 <flux:modal name="catat-pengeluaran" class="w-full max-w-lg" @close="$wire.resetForm()">
-    <form wire:submit.prevent="saveExpense" class="space-y-6">
+    {{-- uploading: dinaikkan ke form supaya tombol Simpan ikut tahu status --}}
+    {{-- upload dari tombol kamera (yang di luar wire:model, lihat catatan di --}}
+    {{-- field Bukti) — tanpa ini pengguna bisa menekan Simpan sebelum foto --}}
+    {{-- selesai terunggah dan $bukti masih kosong. --}}
+    <form wire:submit.prevent="saveExpense" class="space-y-6" x-data="{ uploading: false }"
+        x-on:livewire-upload-start="uploading = true"
+        x-on:livewire-upload-finish="uploading = false"
+        x-on:livewire-upload-error="uploading = false"
+        x-on:livewire-upload-cancel="uploading = false">
         <div>
             <p class="text-[11px] font-semibold uppercase tracking-wider text-ca-copper">CA PL</p>
             <flux:heading size="lg" class="mt-1">
@@ -220,15 +228,20 @@ new class extends Component {
                 {{-- (terutama Safari iOS) hanya membuka kamera langsung untuk klik asli --}}
                 {{-- pengguna, bukan klik yang di-trigger via JS. $wire.upload() dipanggil --}}
                 {{-- manual dari event change murni supaya capture tetap jalan. --}}
-                <label class="flex shrink-0 cursor-pointer items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-zinc-500 transition hover:border-ca-copper/40 hover:text-ca-copper dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
+                <label :class="uploading ? 'pointer-events-none opacity-60' : ''"
+                    class="flex shrink-0 cursor-pointer items-center justify-center rounded-lg border border-zinc-200 bg-white px-3 text-zinc-500 transition hover:border-ca-copper/40 hover:text-ca-copper dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
                     title="Ambil foto langsung">
-                    <flux:icon name="camera" class="size-5" />
+                    <flux:icon name="camera" class="size-5" x-show="! uploading" />
+                    <flux:icon name="arrow-path" class="size-5 animate-spin" x-show="uploading" x-cloak />
                     <input type="file" accept="image/*" capture="environment" class="sr-only"
                         x-on:change="$event.target.files.length && $wire.upload('bukti', $event.target.files[0])" />
                 </label>
             </div>
             <flux:error name="bukti" />
-            <span wire:loading wire:target="bukti" class="mt-1 block text-xs text-zinc-500 animate-pulse">
+            {{-- livewire-upload-* dipancarkan untuk upload manapun (wire:model MAUPUN --}}
+            {{-- $wire.upload manual), jadi satu flag "uploading" ini cukup untuk kedua --}}
+            {{-- input bukti di atas — tidak perlu wire:loading wire:target="bukti" lagi. --}}
+            <span x-show="uploading" x-cloak class="mt-1 block text-xs text-zinc-500 animate-pulse">
                 Mengunggah bukti&hellip;
             </span>
             <flux:text x-show="$wire.editingId" x-cloak class="mt-1 text-xs">
@@ -237,9 +250,9 @@ new class extends Component {
         </flux:field>
 
         <flux:button type="submit" variant="primary" class="w-full bg-ca-copper! hover:bg-ca-copper-deep!"
-            wire:loading.attr="disabled" wire:target="bukti,saveExpense">
-            <span wire:loading.remove wire:target="bukti,saveExpense">Simpan Pengeluaran</span>
-            <span wire:loading wire:target="bukti" class="animate-pulse">Menunggu unggahan&hellip;</span>
+            :disabled="uploading" wire:loading.attr="disabled" wire:target="saveExpense">
+            <span x-show="! uploading" wire:loading.remove wire:target="saveExpense">Simpan Pengeluaran</span>
+            <span x-show="uploading" x-cloak class="animate-pulse">Menunggu unggahan&hellip;</span>
             <span wire:loading wire:target="saveExpense" class="animate-pulse">Menyimpan&hellip;</span>
         </flux:button>
     </form>
