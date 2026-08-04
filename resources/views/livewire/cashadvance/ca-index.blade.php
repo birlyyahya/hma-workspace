@@ -16,6 +16,10 @@ new class extends Component {
 
     public string $search = '';
 
+    public ?string $startDate = null;
+
+    public ?string $endDate = null;
+
     public function mount(): void
     {
         $this->Dompet();
@@ -36,8 +40,36 @@ new class extends Component {
     }
 
     /**
+     * Bersihkan filter tanggal dari dropdown kalender (tombol Reset).
+     */
+    public function resetDateFilter(): void
+    {
+        $this->reset(['startDate', 'endDate']);
+    }
+
+    /**
+     * Label periode di header tabel — default merujuk periode aktif, atau
+     * rentang tanggal terpilih bila filter kalender sedang dipakai.
+     */
+    public function periodeLabel(): string
+    {
+        if (! $this->startDate && ! $this->endDate) {
+            return 'Periode aktif saat ini';
+        }
+
+        $from = $this->startDate ? \Carbon\Carbon::parse($this->startDate)->translatedFormat('d M Y') : 'awal periode';
+        $to = $this->endDate ? \Carbon\Carbon::parse($this->endDate)->translatedFormat('d M Y') : 'sekarang';
+
+        return "{$from} – {$to}";
+    }
+
+    /**
      * Transaksi periode aktif; setiap baris diberi bukti_url dari MinIO
      * (aws_url + bucket cashadvance + path), mengikuti pola attachment-card.
+     * Filter tanggal (dropdown kalender) diterapkan di sisi PHP terhadap
+     * hasil periode aktif — API tidak punya parameter rentang tanggal untuk
+     * endpoint ini, jadi rentang cuma bisa mempersempit periode yang sudah
+     * termuat, bukan menembus periode lain yang sudah tersegel.
      *
      * @return array<string, mixed>
      */
@@ -51,6 +83,22 @@ new class extends Component {
 
             return $trx;
         }, $result ?? []);
+
+        if ($this->startDate || $this->endDate) {
+            $start = $this->startDate ? \Carbon\Carbon::parse($this->startDate)->startOfDay() : null;
+            $end = $this->endDate ? \Carbon\Carbon::parse($this->endDate)->endOfDay() : null;
+
+            $result = array_values(array_filter($result, function (array $trx) use ($start, $end): bool {
+                if (blank($trx['tanggal'] ?? null)) {
+                    return false;
+                }
+
+                $tanggal = \Carbon\Carbon::parse($trx['tanggal']);
+
+                return (! $start || $tanggal->greaterThanOrEqualTo($start))
+                    && (! $end || $tanggal->lessThanOrEqualTo($end));
+            }));
+        }
 
         return $result;
     }
@@ -453,7 +501,7 @@ new class extends Component {
         <div class="p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
                 <p class="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-white/50">Transaksi Terbaru</p>
-                <p class="mt-0.5 text-xs text-zinc-400 dark:text-white/40">Periode #1 (aktif) saja</p>
+                <p class="mt-0.5 text-xs text-zinc-400 dark:text-white/40">{{ $this->periodeLabel() }}</p>
             </div>
             <div class="flex gap-2">
                 <div class="flex-1 relative">
@@ -463,17 +511,21 @@ new class extends Component {
                     </div>
                 </div>
                 <flux:dropdown position="bottom" align="end">
-                    <flux:button icon="calendar" variant="outline" />
-                    <flux:menu>
-                        <flux:menu.item disabled>
-                            <flux:input label="Start Date" type="date" />
+                    <span class="relative inline-flex">
+                        <flux:button icon="calendar" variant="outline" />
+                        @if ($startDate || $endDate)
+                        <span class="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-ca-copper ring-2 ring-white dark:ring-ca-ink"></span>
+                        @endif
+                    </span>
+                    <flux:menu class="w-56">
+                        <flux:menu.item keep-open>
+                            <flux:input wire:model.live="startDate" label="Dari tanggal" type="date" />
                         </flux:menu.item>
-                        <flux:menu.item disabled>
-                            <flux:input label="End Date" type="date" />
+                        <flux:menu.item keep-open>
+                            <flux:input wire:model.live="endDate" label="Sampai tanggal" type="date" />
                         </flux:menu.item>
-                        <flux:menu.item>
-                            <flux:button class="w-full" size="sm">Reset</flux:button>
-                        </flux:menu.item>
+                        <flux:menu.separator />
+                        <flux:menu.item icon="x-mark" wire:click="resetDateFilter">Reset filter tanggal</flux:menu.item>
                     </flux:menu>
                 </flux:dropdown>
                 <flux:button :href="route('cashadvance.laporan.capl', ['kodeCa' => $this->caPlBalance['kode_ca']])" target="_blank" icon="document-arrow-down" variant="ghost" class="text-ca-copper! hover:text-ca-copper-deep!">Export PDF</flux:button>
