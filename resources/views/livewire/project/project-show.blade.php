@@ -126,6 +126,7 @@ new #[Lazy] class extends Component {
         ['key' => 'overview', 'label' => 'Overview',     'icon' => 'layout-grid'],
         ['key' => 'spectech', 'label' => 'Spektek',     'icon' => 'cube'],
         ['key' => 'timeline', 'label' => 'Timeline',     'icon' => 'calendar-days'],
+        ['key' => 'progress', 'label' => 'Progress',     'icon' => 'chart-bar'],
         ['key' => 'team',     'label' => 'Tim',          'icon' => 'users'],
         ['key' => 'file',     'label' => 'File',         'icon' => 'folder'],
     ];
@@ -153,11 +154,11 @@ new #[Lazy] class extends Component {
             }"
         >
             {{-- ============ STICKY HEADER ============ --}}
-            <div class="bg-white/90 backdrop-blur ">
+            <div class="bg-white/90 backdrop-blur md:px-4">
                 <div class="px-4 md:px-0 pt-4 pb-4 rounded-xl">
                     {{-- Breadcrumb --}}
                     <nav class="flex items-center gap-1.5 text-xs text-zinc-500 mb-3">
-                        @if(!Auth::user()->level >= 60)
+                        @if(!Auth::user()->hasPermission('project.view.all'))
                         <a class=" transition inline-flex items-center gap-1">
                             <flux:icon.ellipsis-vertical class="w-3.5 h-3.5" />
                             Project
@@ -306,6 +307,10 @@ new #[Lazy] class extends Component {
                         <livewire:project.components.project-timeline-gantt lazy :id="$this->id" :user_id="$this->project['project_leader_id']"  />
                         <livewire:project.components.project-timeline-tabs lazy :id="$this->id"  :user_id="$this->project['project_leader_id']"  />
                     </div>
+                </div>
+
+                <div x-show="active === 'progress'" wire:key="progress-{{ $this->id }}" x-transition.opacity.duration.150ms>
+                    <livewire:project.components.project-progress-tabs lazy :id="$this->id" />
                 </div>
 
                 <div x-show="active === 'team'" wire:key="team-{{ $this->id }}" x-transition.opacity.duration.150ms>

@@ -390,7 +390,7 @@ test('blank keyword tags are rejected', function () {
         && str_contains($request->url(), 'admin-docs/1'));
 });
 
-test('keyword suggestions merge timeline titles first with other document keywords', function () {
+test('keyword suggestions only contain timeline titles', function () {
     $leader = User::factory()->create();
 
     Http::fake([
@@ -410,7 +410,7 @@ test('keyword suggestions merge timeline titles first with other document keywor
     $component = Volt::actingAs($leader)->test('project.components.file-manager', ['id' => 5]);
 
     expect($component->get('keywordSuggestions'))
-        ->toBe(['PENGIRIMAN', 'PEMERIKSAAN', 'kontrak']);
+        ->toBe(['PENGIRIMAN', 'PEMERIKSAAN']);
 });
 
 test('bulk delete dispatches DeleteProjectFilesJob and hides the rows immediately', function () {

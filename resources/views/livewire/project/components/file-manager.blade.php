@@ -103,7 +103,8 @@ new class extends Component
     #[On('file-uploaded')]
     public function onFileUploaded(): void
     {
-        // Cache dokumen sudah di-flush oleh endpoint complete; render ulang saja.
+        // Cache dokumen sudah di-flush oleh RegisterProjectDocJob; hanya perlu dispatch ke progress tab.
+        $this->dispatch('doc-updated', projectId: (int) $this->id);
     }
 
     // ------------------------------------------------------------ data sources
@@ -636,6 +637,7 @@ new class extends Component
         $this->reset('renamingDocId', 'renameDocName');
         Flux::modal('rename-file-modal')->close();
         Toaster::success('File di-rename');
+        $this->notifyDocumentChanged();
     }
 
     public function startEditKeyword(int $docId): void
@@ -653,9 +655,9 @@ new class extends Component
     }
 
     /**
-     * Saran keyword untuk modal edit: judul timeline project didahulukan
-     * (dokumen yang keyword-nya cocok dengan timeline akan bisa tampil di
-     * timeline progress), lalu keyword dokumen lain di project ini.
+     * Saran keyword untuk modal edit: nama-nama timeline project ini saja,
+     * agar dokumen yang keyword-nya cocok dengan timeline bisa ikut tampil
+     * di timeline progress.
      *
      * @return array<int, string>
      */
@@ -668,11 +670,7 @@ new class extends Component
             $timelineTitles = collect();
         }
 
-        $docKeywords = collect($this->allDocs())
-            ->flatMap(fn (array $doc) => (array) ($doc['keyword'] ?? []))
-            ->map(fn ($keyword) => trim((string) $keyword));
-
-        return $timelineTitles->merge($docKeywords)
+        return $timelineTitles
             ->filter()
             ->unique(fn (string $keyword) => mb_strtolower($keyword))
             ->take(15)
@@ -722,6 +720,7 @@ new class extends Component
         $this->reset('keywordDocId', 'keywordTags');
         Flux::modal('keyword-file-modal')->close();
         Toaster::success('Keyword diperbarui');
+        $this->notifyDocumentChanged();
     }
 
     public function confirmDeleteDoc(int $docId): void
@@ -755,9 +754,8 @@ new class extends Component
 
         if ($this->deleteOne($row)) {
             Toaster::success('File dihapus');
-            app(ProjectCache::class)->flushDocs((int) $this->id);
             unset($this->files);
-            $this->dispatch('file-uploaded');
+            $this->notifyDocumentChanged();
         } else {
             Toaster::error('Hapus file gagal');
         }
@@ -830,6 +828,12 @@ new class extends Component
     }
 
     // ---------------------------------------------------------------- helpers
+
+    private function notifyDocumentChanged(): void
+    {
+        app(ProjectCache::class)->flushDocs((int) $this->id);
+        $this->dispatch('doc-updated', projectId: (int) $this->id);
+    }
 
     protected function ownFolder(?int $folderId): ?ProjectFolder
     {
@@ -1402,7 +1406,7 @@ new class extends Component
 
             @if($this->keywordSuggestions !== [])
                 <div class="space-y-1.5">
-                    <flux:text class="text-xs font-medium text-zinc-500 dark:text-zinc-400">Rekomendasi (nama timeline & keyword lain):</flux:text>
+                    <flux:text class="text-xs font-medium text-zinc-500 dark:text-zinc-400">Rekomendasi (nama timeline):</flux:text>
                     <div class="flex flex-wrap gap-1.5">
                         @foreach($this->keywordSuggestions as $suggestion)
                             <button type="button" x-show="! has(@js($suggestion))" @click="add(@js($suggestion))"

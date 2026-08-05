@@ -25,6 +25,12 @@ new class extends Component {
     }
 
     #[Computed]
+    public function stages(): array
+    {
+        return app(ProjectCache::class)->progressStages((int) ($this->project['id'] ?? 0));
+    }
+
+    #[Computed]
     public function statusColor(): array
     {
         return match ($this->project['status'] ?? null) {
@@ -62,6 +68,26 @@ new class extends Component {
         return collect($this->spectech ?? [])->sum(
             fn ($item) => (float) ($item['qty_nominal'] ?? 0) * (float) ($item['qty_recived'] ?? 0)
         );
+    }
+
+    #[Computed]
+    public function spectechTotalNominal(): float
+    {
+        return collect($this->spectech ?? [])->sum(fn ($item) => (float) ($item['total_nominal'] ?? 0));
+    }
+
+    /**
+     * @return array{hardware: int, software: int}
+     */
+    #[Computed]
+    public function spectechTypeCounts(): array
+    {
+        $items = collect($this->spectech ?? []);
+
+        return [
+            'hardware' => $items->filter(fn ($item) => ($item['type'] ?? 'hardware') === 'hardware')->count(),
+            'software' => $items->filter(fn ($item) => ($item['type'] ?? 'hardware') === 'software')->count(),
+        ];
     }
 
     public function shareLinkCopied(): void
@@ -194,6 +220,91 @@ new class extends Component {
                     </div>
                 </div>
 
+
+                @php
+                    $stages = $this->stages;
+                    $doneCount = collect($stages)->where('status', 'done')->count();
+                    $stagePercent = count($stages) ? (int) round($doneCount / count($stages) * 100) : 0;
+                @endphp
+
+                <section class="space-y-3">
+                    <div class="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-5">
+                        <div class="flex items-center justify-between gap-3">
+                            <div>
+                                <p class="text-sm font-semibold text-zinc-900 dark:text-white">Progress Timeline</p>
+                                <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $doneCount }} dari {{ count($stages) }} tahap selesai ({{ $stagePercent }}%)</p>
+                            </div>
+                            @if (count($stages))
+                            <button type="button" @click="active = 'progress'" class="inline-flex items-center gap-1 text-xs font-medium text-zinc-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-400 transition cursor-pointer">
+                                Lihat detail
+                                <flux:icon.arrow-right class="w-3.5 h-3.5" />
+                            </button>
+                            @endif
+                        </div>
+
+                        @if (count($stages))
+                        <div class="mt-4 h-1.5 w-full rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                            <div class="h-full rounded-full bg-green-500 transition-all duration-500" style="width: {{ $stagePercent }}%"></div>
+                        </div>
+
+                        <div class="-mx-5 mt-1">
+                            <div class="overflow-x-auto px-5 py-6 mask-[linear-gradient(to_right,transparent,black_20px,black_calc(100%-20px),transparent)]">
+                                <ol class="flex items-start min-w-max">
+                                    @foreach ($stages as $stage)
+                                        <li class="flex items-start">
+                                            <button
+                                                type="button"
+                                                @click="active = 'progress'"
+                                                title="{{ $stage['title'] }}"
+                                                class="flex flex-col items-center w-24 sm:w-28 text-center group cursor-pointer rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
+                                            >
+                                                @if ($stage['status'] === 'done')
+                                                    <span class="flex items-center justify-center w-9 h-9 rounded-full bg-green-500 text-white ring-4 ring-green-100 dark:ring-green-500/10 transition-transform group-hover:scale-105">
+                                                        <flux:icon.check class="w-5 h-5" />
+                                                    </span>
+                                                @elseif ($stage['status'] === 'current')
+                                                    <span class="relative flex items-center justify-center w-9 h-9 rounded-full bg-blue-500 text-white ring-4 ring-blue-100 dark:ring-blue-500/10 transition-transform group-hover:scale-105">
+                                                        <span class="absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-60 animate-ping motion-reduce:animate-none"></span>
+                                                        <flux:icon name="{{ $stage['icon'] }}" class="w-4.5 h-4.5 relative" />
+                                                    </span>
+                                                @elseif ($stage['status'] === 'pending')
+                                                    <span class="relative flex items-center justify-center w-9 h-9 rounded-full bg-red-500 text-white ring-4 ring-red-100 dark:ring-red-500/10 transition-transform group-hover:scale-105">
+                                                        <span class="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60 animate-ping motion-reduce:animate-none"></span>
+                                                        <flux:icon name="{{ $stage['icon'] }}" class="w-4.5 h-4.5 relative" />
+                                                    </span>
+                                                @else
+                                                    <span class="flex items-center justify-center w-9 h-9 rounded-full bg-white dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 ring-2 ring-zinc-200 dark:ring-zinc-700 transition-transform group-hover:scale-105">
+                                                        <flux:icon name="{{ $stage['icon'] }}" class="w-4.5 h-4.5" />
+                                                    </span>
+                                                @endif
+
+                                                <p class="mt-2 text-[11px] font-semibold leading-tight line-clamp-2 {{ $stage['status'] === 'pending' ? 'text-zinc-400 dark:text-zinc-500' : 'text-zinc-800 dark:text-zinc-100' }} group-hover:text-red-600 dark:group-hover:text-red-400 transition">
+                                                    {{ $stage['title'] }}
+                                                </p>
+                                                @if ($stage['date'])
+                                                    <p class="text-[10px] text-zinc-400 dark:text-zinc-500">{{ $stage['date'] }}</p>
+                                                @elseif ($stage['status'] === 'current')
+                                                    <p class="text-[10px] font-medium text-blue-600 dark:text-blue-400">berjalan</p>
+                                                @endif
+                                            </button>
+
+                                            @if (! $loop->last)
+                                                <div class="w-6 sm:w-10 h-0.5 mt-4.5 rounded {{ $stage['status'] === 'done' ? 'bg-green-400 dark:bg-green-600' : 'bg-zinc-200 dark:bg-zinc-700' }}"></div>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ol>
+                            </div>
+                        </div>
+                        @else
+                        <div class="text-center py-8">
+                            <flux:icon.map class="w-8 h-8 text-zinc-300 dark:text-zinc-600 mx-auto" />
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Belum ada tahapan progress</p>
+                        </div>
+                        @endif
+                    </div>
+                </section>
+
                 {{-- TIMELINE PROGRESS --}}
                 <div class="bg-white rounded-2xl border border-zinc-200 p-4 sm:p-6">
                     <div class="flex items-center justify-between mb-4">
@@ -274,20 +385,46 @@ new class extends Component {
                 </div>
 
                 {{-- SPECTECH SUMMARY --}}
-                <div class="bg-white rounded-2xl border border-zinc-200 p-4 sm:p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <flux:heading size="sm" class="font-semibold text-zinc-900">
+                <div class="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-4 sm:p-6">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <flux:heading size="sm" class="font-semibold text-zinc-900 dark:text-white">
                                 Ringkasan Spectech
                             </flux:heading>
-                            <flux:text class="text-xs text-zinc-500 mt-0.5">
-                                {{ count($this->spectech ?? []) }} item · Rp {{ number_format($this->spectechReceivedValue, 0, ',', '.') }} diterima
+                            <flux:text class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                {{ count($this->spectech ?? []) }} item
+                                <span class="text-zinc-300 dark:text-zinc-600 mx-1">·</span>
+                                {{ $this->spectechTypeCounts['hardware'] }} Barang
+                                <span class="text-zinc-300 dark:text-zinc-600 mx-1">·</span>
+                                {{ $this->spectechTypeCounts['software'] }} Aplikasi
                             </flux:text>
                         </div>
-                        <span class="text-sm font-semibold text-red-600">{{ $project['progress'] }}%</span>
+                        <button type="button" @click="active = 'spectech'" class="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-zinc-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-400 transition cursor-pointer">
+                            Lihat semua
+                            <flux:icon.arrow-right class="w-3.5 h-3.5" />
+                        </button>
                     </div>
 
-                    <div class="w-full h-2 bg-zinc-100 rounded-full overflow-hidden mb-5">
+                    <div class="mt-4 grid grid-cols-2 gap-3">
+                        <div class="rounded-xl bg-zinc-50 dark:bg-zinc-800/60 px-3 py-2.5">
+                            <p class="text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Nominal Spektek</p>
+                            <p class="mt-0.5 text-sm font-semibold text-zinc-900 dark:text-white truncate">
+                                Rp {{ number_format($this->spectechTotalNominal, 0, ',', '.') }}
+                            </p>
+                        </div>
+                        <div class="rounded-xl bg-zinc-50 dark:bg-zinc-800/60 px-3 py-2.5">
+                            <p class="text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Diterima</p>
+                            <p class="mt-0.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400 truncate">
+                                Rp {{ number_format($this->spectechReceivedValue, 0, ',', '.') }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 mb-1.5 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+                        <span>Progress</span>
+                        <span class="font-semibold text-zinc-900 dark:text-white">{{ $project['progress'] }}%</span>
+                    </div>
+                    <div class="w-full h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-5">
                         <div class="h-full bg-linear-to-r from-red-500 to-red-600 rounded-full transition-all"
                              style="width: {{ $project['progress'] }}%"></div>
                     </div>
@@ -296,38 +433,49 @@ new class extends Component {
                         @forelse($this->spectech as $item)
                             @php
                                 $itemPercentage = (float) ($item['percentage'] ?? 0);
+                                $itemQtyRecv = (int) ($item['qty_recived'] ?? 0);
                                 $itemComplete = $itemPercentage >= 100;
+                                $itemStatus = $itemComplete ? 'completed' : ($itemQtyRecv > 0 ? 'in_progress' : 'not_started');
+                                $itemStatusMeta = match ($itemStatus) {
+                                    'completed' => ['label' => 'Selesai', 'chip' => 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20', 'bar' => 'bg-emerald-500'],
+                                    'in_progress' => ['label' => 'Berjalan', 'chip' => 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20', 'bar' => 'bg-amber-500'],
+                                    default => ['label' => 'Belum Mulai', 'chip' => 'bg-zinc-50 text-zinc-600 ring-zinc-500/20 dark:bg-zinc-800 dark:text-zinc-400 dark:ring-zinc-600', 'bar' => 'bg-zinc-300 dark:bg-zinc-600'],
+                                };
+                                $itemTypeIcon = ($item['type'] ?? 'hardware') === 'software' ? 'computer-desktop' : 'cube';
                             @endphp
-                            <div class="group p-3 rounded-lg border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50/50 transition">
+                            <div class="group p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/40 transition">
                                 <div class="flex items-start justify-between gap-3">
-                                    <div class="min-w-0 flex-1">
-                                        <p class="text-sm font-medium text-zinc-900 truncate">
-                                            {{ $item['name'] }}
-                                        </p>
-                                        <p class="text-xs text-zinc-500 mt-0.5">
-                                            {{ $item['qty_recived'] ?? 0 }}/{{ $item['qty_total'] ?? 0 }} unit
-                                            <span class="mx-1.5 text-zinc-300">•</span>
-                                            Rp {{ number_format($item['total_nominal'] ?? 0, 0, ',', '.') }}
-                                        </p>
+                                    <div class="min-w-0 flex-1 flex items-start gap-2">
+                                        <flux:icon name="{{ $itemTypeIcon }}" class="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 mt-0.5 shrink-0" />
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                                                {{ $item['name'] }}
+                                            </p>
+                                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                                {{ $itemQtyRecv }}/{{ $item['qty_total'] ?? 0 }} unit
+                                                <span class="mx-1.5 text-zinc-300 dark:text-zinc-600">•</span>
+                                                Rp {{ number_format($item['total_nominal'] ?? 0, 0, ',', '.') }}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div class="shrink-0 flex items-center gap-2">
-                                        <span class="text-xs font-semibold {{ $itemComplete ? 'text-emerald-600' : 'text-zinc-700' }}">
+                                    <div class="shrink-0 flex flex-col items-end gap-1">
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium ring-1 whitespace-nowrap {{ $itemStatusMeta['chip'] }}">
+                                            {{ $itemStatusMeta['label'] }}
+                                        </span>
+                                        <span class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
                                             {{ number_format($itemPercentage, 0) }}%
                                         </span>
-                                        @if($itemComplete)
-                                            <flux:icon.check-circle class="w-4 h-4 text-emerald-600" />
-                                        @endif
                                     </div>
                                 </div>
-                                <div class="mt-2 w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
-                                    <div class="h-full {{ $itemComplete ? 'bg-emerald-500' : 'bg-red-500' }} rounded-full"
+                                <div class="mt-2 w-full h-1 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                    <div class="h-full {{ $itemStatusMeta['bar'] }} rounded-full"
                                          style="width: {{ min($itemPercentage, 100) }}%"></div>
                                 </div>
                             </div>
                         @empty
                             <div class="text-center py-8">
-                                <flux:icon.cube class="w-8 h-8 text-zinc-300 mx-auto" />
-                                <p class="text-sm text-zinc-500 mt-2">Belum ada spectech</p>
+                                <flux:icon.cube class="w-8 h-8 text-zinc-300 dark:text-zinc-600 mx-auto" />
+                                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Belum ada spectech</p>
                             </div>
                         @endforelse
                     </div>
