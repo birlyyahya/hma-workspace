@@ -158,7 +158,7 @@ new #[Lazy] class extends Component {
                 <div class="px-4 md:px-0 pt-4 pb-4 rounded-xl">
                     {{-- Breadcrumb --}}
                     <nav class="flex items-center gap-1.5 text-xs text-zinc-500 mb-3">
-                        @if(!Auth::user()->level >= 60)
+                        @if(!Auth::user()->hasPermission('project.view.all'))
                         <a class=" transition inline-flex items-center gap-1">
                             <flux:icon.ellipsis-vertical class="w-3.5 h-3.5" />
                             Project

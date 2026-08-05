@@ -172,6 +172,17 @@ test('overview tab shows empty state when there are no stages', function () {
         ->assertSee('Belum ada tahapan progress');
 });
 
+test('progress tab shows a guide modal explaining stage statuses', function () {
+    $user = User::factory()->create();
+    fakeProgressEndpoints($user->id);
+
+    Livewire::actingAs($user)
+        ->test('project.components.project-progress-tabs', ['id' => 69])
+        ->assertOk()
+        ->assertSee('Cara Membaca Tahapan Progress')
+        ->assertSee('Bagaimana dokumen masuk ke tahap ini?');
+});
+
 function projectPayload(int $leaderId): array
 {
     return [

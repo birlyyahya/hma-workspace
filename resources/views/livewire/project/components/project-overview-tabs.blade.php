@@ -204,65 +204,82 @@ new class extends Component {
                 @php
                     $stages = $this->stages;
                     $doneCount = collect($stages)->where('status', 'done')->count();
+                    $stagePercent = count($stages) ? (int) round($doneCount / count($stages) * 100) : 0;
                 @endphp
 
                 <section class="space-y-3">
-                    <div class="bg-white rounded-2xl border border-zinc-200 p-5">
-                        <div class="flex items-center justify-between mb-4">
+                    <div class="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-5">
+                        <div class="flex items-center justify-between gap-3">
                             <div>
-                                <p class="text-sm font-semibold text-zinc-900">Progress Tahapan</p>
-                                <p class="text-xs text-zinc-500">{{ $doneCount }} dari {{ count($stages) }} tahap selesai</p>
+                                <p class="text-sm font-semibold text-zinc-900 dark:text-white">Progress Timeline</p>
+                                <p class="text-xs text-zinc-500 dark:text-zinc-400">{{ $doneCount }} dari {{ count($stages) }} tahap selesai ({{ $stagePercent }}%)</p>
                             </div>
-                            <span class="text-xs text-zinc-400">klik tahap untuk detail →</span>
+                            @if (count($stages))
+                            <button type="button" @click="active = 'progress'" class="inline-flex items-center gap-1 text-xs font-medium text-zinc-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-400 transition cursor-pointer">
+                                Lihat detail
+                                <flux:icon.arrow-right class="w-3.5 h-3.5" />
+                            </button>
+                            @endif
                         </div>
 
                         @if (count($stages))
-                        <div class="overflow-x-auto py-6">
-                            <ol class="flex items-start min-w-max">
-                                @foreach ($stages as $i => $stage)
-                                    <li class="flex items-start">
-                                        <div class="flex flex-col items-center w-28 text-center group cursor-pointer">
-                                            @if ($stage['status'] === 'done')
-                                                <span class="flex items-center justify-center w-9 h-9 rounded-full bg-green-500 text-white ring-4 ring-green-100">
-                                                    <flux:icon.check class="w-5 h-5" />
-                                                </span>
-                                            @elseif ($stage['status'] === 'current')
-                                                <span class="relative flex items-center justify-center w-9 h-9 rounded-full bg-blue-500 text-white ring-4 ring-blue-100">
-                                                    <span class="absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-60 animate-ping"></span>
-                                                    <flux:icon name="{{ $stage['icon'] }}" class="w-4.5 h-4.5 relative" />
-                                                </span>
-                                            @elseif ($stage['status'] === 'pending')
-                                                <span class="relative flex items-center justify-center w-9 h-9 rounded-full bg-red-500 text-white ring-4 ring-red-100">
-                                                    <span class="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60 animate-ping"></span>
-                                                    <flux:icon name="{{ $stage['icon'] }}" class="w-4.5 h-4.5 relative" />
-                                                </span>
-                                            @else
-                                                <span class="flex items-center justify-center w-9 h-9 rounded-full bg-white text-zinc-400 ring-2 ring-zinc-200">
-                                                    <flux:icon name="{{ $stage['icon'] }}" class="w-4.5 h-4.5" />
-                                                </span>
-                                            @endif
+                        <div class="mt-4 h-1.5 w-full rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                            <div class="h-full rounded-full bg-green-500 transition-all duration-500" style="width: {{ $stagePercent }}%"></div>
+                        </div>
 
-                                            <p class="mt-2 text-[11px] font-semibold leading-tight {{ $stage['status'] === 'pending' ? 'text-zinc-400' : 'text-zinc-800' }}">
-                                                {{ $stage['title'] }}
-                                            </p>
-                                            @if ($stage['date'])
-                                                <p class="text-[10px] text-zinc-400">{{ $stage['date'] }}</p>
-                                            @elseif ($stage['status'] === 'current')
-                                                <p class="text-[10px] font-medium text-blue-600">berjalan</p>
-                                            @endif
-                                        </div>
+                        <div class="-mx-5 mt-1">
+                            <div class="overflow-x-auto px-5 py-6 mask-[linear-gradient(to_right,transparent,black_20px,black_calc(100%-20px),transparent)]">
+                                <ol class="flex items-start min-w-max">
+                                    @foreach ($stages as $stage)
+                                        <li class="flex items-start">
+                                            <button
+                                                type="button"
+                                                @click="active = 'progress'"
+                                                title="{{ $stage['title'] }}"
+                                                class="flex flex-col items-center w-24 sm:w-28 text-center group cursor-pointer rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
+                                            >
+                                                @if ($stage['status'] === 'done')
+                                                    <span class="flex items-center justify-center w-9 h-9 rounded-full bg-green-500 text-white ring-4 ring-green-100 dark:ring-green-500/10 transition-transform group-hover:scale-105">
+                                                        <flux:icon.check class="w-5 h-5" />
+                                                    </span>
+                                                @elseif ($stage['status'] === 'current')
+                                                    <span class="relative flex items-center justify-center w-9 h-9 rounded-full bg-blue-500 text-white ring-4 ring-blue-100 dark:ring-blue-500/10 transition-transform group-hover:scale-105">
+                                                        <span class="absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-60 animate-ping motion-reduce:animate-none"></span>
+                                                        <flux:icon name="{{ $stage['icon'] }}" class="w-4.5 h-4.5 relative" />
+                                                    </span>
+                                                @elseif ($stage['status'] === 'pending')
+                                                    <span class="relative flex items-center justify-center w-9 h-9 rounded-full bg-red-500 text-white ring-4 ring-red-100 dark:ring-red-500/10 transition-transform group-hover:scale-105">
+                                                        <span class="absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-60 animate-ping motion-reduce:animate-none"></span>
+                                                        <flux:icon name="{{ $stage['icon'] }}" class="w-4.5 h-4.5 relative" />
+                                                    </span>
+                                                @else
+                                                    <span class="flex items-center justify-center w-9 h-9 rounded-full bg-white dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 ring-2 ring-zinc-200 dark:ring-zinc-700 transition-transform group-hover:scale-105">
+                                                        <flux:icon name="{{ $stage['icon'] }}" class="w-4.5 h-4.5" />
+                                                    </span>
+                                                @endif
 
-                                        @if (! $loop->last)
-                                            <div class="w-10 sm:w-14 h-0.5 mt-[18px] rounded {{ $stage['status'] === 'done' ? 'bg-green-400' : 'bg-zinc-200' }}"></div>
-                                        @endif
-                                    </li>
-                                @endforeach
-                            </ol>
+                                                <p class="mt-2 text-[11px] font-semibold leading-tight line-clamp-2 {{ $stage['status'] === 'pending' ? 'text-zinc-400 dark:text-zinc-500' : 'text-zinc-800 dark:text-zinc-100' }} group-hover:text-red-600 dark:group-hover:text-red-400 transition">
+                                                    {{ $stage['title'] }}
+                                                </p>
+                                                @if ($stage['date'])
+                                                    <p class="text-[10px] text-zinc-400 dark:text-zinc-500">{{ $stage['date'] }}</p>
+                                                @elseif ($stage['status'] === 'current')
+                                                    <p class="text-[10px] font-medium text-blue-600 dark:text-blue-400">berjalan</p>
+                                                @endif
+                                            </button>
+
+                                            @if (! $loop->last)
+                                                <div class="w-6 sm:w-10 h-0.5 mt-4.5 rounded {{ $stage['status'] === 'done' ? 'bg-green-400 dark:bg-green-600' : 'bg-zinc-200 dark:bg-zinc-700' }}"></div>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ol>
+                            </div>
                         </div>
                         @else
                         <div class="text-center py-8">
-                            <flux:icon.map class="w-8 h-8 text-zinc-300 mx-auto" />
-                            <p class="text-sm text-zinc-500 mt-2">Belum ada tahapan progress</p>
+                            <flux:icon.map class="w-8 h-8 text-zinc-300 dark:text-zinc-600 mx-auto" />
+                            <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Belum ada tahapan progress</p>
                         </div>
                         @endif
                     </div>
