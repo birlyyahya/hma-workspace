@@ -97,6 +97,58 @@ test('progressStages tidak membocorkan dokumen ke tahap lain karena nama project
         ->and($byTitle['IMPLEMENTASI']['documents'])->toBe([]);
 });
 
+test('progressStages tidak mencocokkan keyword majemuk hanya lewat kata modifier', function () {
+    $user = User::factory()->create();
+
+    Http::fake([
+        '*/timelines/search*' => Http::response(['data' => [
+            ['id' => 1, 'title' => 'IMPLEMENTASI INFRASTRUKTUR SERVER', 'start_date' => '2026-08-01', 'end_date' => '2026-08-31', 'notes' => null],
+            ['id' => 2, 'title' => 'INSTALASI APLIKASI', 'start_date' => '2026-08-01', 'end_date' => '2026-08-31', 'notes' => null],
+        ]], 200),
+        '*/global/dar/list*' => Http::response(['data' => []], 200),
+        '*/admin-docs/search*' => Http::response(['data' => [
+            [
+                'id' => 100,
+                'title' => 'Kebutuhan Infrastruktur LMS Kejagung - Perangkat',
+                'keyword' => ['Kebutuhan Infrastruktur LMS Kejagung - Perangkat', 'Infrastruktur Aplikasi'],
+                'created_at' => '2026-07-20 10:00:00',
+            ],
+        ]], 200),
+    ]);
+
+    $byTitle = collect((new ProjectCache('http://api.test'))->progressStages(69))->keyBy('title');
+
+    expect($byTitle['IMPLEMENTASI INFRASTRUKTUR SERVER']['documents'])->toHaveCount(1)
+        ->and($byTitle['IMPLEMENTASI INFRASTRUKTUR SERVER']['documents'][0]['name'])->toBe('Kebutuhan Infrastruktur LMS Kejagung - Perangkat')
+        ->and($byTitle['INSTALASI APLIKASI']['documents'])->toBe([]);
+});
+
+test('progressStages tidak mencocokkan tahap lain hanya karena kata non-kepala di judul dokumen', function () {
+    $user = User::factory()->create();
+
+    Http::fake([
+        '*/timelines/search*' => Http::response(['data' => [
+            ['id' => 1, 'title' => 'IMPLEMENTASI INFRASTRUKTUR SERVER', 'start_date' => '2026-08-01', 'end_date' => '2026-08-31', 'notes' => null],
+            ['id' => 2, 'title' => 'INSTALASI APLIKASI', 'start_date' => '2026-08-01', 'end_date' => '2026-08-31', 'notes' => null],
+        ]], 200),
+        '*/global/dar/list*' => Http::response(['data' => []], 200),
+        '*/admin-docs/search*' => Http::response(['data' => [
+            [
+                'id' => 101,
+                'title' => 'Kebutuhan Perangkat instalasi server',
+                'keyword' => ['infrastruktur', 'server'],
+                'created_at' => '2026-07-27 10:00:00',
+            ],
+        ]], 200),
+    ]);
+
+    $byTitle = collect((new ProjectCache('http://api.test'))->progressStages(69))->keyBy('title');
+
+    expect($byTitle['IMPLEMENTASI INFRASTRUKTUR SERVER']['documents'])->toHaveCount(1)
+        ->and($byTitle['IMPLEMENTASI INFRASTRUKTUR SERVER']['documents'][0]['name'])->toBe('Kebutuhan Perangkat instalasi server')
+        ->and($byTitle['INSTALASI APLIKASI']['documents'])->toBe([]);
+});
+
 test('progressStages sorts stages by earliest start date', function () {
     $user = User::factory()->create();
     fakeProgressEndpoints($user->id);

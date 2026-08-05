@@ -515,23 +515,19 @@ class ProjectCache
     /**
      * Dokumen admin yang terkait sebuah tahap. Dokumen tidak terikat timeline di
      * BEPM, jadi dipetakan berdasarkan judul timeline: dokumen masuk bila judul
-     * atau salah satu keyword-nya memuat kata dari judul tahap (mis. "kontrak"
-     * dari "Tanda Tangan Kontrak"). Sengaja TIDAK memakai teks aktivitas DAR
-     * sebagai kata kunci — aktivitas kerap menyebut nama project/paket yang sama
-     * di banyak tahap, sehingga satu dokumen bisa bocor ke tahap yang salah.
+     * atau salah satu keyword-nya cocok dengan judul tahap (mis. "kontrak" dari
+     * "Tanda Tangan Kontrak"). Sengaja TIDAK memakai teks aktivitas DAR sebagai
+     * kata kunci — aktivitas kerap menyebut nama project/paket yang sama di
+     * banyak tahap, sehingga satu dokumen bisa bocor ke tahap yang salah.
      *
      * @param  Collection<int, array<string, mixed>>  $documents
      * @return array<int, array{name: string, size: ?string}>
      */
     private function buildStageDocuments(Collection $documents, string $title, int $id): array
     {
-        $keywords = collect(preg_split('/\s+/', Str::lower($title)))
-            ->filter(fn ($word) => strlen($word) >= 4)
-            ->unique()
-            ->values()
-            ->all();
+        $stageWords = $this->significantWords($title);
 
-        if ($keywords === []) {
+        if ($stageWords === []) {
             return [];
         }
 
@@ -540,19 +536,15 @@ class ProjectCache
             ->pluck('size_bytes', 'doc_id');
 
         return $documents
-            ->filter(function (array $doc) use ($keywords): bool {
+            ->filter(function (array $doc) use ($stageWords): bool {
 
                 if (empty($doc['created_at'])) {
                     return false;
                 }
-                $haystack = collect([$doc['title'] ?? ''])
-                    ->merge($doc['keyword'] ?? [])
-                    ->join(',');
 
-                return Str::contains(
-                    Str::lower($haystack),
-                    $keywords
-                );
+                return collect([$doc['title'] ?? ''])
+                    ->merge($doc['keyword'] ?? [])
+                    ->contains(fn ($candidate) => $this->candidateMatchesStage($stageWords, (string) $candidate));
             })
             ->map(function (array $doc) use ($fileSizes): array {
 
@@ -565,6 +557,51 @@ class ProjectCache
             })
             ->values()
             ->toArray();
+    }
+
+    /**
+     * Kandidat (judul dokumen atau satu keyword) dicocokkan sendiri-sendiri, bukan
+     * digabung jadi satu blok teks — supaya kata umum pada satu keyword tidak
+     * "bocor" ke tahap lain (mis. kata "aplikasi" pada keyword "Infrastruktur
+     * Aplikasi" tidak boleh membuat dokumen ini masuk ke tahap "Instalasi
+     * Aplikasi"). Kandidat satu kata tetap dicocokkan longgar (kontrak → Tanda
+     * Tangan Kontrak). Kandidat 2+ kata dicocokkan HANYA lewat kata pertama/kepala
+     * frasanya sendiri terhadap seluruh kata judul tahap — bukan sebaliknya.
+     * Arahnya sengaja satu sisi: kata kepala kandidat mewakili topik utama
+     * dokumen itu, sedangkan kata-kata lain dalam judul/keyword sering cuma
+     * pelengkap (mis. "instalasi" pada judul dokumen "Kebutuhan Perangkat
+     * instalasi server" bukan topik utamanya — topiknya "kebutuhan perangkat" —
+     * jadi tidak boleh membuat dokumen ini masuk ke tahap "Instalasi Aplikasi"
+     * hanya karena kata "instalasi" kebetulan ada di situ). Ini heuristik posisi
+     * kata, bukan jaminan gramatikal.
+     *
+     * @param  array<int, string>  $stageWords
+     */
+    private function candidateMatchesStage(array $stageWords, string $candidate): bool
+    {
+        $candidateWords = $this->significantWords($candidate);
+
+        if ($candidateWords === []) {
+            return false;
+        }
+
+        if (count($candidateWords) === 1) {
+            return Str::contains($candidateWords[0], $stageWords);
+        }
+
+        return Str::contains(implode(' ', $stageWords), [$candidateWords[0]]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function significantWords(string $text): array
+    {
+        return collect(preg_split('/\s+/', Str::lower($text)))
+            ->filter(fn ($word) => strlen($word) >= 4)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**
