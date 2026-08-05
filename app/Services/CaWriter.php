@@ -182,7 +182,7 @@ class CaWriter
         try {
             $response = $this->sendTransaction(
                 $this->apiBase."/wallet-kegiatan/{$kode}",
-                [...$payload, '_method' => 'PUT'],
+                [...$payload],
             );
 
             $body = (array) $response->json();
