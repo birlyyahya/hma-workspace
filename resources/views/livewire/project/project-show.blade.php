@@ -154,7 +154,7 @@ new #[Lazy] class extends Component {
             }"
         >
             {{-- ============ STICKY HEADER ============ --}}
-            <div class="bg-white/90 backdrop-blur ">
+            <div class="bg-white/90 backdrop-blur md:px-4">
                 <div class="px-4 md:px-0 pt-4 pb-4 rounded-xl">
                     {{-- Breadcrumb --}}
                     <nav class="flex items-center gap-1.5 text-xs text-zinc-500 mb-3">

@@ -70,6 +70,26 @@ new class extends Component {
         );
     }
 
+    #[Computed]
+    public function spectechTotalNominal(): float
+    {
+        return collect($this->spectech ?? [])->sum(fn ($item) => (float) ($item['total_nominal'] ?? 0));
+    }
+
+    /**
+     * @return array{hardware: int, software: int}
+     */
+    #[Computed]
+    public function spectechTypeCounts(): array
+    {
+        $items = collect($this->spectech ?? []);
+
+        return [
+            'hardware' => $items->filter(fn ($item) => ($item['type'] ?? 'hardware') === 'hardware')->count(),
+            'software' => $items->filter(fn ($item) => ($item['type'] ?? 'hardware') === 'software')->count(),
+        ];
+    }
+
     public function shareLinkCopied(): void
     {
         Toaster::success('Link share project berhasil disalin');
@@ -365,20 +385,46 @@ new class extends Component {
                 </div>
 
                 {{-- SPECTECH SUMMARY --}}
-                <div class="bg-white rounded-2xl border border-zinc-200 p-4 sm:p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <flux:heading size="sm" class="font-semibold text-zinc-900">
+                <div class="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-4 sm:p-6">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <flux:heading size="sm" class="font-semibold text-zinc-900 dark:text-white">
                                 Ringkasan Spectech
                             </flux:heading>
-                            <flux:text class="text-xs text-zinc-500 mt-0.5">
-                                {{ count($this->spectech ?? []) }} item · Rp {{ number_format($this->spectechReceivedValue, 0, ',', '.') }} diterima
+                            <flux:text class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                {{ count($this->spectech ?? []) }} item
+                                <span class="text-zinc-300 dark:text-zinc-600 mx-1">·</span>
+                                {{ $this->spectechTypeCounts['hardware'] }} Barang
+                                <span class="text-zinc-300 dark:text-zinc-600 mx-1">·</span>
+                                {{ $this->spectechTypeCounts['software'] }} Aplikasi
                             </flux:text>
                         </div>
-                        <span class="text-sm font-semibold text-red-600">{{ $project['progress'] }}%</span>
+                        <button type="button" @click="active = 'spectech'" class="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-zinc-400 dark:text-zinc-500 hover:text-red-600 dark:hover:text-red-400 transition cursor-pointer">
+                            Lihat semua
+                            <flux:icon.arrow-right class="w-3.5 h-3.5" />
+                        </button>
                     </div>
 
-                    <div class="w-full h-2 bg-zinc-100 rounded-full overflow-hidden mb-5">
+                    <div class="mt-4 grid grid-cols-2 gap-3">
+                        <div class="rounded-xl bg-zinc-50 dark:bg-zinc-800/60 px-3 py-2.5">
+                            <p class="text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Nominal Spektek</p>
+                            <p class="mt-0.5 text-sm font-semibold text-zinc-900 dark:text-white truncate">
+                                Rp {{ number_format($this->spectechTotalNominal, 0, ',', '.') }}
+                            </p>
+                        </div>
+                        <div class="rounded-xl bg-zinc-50 dark:bg-zinc-800/60 px-3 py-2.5">
+                            <p class="text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Diterima</p>
+                            <p class="mt-0.5 text-sm font-semibold text-emerald-600 dark:text-emerald-400 truncate">
+                                Rp {{ number_format($this->spectechReceivedValue, 0, ',', '.') }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 mb-1.5 flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400">
+                        <span>Progress</span>
+                        <span class="font-semibold text-zinc-900 dark:text-white">{{ $project['progress'] }}%</span>
+                    </div>
+                    <div class="w-full h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-5">
                         <div class="h-full bg-linear-to-r from-red-500 to-red-600 rounded-full transition-all"
                              style="width: {{ $project['progress'] }}%"></div>
                     </div>
@@ -387,38 +433,49 @@ new class extends Component {
                         @forelse($this->spectech as $item)
                             @php
                                 $itemPercentage = (float) ($item['percentage'] ?? 0);
+                                $itemQtyRecv = (int) ($item['qty_recived'] ?? 0);
                                 $itemComplete = $itemPercentage >= 100;
+                                $itemStatus = $itemComplete ? 'completed' : ($itemQtyRecv > 0 ? 'in_progress' : 'not_started');
+                                $itemStatusMeta = match ($itemStatus) {
+                                    'completed' => ['label' => 'Selesai', 'chip' => 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20', 'bar' => 'bg-emerald-500'],
+                                    'in_progress' => ['label' => 'Berjalan', 'chip' => 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20', 'bar' => 'bg-amber-500'],
+                                    default => ['label' => 'Belum Mulai', 'chip' => 'bg-zinc-50 text-zinc-600 ring-zinc-500/20 dark:bg-zinc-800 dark:text-zinc-400 dark:ring-zinc-600', 'bar' => 'bg-zinc-300 dark:bg-zinc-600'],
+                                };
+                                $itemTypeIcon = ($item['type'] ?? 'hardware') === 'software' ? 'computer-desktop' : 'cube';
                             @endphp
-                            <div class="group p-3 rounded-lg border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50/50 transition">
+                            <div class="group p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/40 transition">
                                 <div class="flex items-start justify-between gap-3">
-                                    <div class="min-w-0 flex-1">
-                                        <p class="text-sm font-medium text-zinc-900 truncate">
-                                            {{ $item['name'] }}
-                                        </p>
-                                        <p class="text-xs text-zinc-500 mt-0.5">
-                                            {{ $item['qty_recived'] ?? 0 }}/{{ $item['qty_total'] ?? 0 }} unit
-                                            <span class="mx-1.5 text-zinc-300">•</span>
-                                            Rp {{ number_format($item['total_nominal'] ?? 0, 0, ',', '.') }}
-                                        </p>
+                                    <div class="min-w-0 flex-1 flex items-start gap-2">
+                                        <flux:icon name="{{ $itemTypeIcon }}" class="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 mt-0.5 shrink-0" />
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                                                {{ $item['name'] }}
+                                            </p>
+                                            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                                {{ $itemQtyRecv }}/{{ $item['qty_total'] ?? 0 }} unit
+                                                <span class="mx-1.5 text-zinc-300 dark:text-zinc-600">•</span>
+                                                Rp {{ number_format($item['total_nominal'] ?? 0, 0, ',', '.') }}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div class="shrink-0 flex items-center gap-2">
-                                        <span class="text-xs font-semibold {{ $itemComplete ? 'text-emerald-600' : 'text-zinc-700' }}">
+                                    <div class="shrink-0 flex flex-col items-end gap-1">
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium ring-1 whitespace-nowrap {{ $itemStatusMeta['chip'] }}">
+                                            {{ $itemStatusMeta['label'] }}
+                                        </span>
+                                        <span class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
                                             {{ number_format($itemPercentage, 0) }}%
                                         </span>
-                                        @if($itemComplete)
-                                            <flux:icon.check-circle class="w-4 h-4 text-emerald-600" />
-                                        @endif
                                     </div>
                                 </div>
-                                <div class="mt-2 w-full h-1 bg-zinc-100 rounded-full overflow-hidden">
-                                    <div class="h-full {{ $itemComplete ? 'bg-emerald-500' : 'bg-red-500' }} rounded-full"
+                                <div class="mt-2 w-full h-1 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                    <div class="h-full {{ $itemStatusMeta['bar'] }} rounded-full"
                                          style="width: {{ min($itemPercentage, 100) }}%"></div>
                                 </div>
                             </div>
                         @empty
                             <div class="text-center py-8">
-                                <flux:icon.cube class="w-8 h-8 text-zinc-300 mx-auto" />
-                                <p class="text-sm text-zinc-500 mt-2">Belum ada spectech</p>
+                                <flux:icon.cube class="w-8 h-8 text-zinc-300 dark:text-zinc-600 mx-auto" />
+                                <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-2">Belum ada spectech</p>
                             </div>
                         @endforelse
                     </div>
