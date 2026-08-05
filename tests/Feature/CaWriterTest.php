@@ -143,3 +143,108 @@ test('deleteTransactionCaPL still logs cleanly without a snapshot', function () 
 
     expect($activity->description)->toContain('CA-PL-01')->toContain('#9');
 });
+
+test('updateDompetKegiatan posts to wallet-kegiatan/{kode} with _method=PUT and succeeds', function () {
+    Http::fake(['*/wallet-kegiatan/CA-KEG-01' => Http::response(['success' => true], 200)]);
+
+    $result = makeCaWriter()->updateDompetKegiatan('CA-KEG-01', [
+        'judul_kegiatan' => 'Survei Bandung',
+        'total_penerimaan' => 2_500_000,
+        'saldo_awal_priode' => 2_500_000,
+    ]);
+
+    expect($result['ok'])->toBeTrue()
+        ->and($result['error'])->toBeNull();
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && str_ends_with($request->url(), '/wallet-kegiatan/CA-KEG-01')
+        && $request->isMultipart()
+        && collect($request->data())->contains(fn ($f) => ($f['name'] ?? null) === '_method' && ($f['contents'] ?? null) === 'PUT'));
+});
+
+test('updateDompetKegiatan attaches bukti only when a new file is provided', function () {
+    Http::fake(['*/wallet-kegiatan/CA-KEG-01' => Http::response(['success' => true], 200)]);
+
+    makeCaWriter()->updateDompetKegiatan('CA-KEG-01', [
+        'judul_kegiatan' => 'Survei Bandung',
+        'bukti' => ['contents' => 'BIN', 'name' => 'baru.png'],
+    ], ['judul_kegiatan' => 'Survei Bandung']);
+
+    $activity = Activity::query()->latest('id')->first();
+
+    expect($activity->description)->toContain('bukti')
+        ->and($activity->properties->get('bukti_diganti'))->toBeTrue();
+
+    Http::assertSent(fn ($request) => $request->isMultipart()
+        && collect($request->data())->contains(fn ($f) => ($f['name'] ?? null) === 'bukti'));
+});
+
+test('updateDompetKegiatan only logs fields that actually changed', function () {
+    Http::fake(['*/wallet-kegiatan/CA-KEG-01' => Http::response(['success' => true], 200)]);
+
+    $original = [
+        'judul_kegiatan' => 'Survei Lama',
+        'tahun_anggaran' => 2026,
+        'tanggal_mulai' => '2026-07-01',
+        'total_penerimaan' => 2_500_000,
+        'saldo_awal_priode' => 2_500_000,
+    ];
+
+    makeCaWriter()->updateDompetKegiatan('CA-KEG-01', [
+        'judul_kegiatan' => 'Survei Baru',
+        'tahun_anggaran' => 2026,
+        'tanggal_mulai' => '2026-07-01',
+        'total_penerimaan' => 2_500_000,
+        'saldo_awal_priode' => 2_500_000,
+    ], $original);
+
+    $activity = Activity::query()->latest('id')->first();
+    $changes = $activity->properties->get('changes');
+
+    expect($activity->description)->toContain('judul_kegiatan')
+        ->and($changes)->toHaveKey('judul_kegiatan')
+        ->and($changes['judul_kegiatan'])->toBe(['from' => 'Survei Lama', 'to' => 'Survei Baru'])
+        ->and($changes)->not->toHaveKey('tahun_anggaran');
+});
+
+test('deleteDompetKegiatan sends DELETE to wallet-kegiatan/{kode} and succeeds', function () {
+    Http::fake(['*/wallet-kegiatan/CA-KEG-01' => Http::response(['success' => true], 200)]);
+
+    $result = makeCaWriter()->deleteDompetKegiatan('CA-KEG-01', ['judul_kegiatan' => 'Survei Bandung']);
+
+    expect($result['ok'])->toBeTrue()
+        ->and($result['error'])->toBeNull();
+
+    Http::assertSent(fn ($request) => $request->method() === 'DELETE'
+        && str_ends_with($request->url(), '/wallet-kegiatan/CA-KEG-01'));
+});
+
+test('deleteDompetKegiatan logs the wallet title when given a snapshot', function () {
+    Http::fake(['*/wallet-kegiatan/CA-KEG-01' => Http::response(['success' => true], 200)]);
+
+    makeCaWriter()->deleteDompetKegiatan('CA-KEG-01', ['judul_kegiatan' => 'Survei Bandung', 'user_id' => 3]);
+
+    $activity = Activity::query()->latest('id')->first();
+
+    expect($activity->description)->toContain('CA-KEG-01')->toContain('Survei Bandung')
+        ->and($activity->properties->get('user_id'))->toBe(3);
+});
+
+test('deleteDompetKegiatan still logs cleanly without a snapshot', function () {
+    Http::fake(['*/wallet-kegiatan/CA-KEG-01' => Http::response(['success' => true], 200)]);
+
+    makeCaWriter()->deleteDompetKegiatan('CA-KEG-01');
+
+    $activity = Activity::query()->latest('id')->first();
+
+    expect($activity->description)->toContain('CA-KEG-01');
+});
+
+test('deleteDompetKegiatan returns ok=false without throwing on transport failure', function () {
+    Http::fake(fn () => throw new ConnectionException('Connection timed out'));
+
+    $result = makeCaWriter()->deleteDompetKegiatan('CA-KEG-01');
+
+    expect($result['ok'])->toBeFalse()
+        ->and($result['error'])->toContain('Connection timed out');
+});

@@ -278,7 +278,16 @@ class extends Component {
             </div>
 
             <div class="flex flex-wrap gap-2 pl-13 sm:pl-0">
+                @if (! $this->isClosed() && $this->canManageWallet())
+                <flux:button type="button" variant="ghost" icon="pencil-square" size="sm" class="text-ca-copper! hover:text-ca-copper-deep!"
+                    x-on:click="$flux.modal('edit-dompet-kegiatan').show(); $wire.dispatch('ca-edit-dompet-open')">Edit</flux:button>
+                @endif
                 <flux:button :href="route('cashadvance.laporan.kegiatan', $kodeCa)" target="_blank" variant="ghost" icon="document-arrow-down" size="sm" class="text-ca-copper! hover:text-ca-copper-deep!">Export PDF</flux:button>
+                @if ($this->canManageWallet())
+                <flux:modal.trigger name="hapus-dompet-kegiatan">
+                    <flux:button type="button" variant="ghost" icon="trash" size="sm" class="text-red-600! hover:text-red-700! dark:text-red-400!">Hapus</flux:button>
+                </flux:modal.trigger>
+                @endif
             </div>
         </div>
 
@@ -569,6 +578,8 @@ class extends Component {
         {{-- ================= MODAL COMPONENTS ================= --}}
         <livewire:cashadvance.modals.catat-transaksi-kegiatan :kode-ca="$kodeCa" :categories="$categories" :categories-pemasukan="$categoriesPemasukan" />
         <livewire:cashadvance.modals.hapus-transaksi-kegiatan :kode-ca="$kodeCa" />
+        <livewire:cashadvance.modals.edit-dompet-kegiatan :wallet="$wallet" />
+        <livewire:cashadvance.modals.hapus-dompet-kegiatan :wallet="$wallet" />
         <livewire:cashadvance.modals.tutup-kegiatan :wallet="$wallet" />
         <livewire:cashadvance.modals.tambah-kolaborator :wallet="$wallet" />
         <livewire:cashadvance.modals.hapus-kolaborator />

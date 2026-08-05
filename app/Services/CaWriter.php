@@ -167,6 +167,70 @@ class CaWriter
     }
 
     /**
+     * Perbarui detail dompet kegiatan (judul, tahun anggaran, tanggal mulai,
+     * nominal dana awal & bukti pencairan) via /wallet-kegiatan/{kode}.
+     * NON-idempotent — POST + _method=PUT multipart (bukti hanya dikirim bila
+     * diganti), timeout diperpanjang.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $original  Snapshot dompet sebelum diedit (dari caller) —
+     *                                          dipakai untuk diff before/after pada activity log.
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function updateDompetKegiatan(string $kode, array $payload, array $original = []): array
+    {
+        try {
+            $response = $this->sendTransaction(
+                $this->apiBase."/wallet-kegiatan/{$kode}",
+                [...$payload, '_method' => 'PUT'],
+            );
+
+            $body = (array) $response->json();
+            $ok = $response->successful() || (bool) ($body['success'] ?? false);
+
+            $changes = $this->diffFields($original, $payload, ['judul_kegiatan', 'tahun_anggaran', 'tanggal_mulai', 'total_penerimaan', 'saldo_awal_priode']);
+            $buktiDiganti = isset($payload['bukti']);
+
+            return $this->result($ok, $body, $response->status(), [
+                'name' => 'ca',
+                'event' => 'updated',
+                'description' => $this->describeUpdate("Memperbarui dompet kegiatan {$kode}", $changes, $buktiDiganti),
+                'properties' => ['kode' => $kode, 'changes' => $changes, 'bukti_diganti' => $buktiDiganti],
+            ], scope: 'kegiatan');
+        } catch (\Throwable $e) {
+            return $this->fail('updateDompetKegiatan', $e, ['kode' => $kode]);
+        }
+    }
+
+    /**
+     * Hapus dompet kegiatan beserta seluruh transaksinya via /wallet-kegiatan/{kode}.
+     *
+     * @param  array<string, mixed>  $original  Snapshot dompet yang dihapus (dari caller) —
+     *                                          dicatat di log supaya jejak audit tahu apa yang hilang.
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function deleteDompetKegiatan(string $kode, array $original = []): array
+    {
+        try {
+            $response = $this->externalWrite()->delete($this->apiBase."/wallet-kegiatan/{$kode}");
+
+            $body = (array) $response->json();
+            $ok = $response->successful() || (bool) ($body['success'] ?? false);
+
+            $judul = $original['judul_kegiatan'] ?? null;
+
+            return $this->result($ok, $body, $response->status(), [
+                'name' => 'ca',
+                'event' => 'deleted',
+                'description' => 'Menghapus dompet kegiatan '.$kode.($judul ? ": {$judul}" : ''),
+                'properties' => ['kode' => $kode, ...Arr::only($original, ['judul_kegiatan', 'user_id', 'saldo_akhir'])],
+            ], scope: 'kegiatan');
+        } catch (\Throwable $e) {
+            return $this->fail('deleteDompetKegiatan', $e, ['kode' => $kode]);
+        }
+    }
+
+    /**
      * Catat transaksi (masuk/keluar) pada dompet kegiatan.
      * NON-idempotent — multipart upload bukti, timeout diperpanjang.
      *
