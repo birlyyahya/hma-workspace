@@ -608,6 +608,7 @@ new class extends Component
     @endif
 
     {{-- Pagination --}}
+   {{-- Pagination --}}
     @if(!empty($pagination) && ($pagination['last_page'] ?? 1) > 1)
         @php
             $lastPage    = $pagination['last_page'];
@@ -617,7 +618,8 @@ new class extends Component
             )->values();
         @endphp
 
-        <div wire:loading.remove wire:target="applyFilters,goToPage,year,status"
+        <div wire:key="pagination-{{ $lastPage }}-{{ $currentPage }}"
+             wire:loading.remove wire:target="applyFilters,goToPage,year,status"
              class="flex flex-wrap items-center justify-center gap-1.5 pt-2">
 
             <flux:button
@@ -630,9 +632,10 @@ new class extends Component
 
             @foreach($pages as $i => $page)
                 @if($i > 0 && $page - $pages[$i - 1] > 1)
-                    <span class="text-zinc-400 px-1 text-sm">…</span>
+                    <span wire:key="gap-{{ $page }}" class="text-zinc-400 px-1 text-sm">…</span>
                 @endif
                 <flux:button
+                    wire:key="page-{{ $page }}"
                     wire:click="goToPage({{ $page }})"
                     variant="{{ $page === $currentPage ? 'primary' : 'outline' }}"
                     size="sm"
