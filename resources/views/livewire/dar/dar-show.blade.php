@@ -1078,7 +1078,13 @@ class extends Component
                     {{-- ── Compose (di atas list, ala Instagram) ── --}}
                     <div class="border-b border-zinc-100 px-4 py-4">
                         <div
-                            x-data="{ dragging: false }"
+                            x-data="{
+                                dragging: false,
+                                resizeComment(el) {
+                                    el.style.height = 'auto';
+                                    el.style.height = Math.min(el.scrollHeight, 172) + 'px';
+                                },
+                            }"
                             @dragover.prevent="dragging = true"
                             @dragleave.prevent="dragging = false"
                             @drop.prevent="dragging = false; $refs.fileInput.files = $event.dataTransfer.files; $refs.fileInput.dispatchEvent(new Event('change'))"
@@ -1090,9 +1096,13 @@ class extends Component
                                 <textarea
                                     wire:model="comment"
                                     rows="2"
+                                    x-ref="commentInput"
+                                    x-init="resizeComment($el)"
+                                    @input="resizeComment($el)"
+                                    @comment-added.window="$nextTick(() => resizeComment($el))"
                                     @keydown.meta.enter="$wire.addComment()"
                                     @keydown.ctrl.enter="$wire.addComment()"
-                                    class="block w-full resize-none border-0 bg-transparent py-1.5 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-0"
+                                    class="block max-h-43 w-full resize-none overflow-y-auto border-0 bg-transparent py-1.5 text-sm text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-0"
                                     placeholder="Tulis komentar... (⌘+Enter to send)"
                                 ></textarea>
                             </div>
