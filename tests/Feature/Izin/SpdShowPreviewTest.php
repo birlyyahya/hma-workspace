@@ -131,8 +131,12 @@ test('the PDF route returns 404 for a missing SPD', function () {
 test('admin copy is cached per permission and never leaks to users without spd.create', function () {
     $target = User::factory()->create();
 
+    // Belum submitted/approved — admin copy relevan dan diperbolehkan tampil.
     mock(IzinCache::class, function ($mock) use ($target) {
-        $mock->shouldReceive('spdDetail')->andReturn(fakeSpdDetailResponse($target));
+        $mock->shouldReceive('spdDetail')->andReturn(fakeSpdDetailResponse($target, [
+            'is_submitted' => false,
+            'is_approved' => false,
+        ]));
     });
 
     // Pembuat membuka lebih dulu (memanaskan cache dengan varian 2 halaman)...
@@ -149,6 +153,24 @@ test('admin copy is cached per permission and never leaks to users without spd.c
 
     expect(spdPreviewCountPages($creatorPdf))->toBe(2)
         ->and(spdPreviewCountPages($plainPdf))->toBe(1);
+});
+
+test('admin copy is hidden once the SPD is submitted and approved, even for spd.create users', function () {
+    $target = User::factory()->create();
+
+    mock(IzinCache::class, function ($mock) use ($target) {
+        $mock->shouldReceive('spdDetail')->andReturn(fakeSpdDetailResponse($target, [
+            'is_submitted' => true,
+            'is_approved' => true,
+        ]));
+    });
+
+    $creatorPdf = actingAs(spdPreviewCreatorUser())
+        ->get(route('izin.spd-pdf', 1))
+        ->assertSuccessful()
+        ->getContent();
+
+    expect(spdPreviewCountPages($creatorPdf))->toBe(1);
 });
 
 test('the PDF route unwraps the DARBE data envelope so the attachment reaches the composer', function () {

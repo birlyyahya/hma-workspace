@@ -22,10 +22,15 @@ class SpdPdfController extends Controller
 
         abort_if(! $spd, 404);
 
+        // Halaman administrasi (TTD statis) hanya relevan sebelum SPD benar-benar
+        // disetujui — begitu submitted & approved, halaman checklist utama sudah
+        // menampilkan TTD asli sehingga salinan administrasi jadi redundan.
+        $isApproved = (bool) data_get($spd, 'is_submitted') && (bool) data_get($spd, 'is_approved');
+
         // Template menyembunyikan halaman salinan administrasi untuk user tanpa
         // spd.create — varian PDF-nya berbeda, jadi flag ikut menjadi bagian key
         // agar cache milik pembuat tidak bocor ke user biasa (dan sebaliknya).
-        $withAdminCopy = (bool) request()->user()?->can('spd.create');
+        $withAdminCopy = ! $isApproved && (bool) request()->user()?->can('spd.create');
 
         $cacheKey = 'spd-pdf-'.$id.'-'.($withAdminCopy ? 'admin' : 'plain').'-'.md5((string) json_encode($spd));
 
