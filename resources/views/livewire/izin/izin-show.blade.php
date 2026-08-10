@@ -44,14 +44,19 @@ class extends Component {
             $query->where('slug', 'manager');
         })->first();
 
-        $asmen = User::whereHas('role', function ($query) {
-            $query->where('slug', 'asmen');
+        $pemohon = User::where('username', data_get($izin, 'users.username'))->first();
+
+        $asmenSlug = $pemohon?->isInDepartment('it-infra') ? 'spv-it-infra' : 'asmen';
+
+        $asmen = User::whereHas('role', function ($query) use ($asmenSlug) {
+            $query->where('slug', $asmenSlug);
         })->first();
 
         $izin['manager_name'] = $manager?->name;
         $izin['asmen_name'] = $asmen?->name;
 
         $izin['admins_base64'] = $this->convertImageToBase64(data_get($izin, 'admins'));
+
         $izin['superadmins_base64'] = $this->convertImageToBase64(data_get($izin, 'superadmins'));
         $izin['pemohon_base64'] = $this->convertImageToBase64(data_get($izin, 'url_sign'));
 

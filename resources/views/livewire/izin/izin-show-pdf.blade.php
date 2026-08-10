@@ -13,6 +13,7 @@ class extends Component {
     public function getIzinProperty()
     {
         $response = app(IzinCache::class)->detail((int) $this->id);
+        dd($response);
 
         if (($response['success'] ?? false) === true) {
             return $response['data'] ?? [];
