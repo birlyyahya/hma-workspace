@@ -42,7 +42,10 @@ new class extends Component {
     public function mount(){
 
         $this->timelines = app(ProjectCache::class)->timelines((int) $this->id);
-        $this->activities = app(DarCache::class)->tasks(['project_id' => (int) $this->id])['data'] ?? [];
+        $this->activities = app(DarCache::class)->tasks([
+            'project_id' => (int) $this->id,
+            'perPage' => 9999,
+        ])['data'] ?? [];
 
         $start = collect($this->timelines)->min('start_date');
         $end = collect($this->timelines)->max('end_date');

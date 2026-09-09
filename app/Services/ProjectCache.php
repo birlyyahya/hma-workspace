@@ -424,7 +424,7 @@ class ProjectCache
                 return [];
             }
 
-            $activities = collect(app(DarCache::class)->tasks(['project_id' => $id])['data'] ?? []);
+            $activities = collect(app(DarCache::class)->tasks(['project_id' => $id, 'perPage' => 9999])['data'] ?? []);
             $activitiesByCategory = $activities->groupBy('project_category_id');
             $documents = collect($this->documentsFor($id)) ?? [];
 

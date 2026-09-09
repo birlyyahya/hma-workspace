@@ -171,10 +171,10 @@ class DarCache
      */
     public function tasks(array $params): array
     {
-        if (! empty($params['search'])) {
+        if (!empty($params['search'])) {
+
             return $this->fetchTasks($params);
         }
-
         $key = 'dar:tasks:'.md5((string) json_encode($params));
 
         return $this->rememberFlexible([self::TAG], $key, [self::TTL_DETAIL, self::TTL_DETAIL * 4], fn () => $this->fetchTasks($params), ['data' => []]);
@@ -188,6 +188,7 @@ class DarCache
     {
         $response = $this->externalRead(timeout: 15)
             ->get($this->apiBase.'/global/dar/list', $params);
+
 
         if ($response->failed()) {
             throw new \RuntimeException('status '.$response->status());
