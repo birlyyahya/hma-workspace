@@ -167,3 +167,40 @@ export function downloadTemplate(columns, example, filename) {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Template');
     XLSX.writeFile(workbook, filename || 'template.xlsx');
 }
+
+/**
+ * Unduh laporan izin sebagai workbook dengan bagian terpisah per bulan dan tahun.
+ *
+ * @param {Array<{label: string, rows: Array<Object>}>} groups
+ * @param {string} filename
+ */
+export function downloadGroupedIzinWorkbook(groups, filename) {
+    const rows = [['Laporan Pengajuan Izin'], []];
+    const merges = [];
+
+    groups.forEach((group) => {
+        const groupRow = rows.length;
+        rows.push([group.label]);
+        merges.push({ s: { r: groupRow, c: 0 }, e: { r: groupRow, c: 3 } });
+        rows.push(['Tanggal', 'Nama', 'Alasan', 'Catatan']);
+
+        group.rows.forEach((row) => {
+            rows.push([row.tanggal, row.nama, row.alasan, row.catatan]);
+        });
+
+        rows.push([]);
+    });
+
+    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    worksheet['!merges'] = merges;
+    worksheet['!cols'] = [
+        { wch: 16 },
+        { wch: 30 },
+        { wch: 45 },
+        { wch: 45 },
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Laporan Izin');
+    XLSX.writeFile(workbook, filename || 'laporan-izin.xlsx');
+}

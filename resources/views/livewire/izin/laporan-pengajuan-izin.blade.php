@@ -5,7 +5,6 @@ use Livewire\Volt\Component;
 new class extends Component {
       public $searchQuery = '';
     public function updatedSearchQuery(){
-        sleep(1); // Simulate delay for loading state
             $this->dispatch('izinSearchUpdated', $this->searchQuery);
     }
 }; ?>

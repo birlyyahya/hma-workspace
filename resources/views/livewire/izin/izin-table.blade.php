@@ -66,10 +66,18 @@ new class extends Component {
         $this->fetchData();
     }
 
+    public function resetFilters(): void
+    {
+        $this->reset('sort', 'status', 'start_date', 'end_date');
+        $this->page = 1;
+        $this->fetchData();
+    }
+
     #[On('izinAdded')]
     public function fetchData(): void
     {
         $this->data = app(IzinCache::class)->list($this->buildQuery());
+        $this->cacheExportRows();
     }
 
     public function generatePDF(int $id)
@@ -100,6 +108,38 @@ new class extends Component {
         $filename = 'Pengajuan Izin '.Carbon::parse($izin['start_date'])->format('d M Y').'.pdf';
 
         return $this->streamPdf($pdfBase64, $filename);
+    }
+
+    public function getExportGroups(): array
+    {
+        try {
+            return $this->buildExportGroups();
+        } catch (\Throwable $exception) {
+            report($exception);
+            Toaster::error('Gagal mengambil data untuk export.');
+
+            return [];
+        }
+    }
+
+    public function exportGroupedPdf()
+    {
+        try {
+            $groups = $this->buildExportGroups();
+
+            if ($groups === []) {
+                Toaster::info('Tidak ada data izin untuk diexport.');
+
+                return;
+            }
+
+            return Pdf::loadView('pdf.izin-export', ['groups' => $groups])
+                ->setPaper('a4', 'landscape')
+                ->download('laporan-izin-'.now()->format('Ymd-His').'.pdf');
+        } catch (\Throwable $exception) {
+            report($exception);
+            Toaster::error('Gagal membuat PDF laporan izin.');
+        }
     }
 
     public function placeholder()
@@ -133,6 +173,84 @@ new class extends Component {
         ];
     }
 
+    /**
+     * @return list<array{label: string, rows: list<array{tanggal: string, nama: string, alasan: string, catatan: string}>}>
+     */
+    protected function buildExportGroups(): array
+    {
+        $groupedRows = [];
+        $rows = Cache::tags(['izin'])->get($this->exportRowsCacheKey(), $this->data['data'] ?? []);
+        $startDate = $this->start_date !== '' ? Carbon::parse($this->start_date)->startOfDay() : null;
+        $endDate = $this->end_date !== '' ? Carbon::parse($this->end_date)->endOfDay() : null;
+
+        foreach ($rows as $izin) {
+            $date = Carbon::parse($izin['start_date'] ?? now());
+
+            if (($startDate !== null && $date->lt($startDate)) || ($endDate !== null && $date->gt($endDate))) {
+                continue;
+            }
+
+            $groupedRows[$date->format('Y-m')][] = [
+                'tanggal' => $date->format('d-m-Y'),
+                'nama' => (string) ($izin['user_name'] ?? 'N/A'),
+                'alasan' => (string) ($izin['reason'] ?? ''),
+                'catatan' => (string) ($izin['description'] ?? ''),
+            ];
+        }
+        if ($this->sort === 'asc') {
+            ksort($groupedRows);
+        } else {
+            krsort($groupedRows);
+        }
+
+        $groups = [];
+        foreach ($groupedRows as $yearMonth => $rows) {
+            $groups[] = [
+                'label' => Carbon::createFromFormat('!Y-m', $yearMonth)->locale('id')->translatedFormat('F Y'),
+                'rows' => $rows,
+            ];
+        }
+
+
+        return $groups;
+    }
+
+    protected function cacheExportRows(): void
+    {
+        $cache = Cache::tags(['izin']);
+        $cacheKey = $this->exportRowsCacheKey();
+
+        if ($cache->has($cacheKey)) {
+            return;
+        }
+
+        $query = $this->buildQuery();
+        $query['page'] = 1;
+        $query['per_page'] = 100;
+
+        $rows = [];
+        $page = 1;
+        $lastPage = 1;
+
+        do {
+            $query['page'] = $page;
+            $response = app(IzinCache::class)->list($query);
+            $rows = [...$rows, ...($response['data'] ?? [])];
+            $lastPage = max(1, (int) ($response['last_page'] ?? 1));
+            $page++;
+        } while ($page <= $lastPage);
+
+        $cache->put($cacheKey, $rows, now()->addMinutes(5));
+    }
+
+    protected function exportRowsCacheKey(): string
+    {
+        $query = $this->buildQuery();
+        unset($query['page'], $query['per_page']);
+
+        return 'izin:export:'.md5((string) json_encode($query));
+    }
+
     protected function streamPdf(string $pdfBase64, string $filename)
     {
         $pdfBinary = base64_decode(str_replace('data:application/pdf;base64,', '', $pdfBase64));
@@ -161,12 +279,14 @@ new class extends Component {
         </div>
 
         {{-- Toolbar --}}
-        <div class="p-4 border-b border-zinc-100 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div class="flex items-center gap-3">
-                <flux:icon name="table-cells" class="size-5 text-zinc-400 hidden sm:block" />
-                <div class="leading-tight">
-                    <p class="text-sm font-semibold text-zinc-900">Daftar Izin</p>
-                    <p class="text-xs text-zinc-500">
+        @php
+            $hasActiveFilters = $status !== '' || $start_date !== '' || $end_date !== '' || $sort !== 'desc';
+        @endphp
+        <div class="border-b border-zinc-200 bg-zinc-50/60">
+            <div class="flex items-center justify-between gap-3 px-4 pt-4 sm:px-5">
+                <div class="min-w-0">
+                    <h2 class="text-base font-semibold text-zinc-900">Daftar Izin</h2>
+                    <p class="mt-0.5 text-xs text-zinc-500 tabular-nums">
                         @if ($data['total'] ?? false)
                             {{ $data['total'] }} pengajuan ditemukan
                         @else
@@ -174,114 +294,152 @@ new class extends Component {
                         @endif
                     </p>
                 </div>
+
+                <flux:dropdown position="bottom" align="end">
+                    <flux:button type="button" size="sm" variant="outline" icon="arrow-down-tray" icon:trailing="chevron-down" class="shrink-0 bg-white!">
+                        Export
+                    </flux:button>
+                    <flux:menu class="min-w-44">
+                        <flux:menu.item
+                            icon="table-cells"
+                            x-on:click="$wire.getExportGroups().then(groups => window.downloadGroupedIzinWorkbook(groups, 'laporan-izin.xlsx'))"
+                            wire:loading.attr="disabled"
+                            wire:target="getExportGroups"
+                        >
+                            Export Excel
+                        </flux:menu.item>
+                        <flux:menu.item
+                            icon="document-arrow-down"
+                            wire:click="exportGroupedPdf"
+                            wire:loading.attr="disabled"
+                            wire:target="exportGroupedPdf"
+                        >
+                            Export PDF
+                        </flux:menu.item>
+                    </flux:menu>
+                </flux:dropdown>
             </div>
 
-            <div class="grid grid-cols-2 gap-2 lg:flex lg:items-center lg:gap-2">
-                <flux:select wire:model.live="sort" size="sm" class="w-full lg:w-36">
-                    <flux:select.option value="desc">Terbaru</flux:select.option>
-                    <flux:select.option value="asc">Terlama</flux:select.option>
-                </flux:select>
+            <div class="grid grid-cols-2 items-end gap-3 px-4 pb-4 pt-3.5 sm:px-5 lg:grid-cols-[10rem_10rem_1fr_1fr_auto]">
+                <flux:field>
+                    <flux:label class="text-xs! text-zinc-500!">Urutkan</flux:label>
+                    <flux:select wire:model.live="sort" size="sm">
+                        <flux:select.option value="desc">Terbaru</flux:select.option>
+                        <flux:select.option value="asc">Terlama</flux:select.option>
+                    </flux:select>
+                </flux:field>
 
-                <flux:select wire:model.live="status" size="sm" class="w-full lg:w-36">
-                    <flux:select.option value="">Semua Status</flux:select.option>
-                    <flux:select.option value="2">Approved</flux:select.option>
-                    <flux:select.option value="3">Rejected</flux:select.option>
-                    <flux:select.option value="1">Pending</flux:select.option>
-                </flux:select>
+                <flux:field>
+                    <flux:label class="text-xs! text-zinc-500!">Status</flux:label>
+                    <flux:select wire:model.live="status" size="sm">
+                        <flux:select.option value="">Semua Status</flux:select.option>
+                        <flux:select.option value="2">Approved</flux:select.option>
+                        <flux:select.option value="3">Rejected</flux:select.option>
+                        <flux:select.option value="1">Pending</flux:select.option>
+                    </flux:select>
+                </flux:field>
 
-                <flux:input type="date" wire:model.live="start_date" size="sm" class="w-full lg:w-40" />
-                <flux:input type="date" wire:model.live="end_date" size="sm" class="w-full lg:w-40" />
+                <flux:field>
+                    <flux:label class="text-xs! text-zinc-500!">Dari tanggal</flux:label>
+                    <flux:input type="date" wire:model.live="start_date" size="sm" max="{{ $end_date ?: null }}" />
+                </flux:field>
+
+                <flux:field>
+                    <flux:label class="text-xs! text-zinc-500!">Sampai tanggal</flux:label>
+                    <flux:input type="date" wire:model.live="end_date" size="sm" min="{{ $start_date ?: null }}" />
+                </flux:field>
+
+                <div class="col-span-2 lg:col-span-1">
+                    <flux:button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        icon="arrow-path"
+                        wire:click="resetFilters"
+                        :disabled="! $hasActiveFilters"
+                        class="w-full lg:w-auto"
+                    >
+                        Reset filter
+                    </flux:button>
+                </div>
             </div>
         </div>
 
         {{-- Table (desktop) --}}
         <div class="hidden md:block overflow-x-auto">
             <table class="min-w-225 md:min-w-full text-sm text-left">
-                <thead class="bg-zinc-50/80 border-b border-zinc-200 text-[11px] uppercase tracking-wide text-zinc-500">
+                <thead class="bg-zinc-50 border-b border-zinc-200 text-[11px] uppercase tracking-wider text-zinc-500">
                     <tr>
-                        <th class="px-4 py-3 font-medium whitespace-nowrap">Tanggal</th>
-                        <th class="px-4 py-3 font-medium whitespace-nowrap">Nama</th>
-                        <th class="px-4 py-3 font-medium whitespace-nowrap">Alasan</th>
-                        <th class="px-4 py-3 font-medium whitespace-nowrap">Progress</th>
-                        <th class="px-4 py-3 font-medium whitespace-nowrap">Status</th>
-                        <th class="px-4 py-3 font-medium text-right whitespace-nowrap">Aksi</th>
+                        <th class="px-5 py-3 font-semibold whitespace-nowrap">Tanggal</th>
+                        <th class="px-4 py-3 font-semibold whitespace-nowrap">Nama</th>
+                        <th class="px-4 py-3 font-semibold whitespace-nowrap">Kategori</th>
+                        <th class="px-4 py-3 font-semibold whitespace-nowrap">Alasan</th>
+                        <th class="px-4 py-3 font-semibold text-center whitespace-nowrap">Status</th>
+                        <th class="px-5 py-3 font-semibold text-right whitespace-nowrap">Aksi</th>
                     </tr>
                 </thead>
                 <tbody wire:loading.class="pointer-events-none" class="divide-y divide-zinc-100">
                     @forelse ($this->data['data'] ?? [] as $izin)
                         @php
-                            $admin = (int) ($izin['status_admin'] ?? 1);
-                            $superadmin = (int) ($izin['status_superadmin'] ?? 1);
-
-                            if ($admin === 3 || $superadmin === 3) {
-                                $progress = 100;
-                                $progressColor = 'bg-rose-500';
-                            } elseif ($admin === 2 && $superadmin === 2) {
-                                $progress = 100;
-                                $progressColor = 'bg-emerald-500';
-                            } elseif ($admin === 2 || $superadmin === 2) {
-                                $progress = 50;
-                                $progressColor = 'bg-blue-500';
-                            } else {
-                                $progress = 25;
-                                $progressColor = 'bg-amber-500';
-                            }
-
                             $statusLabel = match ($izin['status'] ?? null) {
                                 '2' => ['text' => 'Approved', 'color' => 'green'],
                                 '3' => ['text' => 'Rejected', 'color' => 'red'],
                                 default => ['text' => 'Pending', 'color' => 'yellow'],
                             };
                         @endphp
-                        <tr wire:key="izin-{{ $izin['id'] }}" class="hover:bg-zinc-50/60 transition">
-                            <td class="px-4 py-3 whitespace-nowrap text-zinc-700 tabular-nums">
+                        <tr wire:key="izin-{{ $izin['id'] }}" class="transition hover:bg-zinc-50/70">
+                            <td class="px-5 py-3.5 whitespace-nowrap text-zinc-700 tabular-nums">
                                 {{ Carbon::parse($izin['start_date'])->format('d M Y') }}
                             </td>
-                            <td class="px-4 py-3 whitespace-nowrap">
-                                <div class="flex items-center gap-2">
+                            <td class="px-4 py-3.5 whitespace-nowrap">
+                                <div class="flex items-center gap-2.5">
                                     <flux:avatar size="xs" name="{{ $izin['user_name'] ?? '?' }}" />
                                     <span class="font-medium text-zinc-900">{{ $izin['user_name'] ?? 'N/A' }}</span>
                                 </div>
                             </td>
-                            <td class="px-4 py-3 min-w-55 text-zinc-600">
+                            <td class="px-4 py-3.5 min-w-48 text-zinc-700">
                                 <span class="line-clamp-2">{{ $izin['reason'] ?? 'N/A' }}</span>
                             </td>
-                            <td class="px-4 py-3 min-w-40">
-                                <div class="flex items-center gap-2">
-                                    <div class="flex-1 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
-                                        <div class="{{ $progressColor }} h-full rounded-full transition-all duration-300" style="width: {{ $progress }}%"></div>
-                                    </div>
-                                    <span class="text-[11px] font-medium text-zinc-500 tabular-nums w-9 text-right">{{ $progress }}%</span>
-                                </div>
+                            <td class="px-4 py-3.5 min-w-40 text-xs text-zinc-500">
+                                <span class="line-clamp-2">{{ $izin['description'] ?? '-' }}</span>
                             </td>
-                            <td class="px-4 py-3">
-                                <flux:badge color="{{ $statusLabel['color'] }}" size="sm">{{ $statusLabel['text'] }}</flux:badge>
+                            <td class="px-4 py-3.5 text-center">
+                                <flux:badge color="{{ $statusLabel['color'] }}" size="sm" inset="top bottom">{{ $statusLabel['text'] }}</flux:badge>
                             </td>
-                            <td class="px-4 py-3 text-right">
-                                <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:justify-end">
-                                    <a href="{{ route('izin.show', $izin['id']) }}" wire:navigate>
-                                        <flux:button icon="eye" variant="outline" size="sm" class="w-full cursor-pointer sm:w-auto">
-                                            Detail
-                                        </flux:button>
-                                    </a>
+                            <td class="px-5 py-3.5 text-right">
+                                <div class="flex items-center justify-end gap-1.5">
                                     <flux:button
-                                        wire:click="generatePDF({{ $izin['id'] }})"
-                                        icon="arrow-down-tray"
+                                        href="{{ route('izin.show', $izin['id']) }}"
+                                        wire:navigate
+                                        icon="eye"
                                         variant="outline"
                                         size="sm"
-                                        class="w-full sm:w-auto cursor-pointer"
+                                        class="cursor-pointer"
                                     >
-                                        PDF
+                                        Detail
                                     </flux:button>
+                                    <flux:tooltip content="Unduh PDF">
+                                        <flux:button
+                                            wire:click="generatePDF({{ $izin['id'] }})"
+                                            icon="arrow-down-tray"
+                                            variant="ghost"
+                                            size="sm"
+                                            class="cursor-pointer"
+                                            aria-label="Unduh PDF"
+                                        />
+                                    </flux:tooltip>
                                 </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-4 py-12 text-center">
+                            <td colspan="6" class="px-4 py-14 text-center">
                                 <div class="flex flex-col items-center gap-2 text-zinc-400">
                                     <flux:icon name="inbox" class="size-8" />
                                     <p class="text-sm">Tidak ada data izin</p>
+                                    @if ($hasActiveFilters)
+                                        <flux:button size="xs" variant="subtle" wire:click="resetFilters">Reset filter</flux:button>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
