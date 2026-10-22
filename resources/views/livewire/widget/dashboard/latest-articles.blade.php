@@ -31,7 +31,7 @@ new class extends Component {
     }
 }; ?>
 
-<div class="bg-white rounded-2xl border border-zinc-200 p-5 sm:p-6 shadow-xs space-y-5">
+<div class="bg-white rounded-2xl sm:p-6 shadow-sm space-y-5">
     <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
             <div class="size-10 rounded-xl bg-blue-50 ring-1 ring-blue-100 flex items-center justify-center">

@@ -190,7 +190,7 @@ new class extends Component
     }
 }; ?>
 
-<div class="bg-white rounded-2xl border border-zinc-200 shadow-xs ">
+<div class="bg-white rounded-2xl shadow-sm ">
     <div class="grid lg:grid-cols-5 divide-y lg:divide-y-0 lg:divide-x divide-zinc-100">
 
         {{-- Calendar --}}

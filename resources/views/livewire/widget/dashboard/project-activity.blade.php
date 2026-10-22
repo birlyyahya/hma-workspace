@@ -137,7 +137,7 @@ new class extends Component
     }
 }; ?>
 
-<div class="bg-white rounded-2xl border border-zinc-200 shadow-xs min-h-100 overflow-auto lg:overflow-hidden">
+<div class="bg-white rounded-2xl shadow-sm min-h-100 overflow-auto lg:overflow-hidden">
     @php $stats = $this->stats; @endphp
 
     <div class="flex flex-wrap items-center justify-between gap-3 p-4 pb-0 sm:p-5 sm:pb-0">

@@ -140,7 +140,7 @@ new #[Lazy] class extends Component {
             <x-errors.403 />
         </div>
     @else
-    <div class="max-h-screen overflow-auto">
+    <div class="">
         <div
             x-data="{
                 active: 'overview',
