@@ -183,9 +183,9 @@ new class extends Component {
         @endif
     </flux:modal.trigger>
 
-    <flux:modal name="notification" flyout class="w-full max-w-md p-0!">
-        <div class="flex h-full flex-col">
-            <div class="px-5 pt-5">
+    <flux:modal name="notification" flyout class="w-full max-w-md overflow-hidden! p-0!">
+        <div class="flex h-dvh flex-col">
+            <div class="shrink-0 px-5 pt-5">
                 <flux:heading size="lg" class="font-semibold">Notifikasi</flux:heading>
             </div>
 
@@ -197,7 +197,7 @@ new class extends Component {
                     'history' => ['label' => 'Riwayat', 'count' => null],
                 ];
             @endphp
-            <div class="mt-3 flex gap-1 overflow-x-auto border-b border-zinc-200 px-3">
+            <div class="mt-3 flex shrink-0 gap-1 overflow-x-auto border-b border-zinc-200 px-3">
                 @foreach ($tabs as $key => $item)
                     <button
                         type="button"
@@ -224,7 +224,7 @@ new class extends Component {
                 @endforeach
             </div>
 
-            <div class="min-h-0 flex-1 divide-y divide-zinc-200 overflow-y-auto">
+            <div class="min-h-0 flex-1 divide-y divide-zinc-200 overflow-y-auto overscroll-contain">
                 @forelse ($this->items as $notification)
                     <button
                         type="button"
@@ -290,7 +290,7 @@ new class extends Component {
                 @endforelse
             </div>
 
-            <div class="flex items-center justify-between border-t border-zinc-200 px-5 py-3">
+            <div class="flex shrink-0 items-center justify-between border-t border-zinc-200 bg-white px-5 py-3">
                 <flux:button
                     size="sm"
                     variant="ghost"

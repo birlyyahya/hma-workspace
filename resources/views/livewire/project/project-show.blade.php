@@ -156,24 +156,6 @@ new #[Lazy] class extends Component {
             {{-- ============ STICKY HEADER ============ --}}
             <div class="bg-white/90 backdrop-blur md:px-4">
                 <div class="px-4 md:px-0 pt-4 pb-4 rounded-xl">
-                    {{-- Breadcrumb --}}
-                    <nav class="flex items-center gap-1.5 text-xs text-zinc-500 mb-3">
-                        @if(!Auth::user()->hasPermission('project.view.all'))
-                        <a class=" transition inline-flex items-center gap-1">
-                            <flux:icon.ellipsis-vertical class="w-3.5 h-3.5" />
-                            Project
-                        </a>
-                        @else
-                        <a href="{{ route('projects') }}" class="hover:text-red-600 transition inline-flex items-center gap-1">
-                            <flux:icon.chevron-left class="w-3.5 h-3.5" />
-                            Project
-                        </a>
-                        @endif
-                        <span class="text-zinc-300">/</span>
-                        <span class="text-zinc-700 font-medium truncate max-w-md">
-                            {{ $this->project['code'] ?? '—' }}
-                        </span>
-                    </nav>
 
                     {{-- Title row --}}
                     <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -271,7 +253,7 @@ new #[Lazy] class extends Component {
 
                 </div>
             </div>
-            <div class="md:sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-zinc-200 rounded-b-xl px-4 md:px-0 pb-0">
+            <div class="md:sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-zinc-200 rounded-b-xl px-4 md:px-4 pb-0">
                 {{-- ============ TAB NAVIGATION ============ --}}
                 <nav class=" -mb-px flex items-center gap-1 overflow-x-auto">
                     @foreach($tabs as $tab)
