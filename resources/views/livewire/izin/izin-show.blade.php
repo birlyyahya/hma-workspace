@@ -52,6 +52,7 @@ class extends Component {
             $query->where('slug', $asmenSlug);
         })->first();
 
+
         $izin['manager_name'] = $manager?->name;
         $izin['asmen_name'] = $asmen?->name;
 
@@ -66,7 +67,7 @@ class extends Component {
 
         $pdfBase64 = 'data:application/pdf;base64,' . base64_encode($pdf->output());
 
-        Cache::put($cacheKey, $pdfBase64, now()->addDay());
+        // Cache::put($cacheKey, $pdfBase64, now()->addDay());
 
         $this->pdfPreview = $pdfBase64;
     }

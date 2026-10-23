@@ -33,29 +33,27 @@
             max-height: 1060px;
             margin: 0 auto;
             background: #fff;
-            border: 3px solid #111;
-            padding: 0px 32px;
-            border-radius: 5px;
+            padding: 0 12px;
             page-break-inside: avoid;
         }
 
         .header-table,
         .form-table {
             width: 100%;
-            margin-top: 32px;
             border-collapse: collapse;
-            table-layout: auto;
         }
 
         .header-table {
             border: 2px solid #111;
+            table-layout: fixed;
         }
 
         .header-table td {
             border-right: 2px solid #111;
             text-align: center;
             vertical-align: middle;
-            padding: 10px;
+            height: 0px;
+            padding: 8px;
         }
 
         .header-table td:last-child {
@@ -63,25 +61,41 @@
         }
 
         .logo-cell {
-            width: 160px;
+            width: 18%;
+            padding: 8px;
         }
 
         .logo {
-            width: 120px;
+            width: 116px;
             max-width: 100%;
+            max-height: 108px;
             height: auto;
+            object-fit: contain;
             display: block;
             margin: 0 auto;
         }
 
+        .title-cell {
+            width: 82%;
+            padding: 12px 18px;
+        }
+
         .title {
+            font-family: Arial, sans-serif;
             font-weight: 700;
-            font-size: 21px;
+            font-size: 20px;
             line-height: 1.2;
         }
 
+        .company-title {
+            margin-top: 8px;
+        }
+
         .content {
-            padding: 20px 6px 0;
+            border-right: 2px solid #111;
+            border-bottom: 2px solid #111;
+            border-left: 2px solid #111;
+            padding: 30px 30px 30px;
             min-height: 430px;
         }
 
@@ -116,6 +130,63 @@
             word-break: break-word;
         }
 
+        .leave-reason-cell {
+            padding: 0 0 2px;
+        }
+
+        .leave-reason-title {
+            padding-bottom: 8px;
+        }
+
+        .leave-reason-grid {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .leave-reason-option {
+            width: 33.33%;
+            padding: 8px;
+            vertical-align: bottom;
+            white-space: nowrap;
+        }
+
+
+        .checkbox {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            margin-right: 8px;
+            border: 2px solid #111;
+            text-align: center;
+            line-height: 15px;
+            vertical-align: middle;
+            box-sizing: border-box;
+        }
+
+        /* Check mark menggunakan CSS border */
+        .checkbox-mark {
+            display: inline-block;
+            width: 4px;
+            height: 18px;
+            border: solid #111;
+            border-width: 0 2.5px 2.5px 0;
+            transform: rotate(45deg);
+            margin-top: -9px;
+            margin-right: -8px;
+        }
+
+
+        /* check mark */
+        .checkbox-mark {
+
+        }
+
+        .reason-text{
+            line-height: 15px;
+            display: inline-block;
+        }
+
         .multi {
             min-height: 34px;
         }
@@ -125,7 +196,7 @@
         }
 
         .signature-section {
-            padding: 120px 6px 0;
+            padding: 50px 6px 0;
         }
 
         .signature-date {
@@ -142,14 +213,13 @@
         }
 
         .signature-box {
-            width: 32%;
+            width: 33%;
             border: 2px solid #111;
             text-align: center;
             vertical-align: top;
         }
 
         .signature-title {
-            min-height: 74px;
             font-size: 17px;
             line-height: 1.2;
             border-bottom: 2px solid #111;
@@ -185,8 +255,7 @@
 
             .container {
                 max-width: 100%;
-                border-radius: 0;
-                border-width: 2px;
+                border: 0;
                 min-height: calc(297mm - 28mm);
                 padding: 24px;
             }

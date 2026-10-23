@@ -63,6 +63,11 @@ class extends Component {
 @endpush
 
 <div class="mt-10 space-y-6 px-1">
+    @php
+    $path = parse_url($this->user, PHP_URL_PATH);
+    $path = str_replace('storage/izindar/', '', $path);
+    $url = Storage::disk('s3_izindar')->temporaryUrl($path, now()->addMinutes(60));
+    @endphp
     <div class="relative mb-5">
         <flux:heading>{{ __('Signature') }}</flux:heading>
         <flux:subheading>{{ __('Update your signature') }}</flux:subheading>
@@ -74,7 +79,7 @@ class extends Component {
             @if ($signature)
             <img src="{{ $signature->temporaryUrl() }}" class="max-h-full max-w-full object-contain">
             @else
-            <img id="signature-frame" src="{{ $this->user }}" class="max-h-full max-w-full object-contain">
+            <img id="signature-frame" src="{{ $url }}" class="max-h-full max-w-full object-contain">
             @endif
             @endif
         </div>

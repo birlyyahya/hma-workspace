@@ -60,9 +60,34 @@ class extends Component {
                 </tr>
 
                 <tr>
-                    <td class="label">Mengajukan izin</td>
-                    <td class="colon">:</td>
-                    <td class="value">{{ $this->izin['reason'] }}</td>
+                    <td colspan="3" class="leave-reason-cell">
+                        <div class="leave-reason-title">Mengajukan izin :</div>
+                        <table class="leave-reason-grid">
+                            @foreach ([
+                                'Datang terlambat',
+                                'Tugas luar kantor',
+                                'Lain-lain',
+                                'Pulang lebih awal',
+                                'Dinas luar kota',
+                                'Sakit',
+                            ] as $jenis)
+                                @if ($loop->first || $loop->index % 3 === 0)
+                                    <tr>
+                                @endif
+                                <td class="leave-reason-option">
+                                    <span class="checkbox">
+                                        @if ($this->izin['reason'] === $jenis)
+                                            <span class="checkbox-mark"></span>
+                                        @endif
+                                    </span>
+                                    <span class="reason-text">{{ $jenis }}</span>
+                                </td>
+                                @if ($loop->last || $loop->index % 3 === 2)
+                                    </tr>
+                                @endif
+                            @endforeach
+                        </table>
+                    </td>
                 </tr>
 
                 <tr>
