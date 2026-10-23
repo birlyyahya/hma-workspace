@@ -27,59 +27,69 @@ new class extends Component {
         };
     }
 
+    public function getGreetingIconColorProperty(): string
+    {
+        $hour = (int) now()->format('H');
+
+        return match (true) {
+            $hour < 11 => 'text-amber-500',
+            $hour < 18 => 'text-sky-500',
+            default => 'text-indigo-500',
+        };
+    }
+
+    public function getHariProperty(): string
+    {
+        return now()->translatedFormat('l');
+    }
+
     public function getTanggalProperty(): string
     {
-        return now()->translatedFormat('l, d F Y');
+        return now()->translatedFormat('d F Y');
     }
 
     public function getQuoteProperty(): string
     {
-        return Inspiring::quote();
+        return strip_tags(Inspiring::quote());
     }
 }; ?>
 
 <div
     data-testid="dashboard-welcome-widget"
-    class="relative overflow-hidden rounded-xl border border-white/15 bg-linear-to-br from-red-700 via-red-600 to-rose-600 p-6 shadow-sm"
+    class="px-1 py-2"
 >
-    <div class="pointer-events-none absolute inset-0">
-        <div class="absolute -right-20 -top-24 size-72 rounded-full bg-white/15 blur-3xl"></div>
-        <div class="absolute -left-24 -bottom-28 size-72 rounded-full bg-black/15 blur-3xl"></div>
-        <div class="absolute inset-0 bg-linear-to-br from-white/10 to-transparent"></div>
-    </div>
+    <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex min-w-0 items-center gap-4">
+            <flux:avatar
+                circle
+                size="lg"
+                class="shrink-0"
+                name="{{ auth()->user()->name }}"
+                color="auto"
+                color:seed="{{ auth()->id() }}"
+            />
 
-    <div class="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-        <div class="min-w-0 space-y-4">
-            <div class="flex flex-wrap items-center gap-2">
-                <div class="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-white/90 ring-1 ring-white/20">
-                    <flux:icon name="calendar-days" class="size-4" />
-                    <span class="truncate">{{ $this->tanggal }}</span>
-                </div>
-
-                <div class="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-white/90 ring-1 ring-white/20">
-                    <flux:icon :name="$this->greetingIcon" class="size-4" />
-                    <span>Selamat {{ $this->waktu }}</span>
-                </div>
+            <div class="min-w-0">
+                <p class="flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400">
+                    <flux:icon :name="$this->greetingIcon" variant="mini" class="size-4 {{ $this->greetingIconColor }}" />
+                    <span>Selamat {{ $this->waktu }},</span>
+                </p>
+                <h1 class="truncate text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl dark:text-white">
+                    {{ auth()->user()->name }}
+                </h1>
+                <p class="mt-1 line-clamp-2 text-sm text-zinc-500 dark:text-zinc-400">
+                    {{ $this->quote }}
+                </p>
             </div>
+        </div>
 
-            <div class="flex items-center gap-3">
-                <flux:avatar
-                    circle
-                    size="sm"
-                    class="ring-2 ring-white/25"
-                    name="{{ auth()->user()->name }}"
-                    color="auto"
-                    color:seed="{{ auth()->id() }}"
-                />
-
-                <div class="min-w-0">
-                    <flux:heading size="xl" class="text-white leading-tight">
-                        {{ auth()->user()->name }}
-                    </flux:heading>
-                    <flux:text class="text-white/80 text-sm line-clamp-2 italic">
-                        {!! $this->quote !!}
-                    </flux:text>
-                </div>
+        <div class="flex shrink-0 items-center gap-3 border-t border-zinc-200/80 pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0 dark:border-zinc-700">
+            <div class="flex size-11 items-center justify-center rounded-xl bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400">
+                <flux:icon name="calendar-days" variant="mini" class="size-5" />
+            </div>
+            <div>
+                <p class="text-xs font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">{{ $this->hari }}</p>
+                <p class="text-sm font-semibold text-zinc-900 tabular-nums dark:text-white">{{ $this->tanggal }}</p>
             </div>
         </div>
     </div>
