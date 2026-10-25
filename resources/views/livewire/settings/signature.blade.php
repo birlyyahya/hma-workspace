@@ -52,10 +52,31 @@ class extends Component {
     private function syncStoredSignature(?string $signature = null): void
     {
         $signature ??= app(IzinCache::class)->userSignature(Auth::user()->username);
+        $signature = $this->normalizeSignaturePath($signature);
 
         if ($signature) {
             Auth::user()->forceFill(['signature' => $signature])->save();
         }
+    }
+
+    private function normalizeSignaturePath(?string $signature): ?string
+    {
+        if (! $signature || str_starts_with($signature, 'data:')) {
+            return null;
+        }
+
+        $path = filter_var($signature, FILTER_VALIDATE_URL)
+            ? parse_url($signature, PHP_URL_PATH)
+            : $signature;
+
+        if (! is_string($path) || $path === '') {
+            return null;
+        }
+
+        $path = ltrim($path, '/');
+        $path = str_replace('storage/izindar/', '', $path);
+
+        return ltrim($path, '/') ?: null;
     }
 
     public function saveDraw(?string $signature = null, ?string $displaySignature = null)
