@@ -17,6 +17,7 @@ class extends Component {
 
     public $signature;
     public $drawSign;
+    public ?string $previewUrl = null;
 
     public function getUserProperty()
     {
@@ -25,27 +26,57 @@ class extends Component {
 
     public function save()
     {
+        if (! $this->signature instanceof \Illuminate\Http\UploadedFile) {
+            Toaster::error('Silakan pilih file tanda tangan terlebih dahulu.');
+
+            return;
+        }
+
         $signatureBase64 = 'data:'.$this->signature->getMimeType().';base64,'.base64_encode(file_get_contents($this->signature->getRealPath()));
 
         $result = app(IzinWriter::class)->updateSignature(Auth::user()->username, $signatureBase64);
 
         if ($result['ok']) {
+            $this->syncStoredSignature(
+                data_get($result, 'body.data.signature') ?: data_get($result, 'body.signature')
+            );
             Toaster::success('Signature berhasil diupdate!');
             Flux::modal('upload-signature')->close();
-            $this->user = $this->signature;
+            $this->previewUrl = $signatureBase64;
+            $this->signature = null;
         } else {
             Toaster::error('Gagal mengupdate signature. Silakan coba lagi.');
         }
     }
 
-    public function saveDraw()
+    private function syncStoredSignature(?string $signature = null): void
     {
-        $result = app(IzinWriter::class)->updateSignature(Auth::user()->username, $this->signature);
+        $signature ??= app(IzinCache::class)->userSignature(Auth::user()->username);
+
+        if ($signature) {
+            Auth::user()->forceFill(['signature' => $signature])->save();
+        }
+    }
+
+    public function saveDraw(?string $signature = null, ?string $displaySignature = null)
+    {
+        $signature ??= $this->signature;
+
+        if (! is_string($signature) || $signature === '') {
+            Toaster::error('Tanda tangan belum dibuat.');
+
+            return;
+        }
+
+        $result = app(IzinWriter::class)->updateSignature(Auth::user()->username, $signature);
 
         if ($result['ok']) {
+            $this->syncStoredSignature(
+                data_get($result, 'body.data.signature') ?: data_get($result, 'body.signature')
+            );
             Toaster::success('Signature berhasil diupdate!');
-            Flux::modal('upload-signature')->close();
-            $this->user = $this->drawSign;
+            Flux::modal('draw-signature')->close();
+            $this->previewUrl = $displaySignature ?? $this->drawSign;
             $this->signature = null;
         } else {
             Toaster::error('Gagal mengupdate signature. Silakan coba lagi.');
@@ -64,9 +95,20 @@ class extends Component {
 
 <div class="mt-10 space-y-6 px-1">
     @php
-    $path = parse_url($this->user, PHP_URL_PATH);
-    $path = str_replace('storage/izindar/', '', $path);
-    $url = Storage::disk('s3_izindar')->temporaryUrl($path, now()->addMinutes(60));
+    $storedSignature = $this->user;
+    $url = $this->previewUrl;
+
+    if (! $url && $storedSignature) {
+        if (str_starts_with($storedSignature, 'data:')) {
+            $url = $storedSignature;
+        } else {
+            $path = parse_url($storedSignature, PHP_URL_PATH) ?: $storedSignature;
+            $path = ltrim(str_replace('storage/izindar/', '', $path), '/');
+            $url = $path !== ''
+                ? Storage::disk('s3_izindar')->temporaryUrl($path, now()->addMinutes(60))
+                : null;
+        }
+    }
     @endphp
     <div class="relative mb-5">
         <flux:heading>{{ __('Signature') }}</flux:heading>
@@ -75,12 +117,10 @@ class extends Component {
 
     <div class="space-y-6">
         <div class="w-full h-64 bg-white rounded-sm border border-gray-200 flex items-center justify-center overflow-hidden">
-            @if($this->user )
             @if ($signature)
-            <img src="{{ $signature->temporaryUrl() }}" class="max-h-full max-w-full object-contain">
-            @else
-            <img id="signature-frame" src="{{ $url }}" class="max-h-full max-w-full object-contain">
-            @endif
+                <img src="{{ $signature->temporaryUrl() }}" class="max-h-full max-w-full object-contain">
+            @elseif ($url)
+                <img id="signature-frame" src="{{ $url }}" class="max-h-full max-w-full object-contain">
             @endif
         </div>
         <div class="flex gap-4">
@@ -101,10 +141,14 @@ class extends Component {
                 <flux:text class="mt-2">Draw your signature here</flux:text>
             </div>
             <div class="w-full" id="sig"></div>
+            <flux:text id="signature-error" class="hidden text-red-600">Silakan buat tanda tangan terlebih dahulu.</flux:text>
             <div class="flex justify-between">
                 <input type="hidden" id="signature-input" wire:model="signature">
                 <flux:button id="clear">Clear</flux:button>
-                <flux:button id="save" variant="primary" wire:click="saveDraw">Save</flux:button>
+                <flux:button id="save" variant="primary" wire:loading.attr="disabled" wire:target="saveDraw">
+                    <span wire:loading.remove wire:target="saveDraw">Save</span>
+                    <span wire:loading wire:target="saveDraw">Menyimpan...</span>
+                </flux:button>
             </div>
         </div>
     </flux:modal>
@@ -129,7 +173,10 @@ class extends Component {
                     SVG, PNG, JPG or GIF (max 800×400px)
                 </p>
             </div>
-            <flux:button variant="primary" color="slate" class="ml-auto" wire:click="save">Save</flux:button>
+            <flux:button variant="primary" color="slate" class="ml-auto" wire:click="save" wire:loading.attr="disabled" wire:target="save">
+                <span wire:loading.remove wire:target="save">Save</span>
+                <span wire:loading wire:target="save">Menyimpan...</span>
+            </flux:button>
         </div>
     </flux:modal>
 
@@ -268,16 +315,28 @@ class extends Component {
             initSignature();
             enableTouchDrawing();
 
-            $('#open-draw-signature').on('click', function() {
+            $('#open-draw-signature').off('click.signature').on('click.signature', function() {
                 setTimeout(resizeSignature, 80);
                 setTimeout(resizeSignature, 220);
             });
 
-            $('#clear').on('click', function() {
+            $('#clear').off('click.signature').on('click.signature', function() {
                 $sig.signature('clear');
             });
-            $('#save').on('click', function() {
-                Flux.modals('draw-signature').close()
+            $('#save').off('click.signature').on('click.signature', function() {
+                if (this.dataset.saving === 'true') {
+                    return;
+                }
+
+                let errorMessage = document.getElementById('signature-error');
+                if ($sig.signature('isEmpty')) {
+                    errorMessage.classList.remove('hidden');
+                    return;
+                }
+                errorMessage.classList.add('hidden');
+
+                this.dataset.saving = 'true';
+                this.disabled = true;
 
                 let svg = $sig.signature('toSVG');
                 let size = getSize();
@@ -299,11 +358,14 @@ class extends Component {
                     .attr('src', dataUrl)
                     .removeClass('hidden');
 
-                @this.set('signature', base64);
-                @this.set('drawSign', dataUrl);
+                @this.call('saveDraw', base64, dataUrl).finally(function() {
+                    let saveButton = document.getElementById('save');
+                    saveButton.dataset.saving = 'false';
+                    saveButton.disabled = false;
+                });
             });
 
-            $(window).on('resize orientationchange', function() {
+            $(window).off('resize.signature orientationchange.signature').on('resize.signature orientationchange.signature', function() {
                 clearTimeout(resizeTimer);
                 resizeTimer = setTimeout(resizeSignature, 100);
             });

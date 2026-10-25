@@ -1,8 +1,8 @@
 @php
 use Carbon\Carbon;
 
-$nama = data_get($izin, 'users.name', 'Muhammad Birly Yahya');
-$divisi = data_get($izin, 'users.divisi', 'IT');
+$nama = data_get($izin, 'users.name', 'IT');
+$divisi = data_get($izin, 'users.role.name', 'IT');
 $reason = data_get($izin, 'reason', 'Tugas luar kantor');
 $jenisIzin = [
     'Datang terlambat',
@@ -19,6 +19,25 @@ $endDate = data_get($izin, 'end_date');
 $startTime = data_get($izin, 'start_time');
 $endTime = data_get($izin, 'end_time');
 $createdAt = data_get($izin, 'created_at');
+
+$approvalSignatures = data_get($izin, 'approval_signatures', []);
+
+if (empty($approvalSignatures)) {
+    $approvalSignatures = [
+        [
+            'title' => 'Mengetahui Oleh',
+            'role' => 'Atasan Langsung',
+            'name' => data_get($izin, 'atasan_langsung_name', data_get($izin, 'asmen_name', 'Atasan Langsung')),
+            'signature_base64' => data_get($izin, 'admins_base64'),
+        ],
+        [
+            'title' => 'Disetujui Oleh',
+            'role' => 'Manager',
+            'name' => data_get($izin, 'manager_name', 'Manager'),
+            'signature_base64' => data_get($izin, 'superadmins_base64'),
+        ],
+    ];
+}
 
 $tanggal = '-';
 if ($startDate) {
@@ -132,8 +151,8 @@ $tanggalTtd = $createdAt
                             <div class="signature-title">Pemohon</div>
 
                             <div class="signature-image">
-                                @if(data_get($izin, 'pemohon_base64'))
-                                <img src="{{ data_get($izin, 'pemohon_base64') }}" alt="Tanda tangan pemohon">
+                                @if(data_get($izin, 'users.signature'))
+                                <img src="{{ data_get($izin, 'users.signature') }}" >
                                 @endif
                             </div>
 
@@ -142,46 +161,34 @@ $tanggalTtd = $createdAt
                             </div>
                         </td>
 
-                        <td class="signature-box">
-                            <div class="signature-title">Atasan Langsung</div>
+                        @foreach ($approvalSignatures as $approval)
+                            <td class="signature-box">
+                                <div class="signature-title">
+                                    {{ $approval['title'] }}
+                                </div>
 
-                            <div class="signature-image">
-                                @if(data_get($izin, 'admins_base64'))
-                                <img src="{{ data_get($izin, 'admins_base64') }}" alt="Tanda tangan atasan langsung">
-                                @endif
-                            </div>
+                                <div class="signature-image">
+                                    @if($approval['signature_base64'])
+                                    <img src="{{ $approval['signature_base64'] }}" alt="Tanda tangan {{ $approval['name'] }}">
+                                    @endif
+                                </div>
 
-                            <div class="signature-footer">
-                                {{ data_get($izin, 'asmen_name', 'Atasan Langsung') }}<br>
-                            </div>
-                        </td>
+                                <div class="signature-footer">
+                                    {{ $approval['name'] }}
+                                </div>
+                            </td>
+                        @endforeach
+                            <td class="signature-box">
+                                <div class="signature-title">
+                                    HRD
+                                </div>
 
-                        <td class="signature-box">
-                            <div class="signature-title">Disetujui Oleh</div>
+                                <div class="signature-image">
+                                </div>
 
-                            <div class="signature-image">
-                                @if(data_get($izin, 'superadmins_base64'))
-                                <img src="{{ data_get($izin, 'superadmins_base64') }}" alt="Tanda tangan manager">
-                                @endif
-                            </div>
-
-                            <div class="signature-footer">
-                                {{ data_get($izin, 'manager_name', 'Manager') }}<br>
-                            </div>
-                        </td>
-
-                        <td class="signature-box">
-                            <div class="signature-title">HRD</div>
-
-                            <div class="signature-image">
-                                @if(data_get($izin, 'pemohon_base64'))
-                                <img src="{{ data_get($izin, 'pemohon_base64') }}" alt="Tanda tangan pemohon">
-                                @endif
-                            </div>
-
-                            <div class="signature-footer">
-                            </div>
-                        </td>
+                                <div class="signature-footer">
+                                </div>
+                            </td>
                     </tr>
                 </table>
             </div>

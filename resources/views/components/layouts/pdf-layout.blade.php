@@ -196,7 +196,7 @@
         }
 
         .signature-section {
-            padding: 50px 6px 0;
+            padding: 50px 0px 0;
         }
 
         .signature-date {
@@ -205,11 +205,11 @@
         }
 
         .signature-table {
-            width: 100%;
+            width: 105%;
             border-collapse: separate;
-            border-spacing: 8px 0;
+            border-spacing: 10px 0;
             table-layout: fixed;
-            margin: 0 -8px;
+            margin: 0 -15px;
         }
 
         .signature-box {
@@ -222,7 +222,7 @@
         .signature-title {
             font-size: 17px;
             line-height: 1.2;
-            border-bottom: 2px solid #111;
+            /* border-bottom: 2px solid #111; */
             padding: 8px 6px;
         }
 

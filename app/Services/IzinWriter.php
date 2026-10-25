@@ -146,7 +146,7 @@ class IzinWriter
             $ok = (bool) ($body['success'] ?? false);
 
             if ($ok) {
-                $this->cache->flushUser($username);
+                $this->cache->flush();
                 $this->logActivity([
                     'name' => 'izin',
                     'event' => 'updated',

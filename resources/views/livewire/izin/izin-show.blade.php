@@ -5,6 +5,7 @@ use App\Services\IzinCache;
 use App\Services\RemoteImageFetcher;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 use Masmerise\Toaster\Toaster;
@@ -31,48 +32,70 @@ class extends Component {
 
     public function generatePDF($id)
     {
-        $cacheKey = 'pdf-preview-' . $id;
+        $response = app(IzinCache::class)->detail((int) $id);
+        $izin = ($response['success'] ?? false) ? $response['data'] : $this->data;
 
-        if (Cache::has($cacheKey)) {
+        $pemohon = User::with('role.department.parent')
+            ->where('username', data_get($izin, 'users.username'))
+            ->first();
 
-            $this->pdfPreview = Cache::get($cacheKey);
+        if (! $pemohon) {
+            Toaster::error('Data pemohon tidak ditemukan.');
+
             return;
         }
-        $izin = $this->data;
 
-        $manager = User::whereHas('role', function ($query) {
-            $query->where('slug', 'manager');
-        })->first();
+        $approvers = $pemohon->izinApprovers();
+        $izin['users'] = $pemohon->toArray();
+        $izin['users']['signature'] = $this->signatureToDataUri(
+            data_get($izin, 'url_sign') ?: $pemohon->signature
+        );
 
-        $pemohon = User::where('username', data_get($izin, 'users.username'))->first();
+        $izin['approval_signatures'] = $approvers->values()->map(function (User $approver) use ($izin) {
+            $isDirector = $approver->hasRole(['direktur', 'director', 'gm']);
+            $isManager = $approver->hasRole('manager');
+            $fallback = $isDirector || $isManager
+                ? data_get($izin, 'superadmins')
+                : data_get($izin, 'admins');
+            $signature = $approver->signature ?: $fallback;
 
-        $asmenSlug = $pemohon?->isInDepartment('it-infra') ? 'spv-it-infra' : 'asmen';
-
-        $asmen = User::whereHas('role', function ($query) use ($asmenSlug) {
-            $query->where('slug', $asmenSlug);
-        })->first();
-
-
-        $izin['manager_name'] = $manager?->name;
-        $izin['asmen_name'] = $asmen?->name;
-
-        $izin['admins_base64'] = $this->convertImageToBase64(data_get($izin, 'admins'));
-
-        $izin['superadmins_base64'] = $this->convertImageToBase64(data_get($izin, 'superadmins'));
-        $izin['pemohon_base64'] = $this->convertImageToBase64(data_get($izin, 'url_sign'));
+            return [
+                'title' => $isDirector || $isManager ? 'Disetujui Oleh' : 'Mengetahui Oleh',
+                'role' => $isDirector ? 'Direktur' : ($isManager ? 'Manager' : 'Atasan Langsung'),
+                'name' => $approver->name,
+                'signature_base64' => $this->signatureToDataUri($signature),
+            ];
+        })->all();
 
         $pdf = Pdf::loadView('pdf.izin-pdf', [
             'izin' => $izin,
         ])->setPaper('A4', 'portrait');
 
-        $pdfBase64 = 'data:application/pdf;base64,' . base64_encode($pdf->output());
-
-        // Cache::put($cacheKey, $pdfBase64, now()->addDay());
-
+        $pdfBase64 = 'data:application/pdf;base64,'.base64_encode($pdf->output());
         $this->pdfPreview = $pdfBase64;
     }
 
-     private function convertImageToBase64($url)
+    private function signatureToDataUri(?string $signature): ?string
+    {
+        if (! $signature) {
+            return null;
+        }
+
+        if (str_starts_with($signature, 'data:')) {
+            return $signature;
+        }
+
+        $url = filter_var($signature, FILTER_VALIDATE_URL)
+            ? $signature
+            : Storage::disk('s3_izindar')->temporaryUrl(
+                ltrim(str_replace('storage/izindar/', '', $signature), '/'),
+                now()->addMinutes(5),
+            );
+
+        return $this->convertImageToBase64($url);
+    }
+
+    private function convertImageToBase64(?string $url): ?string
     {
         return app(RemoteImageFetcher::class)->toDataUri($url);
     }
@@ -108,9 +131,11 @@ class extends Component {
                     </iframe>
                     @else
                     <div class="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 justify-center h-[420px] sm:h-[500px] md:h-[600px] text-gray-400 text-center sm:text-left">
-                        <span>PDF preview akan muncul di sini</span>
-                        <flux:button wire:click="generatePDF({{ $data['id'] }})" variant="primary" size="sm" class="cursor-pointer w-full sm:w-auto">
-                            Preview PDF
+                        <span wire:loading.remove wire:target="generatePDF">PDF preview akan muncul di sini</span>
+                        <span wire:loading wire:target="generatePDF">Sedang membuat PDF...</span>
+                        <flux:button wire:click="generatePDF({{ $data['id'] }})" wire:loading.attr="disabled" wire:target="generatePDF" variant="primary" size="sm" class="cursor-pointer w-full sm:w-auto">
+                            <span wire:loading.remove wire:target="generatePDF">Preview PDF</span>
+                            <span wire:loading wire:target="generatePDF">Membuat PDF...</span>
                         </flux:button>
                     </div>
                     @endif

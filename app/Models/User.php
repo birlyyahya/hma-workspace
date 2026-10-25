@@ -47,6 +47,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'username',
         'role_id',
         'no_telp',
+        'signature',
     ];
 
     /**
@@ -94,10 +95,19 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function isInDepartment(string $departmentCode): bool
     {
+        $this->loadMissing('role.department.parent');
+
         $department = $this->role?->department;
 
-        return $department?->code === $departmentCode
-            || $department?->parent?->code === $departmentCode;
+        while ($department !== null) {
+            if ($department->code === $departmentCode) {
+                return true;
+            }
+
+            $department = $department->parent;
+        }
+
+        return false;
     }
 
     /**
@@ -153,6 +163,99 @@ class User extends Authenticatable implements MustVerifyEmail
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
+    }
+
+    /**
+     * Get supervisors from the nearest higher role level to the highest level.
+     * Roles in the user's department hierarchy are included, along with
+     * organization-wide roles that do not belong to a department.
+     *
+     * @return Collection<int, User>
+     */
+    public function supervisorChain(): Collection
+    {
+        $this->loadMissing('role.department.parent');
+
+        $currentLevel = $this->role?->level;
+
+        if ($currentLevel === null) {
+            return collect();
+        }
+
+        $roles = Role::query()
+            ->with(['department', 'users.role.department.parent'])
+            ->where('level', '>', $currentLevel)
+            ->where(function ($query) {
+                $query->whereBetween('level', [60, 99])
+                    ->orWhereIn('slug', ['direktur', 'director']);
+            })
+            ->orderBy('level')
+            ->get();
+
+        $staffDepartmentCode = str_starts_with((string) $this->role?->slug, 'staff-')
+            ? Str::after((string) $this->role?->slug, 'staff-')
+            : null;
+
+        return $roles
+            ->filter(fn (Role $role) => $role->department === null
+                || $this->isInDepartment($role->department->code)
+                || ($staffDepartmentCode !== null && $role->slug === 'spv-'.$staffDepartmentCode))
+            ->flatMap(fn (Role $role) => $role->users)
+            ->reject(fn (User $user) => $user->is($this))
+            ->unique('id')
+            ->values();
+    }
+
+    /**
+     * Resolve the approvers used by an izin PDF according to the organizational hierarchy.
+     *
+     * @return Collection<int, User>
+     */
+    public function izinApprovers(): Collection
+    {
+        $chain = $this->supervisorChain();
+        $roleSlug = $this->role?->slug;
+
+        if ($roleSlug === 'manager') {
+            $director = $chain->first(fn (User $user) => $user->hasRole(['direktur', 'director', 'gm']));
+
+            return $director ? collect([$director]) : collect();
+        }
+
+        if ($roleSlug === 'asmen') {
+            $manager = $chain->first(fn (User $user) => $user->hasRole('manager'));
+
+            return $manager ? collect([$manager]) : collect();
+        }
+
+        if (str_starts_with((string) $roleSlug, 'spv-')) {
+            return collect([
+                $chain->first(fn (User $user) => $user->hasRole('asmen')),
+                $chain->first(fn (User $user) => $user->hasRole('manager')),
+            ])->filter()->unique('id')->values();
+        }
+
+        if (str_starts_with((string) $roleSlug, 'staff-')) {
+            $departmentCode = $this->role?->department?->code
+                ?? Str::after((string) $roleSlug, 'staff-');
+            $spvSlug = $departmentCode ? 'spv-'.$departmentCode : null;
+            $spv = $spvSlug
+                ? $chain->first(fn (User $user) => $user->hasRole($spvSlug))
+                : null;
+            $firstApprover = $spv ?? $chain->first(fn (User $user) => $user->hasRole('asmen'));
+
+            return collect([
+                $firstApprover,
+                $chain->first(fn (User $user) => $user->hasRole('manager')),
+            ])->filter()->unique('id')->values();
+        }
+
+        return $chain->take(2)->values();
+    }
+
+    public function directSupervisor(): ?User
+    {
+        return $this->supervisorChain()->first();
     }
 
     public function permissions(): Collection

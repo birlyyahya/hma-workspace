@@ -25,11 +25,13 @@ class RemoteImageFetcher
         }
 
         try {
-            $content = $this->externalRead(timeout: $timeout)->get($url)->body();
+            $response = $this->externalRead(timeout: $timeout)->get($url);
 
-            if (! $content) {
+            if (! $response->successful() || ! $response->body()) {
                 return null;
             }
+
+            $content = $response->body();
 
             $mime = finfo_buffer(finfo_open(FILEINFO_MIME_TYPE), $content) ?: 'image/png';
 
