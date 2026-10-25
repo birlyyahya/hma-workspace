@@ -1,11 +1,9 @@
 <?php
 
 use App\Services\IzinCache;
+use App\Services\IzinPdfComposer;
 use App\Services\IzinWriter;
-use App\Services\RemoteImageFetcher;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 use Masmerise\Toaster\Toaster;
@@ -141,12 +139,6 @@ class extends Component {
             return;
         }
 
-        $cacheKey = 'pdf-preview-'.$this->createdIzinId;
-
-        if (Cache::has($cacheKey)) {
-            return $this->streamPdf(Cache::get($cacheKey), "izin_{$this->createdIzinId}.pdf");
-        }
-
         $detail = app(IzinCache::class)->detail((int) $this->createdIzinId);
 
         if (! ($detail['success'] ?? false)) {
@@ -156,13 +148,13 @@ class extends Component {
         }
 
         $izin = $detail['data'];
-        $izin['admins_base64'] = $this->convertImageToBase64(data_get($izin, 'admins'));
-        $izin['superadmins_base64'] = $this->convertImageToBase64(data_get($izin, 'superadmins'));
-        $izin['pemohon_base64'] = $this->convertImageToBase64(data_get($izin, 'url_sign'));
+        $pdfBase64 = app(IzinPdfComposer::class)->render($izin);
 
-        $pdf = Pdf::loadView('pdf.izin-pdf', ['izin' => $izin])->setPaper('A4', 'portrait');
-        $pdfBase64 = 'data:application/pdf;base64,'.base64_encode($pdf->output());
-        Cache::put($cacheKey, $pdfBase64, now()->addDay());
+        if ($pdfBase64 === null) {
+            Toaster::error('Data pemohon tidak ditemukan.');
+
+            return;
+        }
 
         $filename = 'Pengajuan Izin '.Carbon::parse($izin['start_date'])->format('d M Y').'.pdf';
 
@@ -176,10 +168,6 @@ class extends Component {
         return response()->streamDownload(fn () => print $pdfBinary, $filename);
     }
 
-    protected function convertImageToBase64(?string $url): ?string
-    {
-        return app(RemoteImageFetcher::class)->toDataUri($url);
-    }
 }; ?>
 
 <div>

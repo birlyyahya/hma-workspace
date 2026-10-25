@@ -1,7 +1,7 @@
 <?php
 
 use App\Services\IzinCache;
-use App\Services\RemoteImageFetcher;
+use App\Services\IzinPdfComposer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -82,12 +82,6 @@ new class extends Component {
 
     public function generatePDF(int $id)
     {
-        $cacheKey = 'pdf-preview-'.$id;
-
-        if (Cache::has($cacheKey)) {
-            return $this->streamPdf(Cache::get($cacheKey), "izin_{$id}.pdf");
-        }
-
         $response = app(IzinCache::class)->detail((int) $id);
 
         if (($response['success'] ?? false) !== true) {
@@ -97,13 +91,13 @@ new class extends Component {
         }
 
         $izin = $response['data'];
-        $izin['admins_base64'] = $this->convertImageToBase64(data_get($izin, 'admins'));
-        $izin['superadmins_base64'] = $this->convertImageToBase64(data_get($izin, 'superadmins'));
-        $izin['pemohon_base64'] = $this->convertImageToBase64(data_get($izin, 'url_sign'));
+        $pdfBase64 = app(IzinPdfComposer::class)->render($izin);
 
-        $pdf = Pdf::loadView('pdf.izin-pdf', ['izin' => $izin])->setPaper('A4', 'portrait');
-        $pdfBase64 = 'data:application/pdf;base64,'.base64_encode($pdf->output());
-        Cache::put($cacheKey, $pdfBase64, now()->addDay());
+        if ($pdfBase64 === null) {
+            Toaster::error('Data pemohon tidak ditemukan.');
+
+            return;
+        }
 
         $filename = 'Pengajuan Izin '.Carbon::parse($izin['start_date'])->format('d M Y').'.pdf';
 
@@ -258,10 +252,6 @@ new class extends Component {
         return response()->streamDownload(fn () => print ($pdfBinary), $filename);
     }
 
-    protected function convertImageToBase64(?string $url): ?string
-    {
-        return app(RemoteImageFetcher::class)->toDataUri($url, 15);
-    }
 }; ?>
 
 <div>

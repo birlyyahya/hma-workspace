@@ -1,11 +1,8 @@
 <?php
 
-use App\Models\User;
 use App\Services\IzinCache;
-use App\Services\RemoteImageFetcher;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\IzinPdfComposer;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 use Masmerise\Toaster\Toaster;
@@ -34,70 +31,15 @@ class extends Component {
     {
         $response = app(IzinCache::class)->detail((int) $id);
         $izin = ($response['success'] ?? false) ? $response['data'] : $this->data;
+        $pdfBase64 = app(IzinPdfComposer::class)->render($izin ?? []);
 
-        $pemohon = User::with('role.department.parent')
-            ->where('username', data_get($izin, 'users.username'))
-            ->first();
-
-        if (! $pemohon) {
+        if ($pdfBase64 === null) {
             Toaster::error('Data pemohon tidak ditemukan.');
 
             return;
         }
 
-        $approvers = $pemohon->izinApprovers();
-        $izin['users'] = $pemohon->toArray();
-        $izin['users']['signature'] = $this->signatureToDataUri(
-            data_get($izin, 'url_sign') ?: $pemohon->signature
-        );
-
-        $izin['approval_signatures'] = $approvers->values()->map(function (User $approver) use ($izin) {
-            $isDirector = $approver->hasRole(['direktur', 'director', 'gm']);
-            $isManager = $approver->hasRole('manager');
-            $fallback = $isDirector || $isManager
-                ? data_get($izin, 'superadmins')
-                : data_get($izin, 'admins');
-            $signature = $approver->signature ?: $fallback;
-
-            return [
-                'title' => $isDirector || $isManager ? 'Disetujui Oleh' : 'Mengetahui Oleh',
-                'role' => $isDirector ? 'Direktur' : ($isManager ? 'Manager' : 'Atasan Langsung'),
-                'name' => $approver->name,
-                'signature_base64' => $this->signatureToDataUri($signature),
-            ];
-        })->all();
-
-        $pdf = Pdf::loadView('pdf.izin-pdf', [
-            'izin' => $izin,
-        ])->setPaper('A4', 'portrait');
-
-        $pdfBase64 = 'data:application/pdf;base64,'.base64_encode($pdf->output());
         $this->pdfPreview = $pdfBase64;
-    }
-
-    private function signatureToDataUri(?string $signature): ?string
-    {
-        if (! $signature) {
-            return null;
-        }
-
-        if (str_starts_with($signature, 'data:')) {
-            return $signature;
-        }
-
-        $url = filter_var($signature, FILTER_VALIDATE_URL)
-            ? $signature
-            : Storage::disk('s3_izindar')->temporaryUrl(
-                ltrim(str_replace('storage/izindar/', '', $signature), '/'),
-                now()->addMinutes(5),
-            );
-
-        return $this->convertImageToBase64($url);
-    }
-
-    private function convertImageToBase64(?string $url): ?string
-    {
-        return app(RemoteImageFetcher::class)->toDataUri($url);
     }
 
 }; ?>
