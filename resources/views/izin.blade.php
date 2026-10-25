@@ -6,51 +6,50 @@
     </x-slot>
 
     <div class="bg-zinc-50/50 min-h-screen">
-        <div class="max-w-screen-2xl mx-auto px-0 py-4 space-y-4 md:space-y-6">
+        <div class="max-w-screen-2xl mx-auto p-5 space-y-4 md:space-y-6">
 
             {{-- HERO HEADER --}}
-            <div class="relative overflow-hidden rounded-2xl border border-white/15 bg-linear-to-br from-red-700 via-red-600 to-rose-600 px-4 py-5 sm:px-8 sm:py-6 text-white shadow-sm">
-                <div class="pointer-events-none absolute inset-0">
-                    <div class="absolute -right-20 -top-24 size-72 rounded-full bg-white/10 blur-3xl"></div>
-                    <div class="absolute -left-24 -bottom-28 size-72 rounded-full bg-black/15 blur-3xl"></div>
-                </div>
-
-                <div class="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-                    <div class="min-w-0 space-y-3">
-                        <div class="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-white/90 ring-1 ring-white/20 backdrop-blur">
-                            <flux:icon name="document-text" class="size-3.5" />
-                            <span>Workspace</span>
-                            <span class="opacity-50">/</span>
-                            <span>Izin</span>
+            <header class="border-b border-zinc-200 pb-5 pt-2 dark:border-zinc-800 sm:pb-6">
+                <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between sm:gap-8">
+                    <div class="min-w-0">
+                        <div class="mb-2 flex items-center gap-2 text-[11px] font-medium text-red-800 dark:text-red-300">
+                            <span class="h-1.5 w-1.5 rounded-full bg-red-800 dark:bg-red-400"></span>
+                            <span>Izin workspace</span>
                         </div>
-                        <div class="space-y-1">
-                            <flux:heading size="xl" class="text-white leading-tight">
-                                Pengajuan Izin
-                            </flux:heading>
-                            <p class="text-sm text-white/80">
-                                Ajukan dan pantau seluruh permohonan izin Anda dalam satu tempat.
-                            </p>
-                        </div>
+                        <flux:heading size="xl" class="text-2xl font-semibold tracking-tight text-zinc-950 sm:text-3xl dark:text-white">
+                            Pengajuan Izin
+                        </flux:heading>
+                        <p class="mt-1.5 max-w-xl text-sm leading-5 text-zinc-600 dark:text-zinc-300">
+                            Ajukan dan pantau seluruh permohonan izin Anda dalam satu tempat.
+                        </p>
                     </div>
 
-                    <div class="flex w-full flex-col gap-2 sm:flex-row md:w-auto md:gap-3">
+                    <div class="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
                         @can('izin.create')
-                        <flux:modal.trigger name="form-izin-modal">
-                            <flux:button icon="plus-circle" variant="primary" class="cursor-pointer w-full sm:w-auto bg-white! text-red-700! hover:bg-white/90!">
+                        <flux:modal.trigger name="form-izin-modal" class="w-full sm:w-auto">
+                            <flux:button
+                                icon="plus-circle"
+                                variant="primary"
+                                class="w-full cursor-pointer bg-red-800! text-white! hover:bg-red-900! sm:w-auto dark:bg-red-700! dark:hover:bg-red-800!"
+                            >
                                 Ajukan Izin
                             </flux:button>
                         </flux:modal.trigger>
                         @endcan
                         @can('izin.view.all')
                         <a href="{{ route('izin.laporan-pengajuan') }}" class="w-full sm:w-auto">
-                            <flux:button icon="document-text" variant="primary" class="cursor-pointer w-full sm:w-auto bg-white! text-red-700! hover:bg-white/90!">
+                            <flux:button
+                                icon="document-text"
+                                variant="ghost"
+                                class="w-full cursor-pointer text-zinc-700! hover:bg-zinc-100! sm:w-auto dark:text-zinc-200! dark:hover:bg-zinc-800!"
+                            >
                                 Laporan Pengajuan
                             </flux:button>
                         </a>
                         @endcan
                     </div>
                 </div>
-            </div>
+            </header>
             <div class="grid grid-cols-1 gap-4 md:gap-5 lg:grid-cols-2">
                 <livewire:izin.widget.report-izin lazy />
                 <livewire:izin.widget.report-izin-category lazy />

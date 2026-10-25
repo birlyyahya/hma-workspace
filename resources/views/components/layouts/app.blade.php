@@ -6,7 +6,7 @@
                 <livewire:components.notification-header/>
 
             </div>
-            <div class="h-197 overflow-auto px-5">
+            <div class="h-197 overflow-auto px-4">
                 {{ $slot }}
             </div>
         </div>

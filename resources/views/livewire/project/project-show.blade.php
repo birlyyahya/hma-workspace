@@ -140,7 +140,7 @@ new #[Lazy] class extends Component {
             <x-errors.403 />
         </div>
     @else
-    <div class="">
+    <div class="p-5">
         <div
             x-data="{
                 active: 'overview',
@@ -154,7 +154,7 @@ new #[Lazy] class extends Component {
             }"
         >
             {{-- ============ STICKY HEADER ============ --}}
-            <div class="bg-white/90 backdrop-blur md:px-4">
+            <div class="bg-white/90 backdrop-blur rounded-t-xl md:px-4">
                 <div class="px-4 md:px-0 pt-4 pb-4 rounded-xl">
 
                     {{-- Title row --}}

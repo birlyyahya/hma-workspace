@@ -1,45 +1,34 @@
 <x-layouts.app :title="__('DAR - HMA Workspace')">
 
     <div class="bg-zinc-50/50 min-h-screen">
-        <div class="max-w-screen-2xl mx-auto px-0 py-4 md:space-y-6 space-y-4">
-               {{-- HERO HEADER --}}
-            <div class="relative overflow-hidden rounded-2xl border border-white/15 bg-linear-to-br from-red-700 via-red-600 to-rose-600 px-4 py-5 sm:px-8 sm:py-6 text-white shadow-sm">
-                <div class="pointer-events-none absolute inset-0">
-                    <div class="absolute -right-20 -top-24 size-72 rounded-full bg-white/10 blur-3xl"></div>
-                    <div class="absolute -left-24 -bottom-28 size-72 rounded-full bg-black/15 blur-3xl"></div>
-                </div>
-
-                <div class="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-                    <div class="min-w-0 space-y-3">
-                        <div class="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-white/90 ring-1 ring-white/20 backdrop-blur">
-                            <flux:icon name="document-text" class="size-3.5" />
-                            <span>Workspace</span>
-                            <span class="opacity-50">/</span>
-                            <span>DAR</span>
+        <div class="max-w-screen-2xl mx-auto p-5 md:space-y-6 space-y-4">
+            {{-- HERO HEADER --}}
+            <header class="border-b border-zinc-200 pb-5 pt-2 dark:border-zinc-800 sm:pb-6">
+                <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between sm:gap-8">
+                    <div class="min-w-0">
+                        <div class="mb-2 flex items-center gap-2 text-[11px] font-medium text-red-800 dark:text-red-300">
+                            <span class="h-1.5 w-1.5 rounded-full bg-red-800 dark:bg-red-400"></span>
+                            <span>Daily workspace</span>
                         </div>
-                        <div class="space-y-1">
-                            <flux:heading size="xl" class="text-white leading-tight">
-                                Daily Activity Report
-                            </flux:heading>
-                            <p class="text-sm text-white/80">
-                                Lihat ringkasan aktivitas harian Anda dan pantau perkembangan tugas dengan mudah.
-                            </p>
-                        </div>
+                        <flux:heading size="xl" class="text-2xl font-semibold tracking-tight text-zinc-950 sm:text-3xl dark:text-white">
+                            Daily Activity Report
+                        </flux:heading>
+                        <p class="mt-1.5 max-w-xl text-sm leading-5 text-zinc-600 dark:text-zinc-300">
+                            Lihat aktivitas hari ini dan pantau perkembangan tugas Anda.
+                        </p>
                     </div>
 
-                    <div class="flex w-full flex-col gap-2 sm:flex-row md:w-auto md:gap-3">
-                        <flux:modal.trigger name="create-task" class="w-full sm:w-auto">
-                            <flux:button
-                                icon="plus-circle"
-                                variant="primary"
-                                class="cursor-pointer w-full sm:w-auto bg-white! text-red-700! hover:bg-white/90!"
-                            >
-                                Buat Tugas Baru
-                            </flux:button>
-                        </flux:modal.trigger>
-                    </div>
+                    <flux:modal.trigger name="create-task" class="w-full shrink-0 sm:w-auto">
+                        <flux:button
+                            icon="plus-circle"
+                            variant="primary"
+                            class="w-full cursor-pointer bg-red-800! text-white! hover:bg-red-900! sm:w-auto dark:bg-red-700! dark:hover:bg-red-800!"
+                        >
+                            Buat Tugas Baru
+                        </flux:button>
+                    </flux:modal.trigger>
                 </div>
-            </div>
+            </header>
 
             <livewire:dar.widget.timeline-today-dar lazy/>
 

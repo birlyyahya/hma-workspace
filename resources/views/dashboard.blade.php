@@ -2,7 +2,7 @@
     <div class="flex h-full p-5 w-full flex-col gap-5 overflow-y-auto overflow-x-hidden rounded-xl">
 
         {{-- Welcome banner --}}
-        <div class="relative w-full rounded-xl">
+        <div class="relative w-full rounded-xl mb-5">
             <livewire:widget.dashboard.welcome lazy />
         </div>
 

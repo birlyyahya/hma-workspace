@@ -174,13 +174,15 @@ new class extends Component {
 
 <div wire:poll.visible.60s>
     <flux:modal.trigger name="notification">
-        <flux:button size="sm" variant="ghost" icon="bell" iconVariant="outline" class="relative" aria-label="Notifikasi">
-        </flux:button>
-        @if ($this->unreadCount > 0)
-            <span class="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-semibold leading-4 text-white tabular-nums">
-                {{ $this->unreadCount > 9 ? '9+' : $this->unreadCount }}
-            </span>
-        @endif
+        <div class="relative">
+            <flux:button size="sm" variant="ghost" icon="bell" iconVariant="outline" aria-label="Notifikasi">
+            </flux:button>
+            @if ($this->unreadCount > 0)
+                <span class="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-semibold leading-4 text-white tabular-nums">
+                    {{ $this->unreadCount > 9 ? '9+' : $this->unreadCount }}
+                </span>
+            @endif
+        </div>
     </flux:modal.trigger>
 
     <flux:modal name="notification" flyout class="w-full max-w-md overflow-hidden! p-0!">
