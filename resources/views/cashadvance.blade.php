@@ -1,5 +1,5 @@
 <x-layouts.app>
-    <div class="max-h-screen overflow-auto p-5">
+    <div class="max-h-screen overflow-auto md:p-5">
         <div class="mb-5 space-y-4">
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div class="flex flex-col items-start gap-1 md:flex-row md:items-end md:gap-4">

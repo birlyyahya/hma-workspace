@@ -6,13 +6,17 @@
     </x-slot>
 
    @if(Auth::user()->hasPermission('user.view.all') )
-   <div class="max-h-screen overflow-auto px-3 py-5 md:px-6 md:py-6">
+   <div class="h-full md:p-5 pt-2">
        <div
            x-data="{ tab: $persist('users').as('user-management-tab') }"
            class="mx-auto max-w-7xl space-y-5"
        >
            <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                <div class="space-y-1">
+                <div class="mb-2 flex items-center gap-2 text-[11px] font-medium text-red-800 dark:text-red-300">
+                            <span class="h-1.5 w-1.5 rounded-full bg-red-800 dark:bg-red-400"></span>
+                            <span>User Management</span>
+                        </div>
                    <flux:heading size="xl" class="font-bold tracking-tight">User & Role Management</flux:heading>
                    <flux:description class="text-sm text-zinc-500">
                        Kelola pengguna sistem dan struktur peran beserta level aksesnya.

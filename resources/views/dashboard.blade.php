@@ -1,5 +1,5 @@
 <x-layouts.app :title="__('Dashboard')">
-    <div class="flex h-full p-5 w-full flex-col gap-5 overflow-y-auto overflow-x-hidden rounded-xl">
+    <div class="flex h-full md:p-5 w-full flex-col gap-5 overflow-auto rounded-xl">
 
         {{-- Welcome banner --}}
         <div class="relative w-full rounded-xl mb-5">

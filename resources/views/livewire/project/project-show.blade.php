@@ -140,7 +140,7 @@ new #[Lazy] class extends Component {
             <x-errors.403 />
         </div>
     @else
-    <div class="p-5">
+    <div class="md:py-5">
         <div
             x-data="{
                 active: 'overview',
@@ -253,7 +253,7 @@ new #[Lazy] class extends Component {
 
                 </div>
             </div>
-            <div class="md:sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-zinc-200 rounded-b-xl px-4 md:px-4 pb-0">
+            <div class="md:sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-zinc-200 rounded-b-xl px-4 pb-0">
                 {{-- ============ TAB NAVIGATION ============ --}}
                 <nav class=" -mb-px flex items-center gap-1 overflow-x-auto">
                     @foreach($tabs as $tab)

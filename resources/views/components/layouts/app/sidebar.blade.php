@@ -67,6 +67,10 @@
 
         <flux:spacer />
 
+        <div class="md:hidden mr-5">
+            <livewire:components.notification-header-mobile/>
+        </div>
+
         <flux:dropdown position="top" align="end">
             <flux:profile :initials="auth()->user()->initials()" icon-trailing="chevron-down" />
 

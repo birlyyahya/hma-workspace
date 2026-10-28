@@ -6,7 +6,7 @@
     </x-slot>
 
     <div class="bg-zinc-50/50 min-h-screen">
-        <div class="max-w-screen-2xl mx-auto p-5 space-y-4 md:space-y-6">
+        <div class="max-w-screen-2xl mx-auto p-0 md:p-5 space-y-4 md:space-y-6">
 
             {{-- HERO HEADER --}}
             <header class="border-b border-zinc-200 pb-5 pt-2 dark:border-zinc-800 sm:pb-6">

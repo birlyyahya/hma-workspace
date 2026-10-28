@@ -1,6 +1,6 @@
 @props(['heading' => '', 'subheading' => ''])
 
-<div class="flex items-start max-md:flex-col">
+<div class="flex h-screen max-h-150 items-start max-md:flex-col">
     <div class="me-10 w-full pb-4 md:w-[220px]">
         <flux:navlist aria-label="{{ __('Knowledge') }}">
             <flux:navlist.item icon="home" :href="route('knowledge')" wire:navigate>{{ __('Hub') }}</flux:navlist.item>
@@ -30,7 +30,7 @@
             <div class="mb-4">{{ $toolbar }}</div>
         @endisset
 
-        <div class="mt-2 w-full">
+        <div class="mt-2 w-full overflow-auto">
             {{ $slot }}
         </div>
     </div>
