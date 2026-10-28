@@ -172,6 +172,8 @@ new class extends Component {
      */
     protected function buildExportGroups(): array
     {
+        $this->authorize('izin.view.all');
+
         $groupedRows = [];
         $rows = Cache::tags(['izin'])->get($this->exportRowsCacheKey(), $this->data['data'] ?? []);
         $startDate = $this->start_date !== '' ? Carbon::parse($this->start_date)->startOfDay() : null;
@@ -285,6 +287,7 @@ new class extends Component {
                     </p>
                 </div>
 
+                @can('izin.view.all')
                 <flux:dropdown position="bottom" align="end">
                     <flux:button type="button" size="sm" variant="outline" icon="arrow-down-tray" icon:trailing="chevron-down" class="shrink-0 bg-white!">
                         Export
@@ -298,16 +301,9 @@ new class extends Component {
                         >
                             Export Excel
                         </flux:menu.item>
-                        <flux:menu.item
-                            icon="document-arrow-down"
-                            wire:click="exportGroupedPdf"
-                            wire:loading.attr="disabled"
-                            wire:target="exportGroupedPdf"
-                        >
-                            Export PDF
-                        </flux:menu.item>
                     </flux:menu>
                 </flux:dropdown>
+                @endcan
             </div>
 
             <div class="grid grid-cols-2 items-end gap-3 px-4 pb-4 pt-3.5 sm:px-5 lg:grid-cols-[10rem_10rem_1fr_1fr_auto]">
