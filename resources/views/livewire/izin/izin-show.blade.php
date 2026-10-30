@@ -124,7 +124,127 @@ class extends Component {
                             <flux:textarea icon="check" readonly>{{ $data['description'] ?? '-' }}</flux:textarea>
                         </div>
                     </div>
-                    <div class="bg-white rounded-lg">
+                    {{-- DUMMY UI: kartu Alur Persetujuan, 3 varian statis (hapus setelah logic siap) --}}
+                    <div class="mt-4 space-y-4">
+
+                        {{-- Varian 1: Disetujui IT, menunggu HRD --}}
+                        <div class="bg-white p-4 border rounded-lg">
+                            <div class="flex items-center justify-between gap-2 mb-5">
+                                <flux:heading size="lg">Alur Persetujuan</flux:heading>
+                                <flux:badge color="blue" size="sm" icon="check-circle">Disetujui IT</flux:badge>
+                            </div>
+                            <ol class="relative ml-3 space-y-6 border-s-2 border-zinc-200">
+                                <li class="ms-6">
+                                    <span class="absolute -start-3.25 flex size-6 items-center justify-center rounded-full bg-emerald-500 text-white ring-4 ring-white">
+                                        <flux:icon name="paper-airplane" variant="micro" class="size-3" />
+                                    </span>
+                                    <p class="text-sm font-medium text-zinc-900">Diajukan</p>
+                                    <p class="text-xs text-zinc-500">Budi Santoso · 30 Okt 2026, 09:12</p>
+                                </li>
+                                <li class="ms-6">
+                                    <span class="absolute -start-3.25 flex size-6 items-center justify-center rounded-full bg-blue-500 text-white ring-4 ring-white">
+                                        <flux:icon name="check" variant="micro" class="size-3" />
+                                    </span>
+                                    <div class="flex items-center gap-2">
+                                        <p class="text-sm font-medium text-zinc-900">Disetujui Divisi IT</p>
+                                        <flux:badge color="blue" size="sm">IT</flux:badge>
+                                    </div>
+                                    <p class="text-xs text-zinc-500">Andi Pratama · 30 Okt 2026, 10:05</p>
+                                    <p class="mt-2 rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600">"Sudah sesuai jadwal tim."</p>
+                                </li>
+                                <li class="ms-6">
+                                    <span class="absolute -start-3.25 flex size-6 items-center justify-center rounded-full bg-white ring-4 ring-white">
+                                        <span class="absolute inline-flex size-full animate-ping rounded-full bg-amber-300 opacity-60"></span>
+                                        <span class="relative size-3.5 rounded-full border-2 border-amber-400 bg-white"></span>
+                                    </span>
+                                    <div class="flex items-center gap-2">
+                                        <p class="text-sm font-medium text-zinc-500">Menunggu Divisi HRD</p>
+                                        <flux:badge color="yellow" size="sm">HRD</flux:badge>
+                                    </div>
+                                    <p class="text-xs text-zinc-400">Belum diproses</p>
+                                </li>
+                            </ol>
+                        </div>
+
+                        {{-- Varian 2: Disetujui HRD (final) --}}
+                        <div class="bg-white p-4 border rounded-lg">
+                            <div class="flex items-center justify-between gap-2 mb-5">
+                                <flux:heading size="lg">Alur Persetujuan</flux:heading>
+                                <flux:badge color="green" size="sm" icon="check-badge">Disetujui HRD</flux:badge>
+                            </div>
+                            <ol class="relative ml-3 space-y-6 border-s-2 border-emerald-300">
+                                <li class="ms-6">
+                                    <span class="absolute -start-3.25 flex size-6 items-center justify-center rounded-full bg-emerald-500 text-white ring-4 ring-white">
+                                        <flux:icon name="paper-airplane" variant="micro" class="size-3" />
+                                    </span>
+                                    <p class="text-sm font-medium text-zinc-900">Diajukan</p>
+                                    <p class="text-xs text-zinc-500">Siti Rahma · 28 Okt 2026, 08:40</p>
+                                </li>
+                                <li class="ms-6">
+                                    <span class="absolute -start-3.25 flex size-6 items-center justify-center rounded-full bg-emerald-500 text-white ring-4 ring-white">
+                                        <flux:icon name="check" variant="micro" class="size-3" />
+                                    </span>
+                                    <div class="flex items-center gap-2">
+                                        <p class="text-sm font-medium text-zinc-900">Disetujui Divisi IT</p>
+                                        <flux:badge color="green" size="sm">IT</flux:badge>
+                                    </div>
+                                    <p class="text-xs text-zinc-500">Andi Pratama · 28 Okt 2026, 09:30</p>
+                                </li>
+                                <li class="ms-6">
+                                    <span class="absolute -start-3.25 flex size-6 items-center justify-center rounded-full bg-emerald-600 text-white ring-4 ring-emerald-100">
+                                        <flux:icon name="check-badge" variant="micro" class="size-3.5" />
+                                    </span>
+                                    <div class="flex items-center gap-2">
+                                        <p class="text-sm font-semibold text-emerald-700">Disetujui Divisi HRD</p>
+                                        <flux:badge color="green" size="sm">HRD</flux:badge>
+                                    </div>
+                                    <p class="text-xs text-zinc-500">Rina Wulandari · 28 Okt 2026, 13:15</p>
+                                    <p class="mt-2 rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-800">Pengajuan selesai dan disetujui.</p>
+                                </li>
+                            </ol>
+                        </div>
+
+                        {{-- Varian 3: Ditolak HRD --}}
+                        <div class="bg-white p-4 border rounded-lg">
+                            <div class="flex items-center justify-between gap-2 mb-5">
+                                <flux:heading size="lg">Alur Persetujuan</flux:heading>
+                                <flux:badge color="red" size="sm" icon="x-circle">Ditolak</flux:badge>
+                            </div>
+                            <ol class="relative ml-3 space-y-6 border-s-2 border-zinc-200">
+                                <li class="ms-6">
+                                    <span class="absolute -start-3.25 flex size-6 items-center justify-center rounded-full bg-emerald-500 text-white ring-4 ring-white">
+                                        <flux:icon name="paper-airplane" variant="micro" class="size-3" />
+                                    </span>
+                                    <p class="text-sm font-medium text-zinc-900">Diajukan</p>
+                                    <p class="text-xs text-zinc-500">Dewi Lestari · 25 Okt 2026, 11:02</p>
+                                </li>
+                                <li class="ms-6">
+                                    <span class="absolute -start-3.25 flex size-6 items-center justify-center rounded-full bg-blue-500 text-white ring-4 ring-white">
+                                        <flux:icon name="check" variant="micro" class="size-3" />
+                                    </span>
+                                    <div class="flex items-center gap-2">
+                                        <p class="text-sm font-medium text-zinc-900">Disetujui Divisi IT</p>
+                                        <flux:badge color="blue" size="sm">IT</flux:badge>
+                                    </div>
+                                    <p class="text-xs text-zinc-500">Andi Pratama · 25 Okt 2026, 14:20</p>
+                                </li>
+                                <li class="ms-6">
+                                    <span class="absolute -start-3.25 flex size-6 items-center justify-center rounded-full bg-red-500 text-white ring-4 ring-white">
+                                        <flux:icon name="x-mark" variant="micro" class="size-3" />
+                                    </span>
+                                    <div class="flex items-center gap-2">
+                                        <p class="text-sm font-semibold text-red-700">Ditolak Divisi HRD</p>
+                                        <flux:badge color="red" size="sm">HRD</flux:badge>
+                                    </div>
+                                    <p class="text-xs text-zinc-500">Rina Wulandari · 26 Okt 2026, 09:10</p>
+                                    <div class="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2">
+                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-red-700">Alasan penolakan</p>
+                                        <p class="mt-0.5 text-xs text-red-800">Kuota cuti tahunan sudah habis.</p>
+                                    </div>
+                                </li>
+                            </ol>
+                        </div>
+
                     </div>
                 </div>
             </div>

@@ -368,7 +368,7 @@ new class extends Component {
                     @forelse ($this->data['data'] ?? [] as $izin)
                         @php
                             $statusLabel = match ($izin['status'] ?? null) {
-                                '2' => ['text' => 'Approved', 'color' => 'green'],
+                                '2' => ['text' => 'Approved', 'color' => 'blue'],
                                 '3' => ['text' => 'Rejected', 'color' => 'red'],
                                 default => ['text' => 'Pending', 'color' => 'yellow'],
                             };
@@ -389,8 +389,17 @@ new class extends Component {
                             <td class="px-4 py-3.5 min-w-40 text-xs text-zinc-500">
                                 <span class="line-clamp-2">{{ $izin['description'] ?? '-' }}</span>
                             </td>
-                            <td class="px-4 py-3.5 text-center">
-                                <flux:badge color="{{ $statusLabel['color'] }}" size="sm" inset="top bottom">{{ $statusLabel['text'] }}</flux:badge>
+                            <td class="px-4 py-3.5">
+                                <div class="flex flex-col items-center gap-1.5">
+                                    <flux:badge color="{{ $izin['hrd_checked'] === 1 ? 'green' : $statusLabel['color'] }}" size="sm" inset="top bottom" icon="check-badge">Disetujui {{ $izin['hrd_checked'] === 1 ? 'HRD' : 'IT' }}</flux:badge>
+                                    <div class="flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-zinc-400">
+                                        <span class="text-{{ $izin['hrd_checked'] === 1 ? 'green' : $statusLabel['color'] }}-600">IT</span>
+                                        <span class="size-2 rounded-full bg-{{ $izin['hrd_checked'] === 1 ? 'green' : $statusLabel['color'] }}-500"></span>
+                                        <span class="h-0.5 w-5 rounded-full bg-{{ $izin['hrd_checked'] === 1 ? 'green' : $statusLabel['color'] }}-300"></span>
+                                        <span class="size-2 rounded-full {{ $izin['hrd_checked'] === 1 ? 'bg-emerald-500' : 'border-2 border-zinc-300 bg-white' }}"></span>
+                                        <span class="{{ $izin['hrd_checked'] === 1 ? 'text-green-600' : '' }}">HRD</span>
+                                    </div>
+                                </div>
                             </td>
                             <td class="px-5 py-3.5 text-right">
                                 <div class="flex items-center justify-end gap-1.5">
@@ -436,6 +445,95 @@ new class extends Component {
 
         {{-- Cards (mobile) --}}
         <div class="space-y-3 p-3 md:hidden" wire:loading.class="pointer-events-none">
+            {{-- DUMMY UI: satu card statis untuk desain status "Disetujui IT" (hapus setelah logic siap) --}}
+            <article class="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex min-w-0 items-center gap-2">
+                        <flux:avatar size="xs" name="Budi Santoso" />
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-medium text-zinc-900">Budi Santoso</p>
+                            <p class="text-xs text-zinc-500 tabular-nums">30 Okt 2026</p>
+                        </div>
+                    </div>
+                    <flux:badge color="blue" size="sm" icon="check-circle" class="shrink-0">Disetujui IT</flux:badge>
+                </div>
+
+                <p class="mt-2.5 text-sm text-zinc-600 line-clamp-2">Cuti tahunan</p>
+
+                <div class="mt-4 flex items-start">
+                    <div class="flex w-14 flex-col items-center gap-1">
+                        <span class="flex size-5 items-center justify-center rounded-full bg-emerald-500 text-white">
+                            <flux:icon name="check" variant="micro" class="size-3" />
+                        </span>
+                        <span class="text-[10px] font-medium text-zinc-500">Diajukan</span>
+                    </div>
+                    <div class="mt-2.5 h-0.5 flex-1 rounded-full bg-emerald-300"></div>
+                    <div class="flex w-14 flex-col items-center gap-1">
+                        <span class="flex size-5 items-center justify-center rounded-full bg-blue-500 text-white">
+                            <flux:icon name="check" variant="micro" class="size-3" />
+                        </span>
+                        <span class="text-[10px] font-medium text-blue-600">IT</span>
+                    </div>
+                    <div class="mt-2.5 h-0.5 flex-1 rounded-full bg-blue-200"></div>
+                    <div class="flex w-14 flex-col items-center gap-1">
+                        <span class="relative flex size-5 items-center justify-center">
+                            <span class="absolute inline-flex size-full animate-ping rounded-full bg-amber-300 opacity-60"></span>
+                            <span class="relative size-3 rounded-full border-2 border-amber-400 bg-white"></span>
+                        </span>
+                        <span class="text-[10px] font-medium text-zinc-400">HRD</span>
+                    </div>
+                </div>
+
+                <div class="mt-3 grid grid-cols-2 gap-2 border-t border-zinc-100 pt-3">
+                    <flux:button icon="eye" variant="outline" size="sm" class="w-full cursor-pointer">Detail</flux:button>
+                    <flux:button icon="arrow-down-tray" variant="outline" size="sm" class="w-full cursor-pointer">PDF</flux:button>
+                </div>
+            </article>
+
+            {{-- DUMMY UI: status "Disetujui HRD" (final) --}}
+            <article class="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex min-w-0 items-center gap-2">
+                        <flux:avatar size="xs" name="Siti Rahma" />
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-medium text-zinc-900">Siti Rahma</p>
+                            <p class="text-xs text-zinc-500 tabular-nums">28 Okt 2026</p>
+                        </div>
+                    </div>
+                    <flux:badge color="green" size="sm" icon="check-badge" class="shrink-0">Disetujui HRD</flux:badge>
+                </div>
+
+                <p class="mt-2.5 text-sm text-zinc-600 line-clamp-2">Izin sakit</p>
+
+                <div class="mt-4 flex items-start">
+                    <div class="flex w-14 flex-col items-center gap-1">
+                        <span class="flex size-5 items-center justify-center rounded-full bg-emerald-500 text-white">
+                            <flux:icon name="check" variant="micro" class="size-3" />
+                        </span>
+                        <span class="text-[10px] font-medium text-zinc-500">Diajukan</span>
+                    </div>
+                    <div class="mt-2.5 h-0.5 flex-1 rounded-full bg-emerald-400"></div>
+                    <div class="flex w-14 flex-col items-center gap-1">
+                        <span class="flex size-5 items-center justify-center rounded-full bg-emerald-500 text-white">
+                            <flux:icon name="check" variant="micro" class="size-3" />
+                        </span>
+                        <span class="text-[10px] font-medium text-emerald-600">IT</span>
+                    </div>
+                    <div class="mt-2.5 h-0.5 flex-1 rounded-full bg-emerald-400"></div>
+                    <div class="flex w-14 flex-col items-center gap-1">
+                        <span class="flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white ring-4 ring-emerald-100">
+                            <flux:icon name="check" variant="micro" class="size-3" />
+                        </span>
+                        <span class="text-[10px] font-semibold text-emerald-700">HRD</span>
+                    </div>
+                </div>
+
+                <div class="mt-3 grid grid-cols-2 gap-2 border-t border-zinc-100 pt-3">
+                    <flux:button icon="eye" variant="outline" size="sm" class="w-full cursor-pointer">Detail</flux:button>
+                    <flux:button icon="arrow-down-tray" variant="outline" size="sm" class="w-full cursor-pointer">PDF</flux:button>
+                </div>
+            </article>
+
             @forelse ($this->data['data'] ?? [] as $izin)
                 @php
                     $admin = (int) ($izin['status_admin'] ?? 1);
