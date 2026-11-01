@@ -16,7 +16,7 @@
                 Dashboard
             </flux:sidebar.item>
             <flux:sidebar.group icon="folder" expandable heading="Projects" class="grid">
-                <livewire:components.sidebar-item />
+                <livewire:components.sidebar-item lazy />
             </flux:sidebar.group>
             <flux:sidebar.item class="hidden" icon="qr-code" :href="route('events')" :current="request()->routeIs('events') || request()->routeIs('events.show')" wire:navigate>
                 Events
