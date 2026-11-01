@@ -1,6 +1,6 @@
 <x-layouts.app :title="__('DAR - HMA Workspace')">
 
-    <div class="bg-zinc-50/50 min-h-screen">
+    <div class="bg-zinc-50/50 min-h-full">
         <div class="max-w-screen-2xl mx-auto md:p-5 md:space-y-6 space-y-4">
             {{-- HERO HEADER --}}
             <header class="border-b border-zinc-200 pb-5 pt-2 dark:border-zinc-800 sm:pb-6">

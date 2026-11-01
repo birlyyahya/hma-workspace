@@ -99,7 +99,7 @@ new class extends Component {
 ?>
 
 <div>
-    <div class="bg-zinc-50/50 min-h-screen">
+    <div class="bg-zinc-50/50">
         <div class="grid grid-cols-12 gap-4 md:gap-6">
 
             {{-- ============ LEFT COLUMN ============ --}}

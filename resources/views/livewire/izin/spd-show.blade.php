@@ -60,7 +60,7 @@ class extends Component {
     }
 }; ?>
 
-<div class="min-h-screen px-2 py-4 sm:px-4 sm:py-6">
+<div class="px-2 py-4 sm:px-4 sm:py-6">
 
     @if (!$spd)
     <div class="mx-auto max-w-2xl rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-zinc-200">

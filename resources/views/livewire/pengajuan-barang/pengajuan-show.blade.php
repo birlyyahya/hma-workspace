@@ -26,7 +26,7 @@ class extends Component {
     }
 }; ?>
 
-<div class="bg-zinc-50/50 min-h-screen">
+<div class="bg-zinc-50/50">
     <div class="max-w-4xl mx-auto px-2 py-4 space-y-4 md:space-y-6">
 
         {{-- ================= HEADER ================= --}}

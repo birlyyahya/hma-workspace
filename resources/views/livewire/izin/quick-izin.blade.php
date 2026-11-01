@@ -179,7 +179,7 @@ class extends Component {
 }; ?>
 
 <div>
-    <div class="bg-zinc-50 min-h-screen">
+    <div class="bg-zinc-50">
         {{-- Top bar --}}
         <div class="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-zinc-200">
             <div class="max-w-md mx-auto px-4 py-3 flex items-center gap-3">

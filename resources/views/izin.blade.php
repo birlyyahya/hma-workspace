@@ -5,7 +5,7 @@
         </h2>
     </x-slot>
 
-    <div class="bg-zinc-50/50 min-h-screen">
+    <div class="bg-zinc-50/50 min-h-full">
         <div class="max-w-screen-2xl mx-auto p-0 md:p-5 space-y-4 md:space-y-6">
 
             {{-- HERO HEADER --}}

@@ -589,7 +589,7 @@ class extends Component
     <div
         x-data="darShow"
         x-on:comment-added.window="scrollToLatestComment()"
-        class="min-h-screen bg-linear-to-b from-zinc-50 to-white md:py-4 py-6 lg:px-8"
+        class="bg-linear-to-b from-zinc-50 to-white md:py-4 py-6 lg:px-8"
     >
         <div class="mx-auto max-w-6xl">
 
