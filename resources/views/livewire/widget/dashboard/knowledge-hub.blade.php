@@ -23,39 +23,24 @@ new class extends Component {
     }
 }; ?>
 
-<div class="bg-white rounded-2xl md:p-5 sm:p-6 shadow-sm space-y-4">
-    <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-            <div class="size-10 rounded-xl bg-zinc-100 ring-1 ring-zinc-200 flex items-center justify-center">
-                <flux:icon name="book-open" class="size-5 text-zinc-700" />
-            </div>
-            <div>
-                <flux:heading size="lg" class="text-zinc-900 leading-tight">Knowledge Hub</flux:heading>
-                <flux:description class="text-xs text-zinc-500">Dokumentasi & SOP perusahaan</flux:description>
-            </div>
-        </div>
+<div class="bg-white rounded-2xl shadow-sm">
+    <div class="flex items-baseline justify-between gap-4 px-5 pt-5 sm:px-6 sm:pt-6">
+        <h2 class="text-base font-semibold tracking-tight text-zinc-900">Knowledge Hub</h2>
         <a href="{{ route('knowledge') }}" wire:navigate
-            class="inline-flex items-center gap-1 text-xs font-medium text-zinc-500 hover:text-zinc-900">
-            Explore <flux:icon name="arrow-right" class="size-3.5" />
+            class="text-xs font-medium text-zinc-500 transition-colors hover:text-accent-content focus-visible:outline-2 focus-visible:outline-accent">
+            Jelajahi
         </a>
     </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="grid grid-cols-1 gap-x-8 px-5 pb-3 pt-3 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
         @foreach ($this->sections as $section)
             <a href="{{ route($section['route']) }}" wire:navigate wire:key="hub-{{ $loop->index }}"
-                class="flex items-center justify-between gap-3 rounded-xl border border-zinc-100 p-3 hover:border-zinc-200 hover:bg-zinc-50 transition">
-                <div class="flex items-center gap-3 min-w-0">
-                    <div class="size-9 rounded-lg bg-zinc-100 flex items-center justify-center shrink-0">
-                        <flux:icon :name="$section['icon']" class="size-4.5 text-zinc-600" />
-                    </div>
-                    <div class="min-w-0">
-                        <p class="text-sm font-medium text-zinc-900 truncate">{{ $section['title'] }}</p>
-                        <p class="text-xs text-zinc-500 truncate">{{ $section['desc'] }}</p>
-                    </div>
+                class="group border-t border-zinc-100 py-3.5 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent">
+                <div class="flex items-baseline justify-between gap-3">
+                    <p class="min-w-0 truncate text-sm font-semibold text-zinc-900 transition-colors group-hover:text-accent-content">{{ $section['title'] }}</p>
+                    <span class="shrink-0 text-xs tabular-nums text-zinc-500">{{ $section['count'] }}</span>
                 </div>
-                <span class="shrink-0 text-xs font-semibold text-zinc-700 bg-zinc-100 rounded-full px-2 py-0.5 min-w-7 text-center">
-                    {{ $section['count'] }}
-                </span>
+                <p class="mt-0.5 truncate text-xs text-zinc-500">{{ $section['desc'] }}</p>
             </a>
         @endforeach
     </div>
