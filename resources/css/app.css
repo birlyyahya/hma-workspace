@@ -275,3 +275,29 @@ li[data-list="bullet"] {
 .ck-content li {
     margin-bottom: 0.25rem;
 }
+
+/* Sidebar aplikasi: item aktif berupa tint lembut tanpa outline, label lebih ringkas. */
+[data-flux-sidebar-item] {
+    @apply transition-colors duration-150 motion-reduce:transition-none;
+}
+
+[data-flux-sidebar-item] [data-content] {
+    font-size: 0.88rem;
+}
+
+[data-flux-sidebar-item][data-current] {
+    @apply border-transparent bg-red-50 text-accent-content shadow-none dark:bg-white/10 dark:text-red-300;
+}
+
+[data-flux-sidebar-item][data-current] [data-content] {
+    font-weight: 600;
+}
+
+[data-flux-sidebar-item]:focus-visible {
+    @apply outline-2 -outline-offset-2 outline-accent;
+}
+
+/* Daftar proyek di bawah grup sudah diberi indentasi + rail, ikon berulang hanya menambah noise. */
+ui-disclosure[data-flux-sidebar-group] [data-flux-sidebar-item] > .relative {
+    display: none;
+}

@@ -11,10 +11,9 @@
             <flux:sidebar.collapse class="in-data-flux-sidebar-on-desktop:not-in-data-flux-sidebar-collapsed-desktop:-mr-2" />
         </flux:sidebar.header>
 
-        <flux:sidebar.nav >
+        <flux:sidebar.nav>
             <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
                 Dashboard
-
             </flux:sidebar.item>
             <flux:sidebar.group icon="folder" expandable heading="Projects" class="grid">
                 <livewire:components.sidebar-item />
@@ -31,7 +30,7 @@
             <flux:sidebar.item class="hidden" icon="archive-box" :href="route('inventaris')" :current="request()->routeIs('inventaris')" wire:navigate>
                 Inventaris
             </flux:sidebar.item>
-            <flux:sidebar.item icon="envelope" :href="route('izin')" :current="request()->routeIs('izin') || request()->routeIs('izin.show') || request()->routeIs('izin.laporan-pengajuan')" wire:navigate >
+            <flux:sidebar.item icon="envelope" :href="route('izin')" :current="request()->routeIs('izin') || request()->routeIs('izin.show') || request()->routeIs('izin.laporan-pengajuan')" wire:navigate>
                 Izin & SPD
             </flux:sidebar.item>
             {{-- <flux:sidebar.item icon="shopping-cart" :href="route('pengajuan-barang')" :current="request()->routeIs('pengajuan-barang') || request()->routeIs('pengajuan-barang.*')" wire:navigate>
@@ -58,7 +57,9 @@
             </flux:sidebar.group>
         </flux:sidebar.nav>
 
-        <x-desktop-user-menu class="hidden lg:block" class="font-light" :name="auth()->user()->name" />
+        <div class="border-t border-zinc-100 pt-3">
+            <x-desktop-user-menu :name="auth()->user()->name" />
+        </div>
     </flux:sidebar>
 
     <!-- Mobile User Menu -->
