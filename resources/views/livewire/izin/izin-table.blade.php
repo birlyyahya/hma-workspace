@@ -1,9 +1,12 @@
 <?php
 
 use App\Services\IzinCache;
+use App\Services\IzinNotifier;
 use App\Services\IzinPdfComposer;
+use App\Services\IzinWriter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Flux\Flux;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\On;
 use Livewire\Volt\Component;
@@ -22,6 +25,14 @@ new class extends Component {
 
     /** Mode laporan (untuk halaman laporan pengajuan, listing seluruh user). */
     public bool $laporan = false;
+
+    public ?int $hrdConfirmId = null;
+    public string $hrdConfirmName = '';
+    public string $hrdConfirmDate = '';
+    public string $hrdConfirmReason = '';
+
+    /** '' (belum dipilih) | 'approve' | 'reject' */
+    public string $hrdAction = '';
 
     public function mount(): void
     {
@@ -78,6 +89,73 @@ new class extends Component {
     {
         $this->data = app(IzinCache::class)->list($this->buildQuery());
         $this->cacheExportRows();
+    }
+
+    public function openHrdConfirm(int $id): void
+    {
+        $izin = collect($this->data['data'] ?? [])->firstWhere('id', $id);
+
+        if ($izin === null) {
+            Toaster::error('Data izin tidak ditemukan.');
+
+            return;
+        }
+
+        $this->hrdConfirmId = $id;
+        $this->hrdConfirmName = (string) ($izin['user_name'] ?? 'N/A');
+        $this->hrdConfirmDate = Carbon::parse($izin['start_date'])->format('d M Y');
+        $this->hrdConfirmReason = (string) ($izin['reason'] ?? '-');
+        $this->hrdAction = '';
+
+        Flux::modal('hrd-confirm-modal')->show();
+    }
+
+    public function confirmHrd(): void
+    {
+        if ($this->hrdConfirmId === null || ! in_array($this->hrdAction, ['approve', 'reject'], true)) {
+            Toaster::warning('Pilih terlebih dahulu: setujui atau tolak.');
+
+            return;
+        }
+
+        if (! Auth::user()?->can('izin.view.all')) {
+            Toaster::warning('Anda tidak memiliki akses untuk memproses izin ini.');
+
+            return;
+        }
+
+        $response = collect($this->data['data'] ?? [])->firstWhere('id', $this->hrdConfirmId);
+
+        if ($response === null) {
+            Toaster::error('Data izin tidak ditemukan.');
+
+            return;
+        }
+
+        $approve = $this->hrdAction === 'approve';
+
+        $result = app(IzinWriter::class)->updateIzinStatus(
+            $response,
+            $approve ? 'hrd_checked' : 'cancel',
+            Auth::user()->username,
+        );
+
+        if (! $result['ok']) {
+            Toaster::error($result['body']['message'] ?? 'Gagal memproses izin. Silakan coba lagi.');
+
+            return;
+        }
+
+        $notifier = app(IzinNotifier::class);
+        $approve
+            ? $notifier->hrdConfirmed($response, Auth::user())
+            : $notifier->hrdRejected($response, Auth::user());
+
+        Toaster::success($approve ? 'Izin dikonfirmasi HRD.' : 'Izin ditolak.');
+
+        Flux::modal('hrd-confirm-modal')->close();
+        $this->reset('hrdConfirmId', 'hrdAction');
+        $this->fetchData();
     }
 
     public function generatePDF(int $id)
@@ -261,7 +339,7 @@ new class extends Component {
         {{-- Loading overlay --}}
         <div
             wire:loading.flex
-            wire:target.except="generatePDF"
+            wire:target.except="generatePDF,openHrdConfirm,confirmHrd"
             class="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-sm"
         >
             <div class="flex flex-col items-center gap-2">
@@ -360,19 +438,12 @@ new class extends Component {
                         <th class="px-4 py-3 font-semibold whitespace-nowrap">Nama</th>
                         <th class="px-4 py-3 font-semibold whitespace-nowrap">Kategori</th>
                         <th class="px-4 py-3 font-semibold whitespace-nowrap">Alasan</th>
-                        <th class="px-4 py-3 font-semibold text-center whitespace-nowrap">Status</th>
+                        <th class="px-1 py-3 font-semibold text-center whitespace-nowrap">Status</th>
                         <th class="px-5 py-3 font-semibold text-right whitespace-nowrap">Aksi</th>
                     </tr>
                 </thead>
                 <tbody wire:loading.class="pointer-events-none" class="divide-y divide-zinc-100">
                     @forelse ($this->data['data'] ?? [] as $izin)
-                        @php
-                            $statusLabel = match ($izin['status'] ?? null) {
-                                '2' => ['text' => 'Approved', 'color' => 'blue'],
-                                '3' => ['text' => 'Rejected', 'color' => 'red'],
-                                default => ['text' => 'Pending', 'color' => 'yellow'],
-                            };
-                        @endphp
                         <tr wire:key="izin-{{ $izin['id'] }}" class="transition hover:bg-zinc-50/70">
                             <td class="px-5 py-3.5 whitespace-nowrap text-zinc-700 tabular-nums">
                                 {{ Carbon::parse($izin['start_date'])->format('d M Y') }}
@@ -389,31 +460,42 @@ new class extends Component {
                             <td class="px-4 py-3.5 min-w-40 text-xs text-zinc-500">
                                 <span class="line-clamp-2">{{ $izin['description'] ?? '-' }}</span>
                             </td>
-                            <td class="px-4 py-3.5">
+                            <td class="px-4 py-3.5 min-w-40">
                                 <div class="flex flex-col items-center gap-1.5">
-                                    <flux:badge color="{{ $izin['hrd_checked'] === 1 ? 'green' : $statusLabel['color'] }}" size="sm" inset="top bottom" icon="check-badge">Disetujui {{ $izin['hrd_checked'] === 1 ? 'HRD' : 'IT' }}</flux:badge>
-                                    <div class="flex items-center gap-1.5 text-[10px] font-semibold tracking-wide text-zinc-400">
-                                        <span class="text-{{ $izin['hrd_checked'] === 1 ? 'green' : $statusLabel['color'] }}-600">IT</span>
-                                        <span class="size-2 rounded-full bg-{{ $izin['hrd_checked'] === 1 ? 'green' : $statusLabel['color'] }}-500"></span>
-                                        <span class="h-0.5 w-5 rounded-full bg-{{ $izin['hrd_checked'] === 1 ? 'green' : $statusLabel['color'] }}-300"></span>
-                                        <span class="size-2 rounded-full {{ $izin['hrd_checked'] === 1 ? 'bg-emerald-500' : 'border-2 border-zinc-300 bg-white' }}"></span>
-                                        <span class="{{ $izin['hrd_checked'] === 1 ? 'text-green-600' : '' }}">HRD</span>
-                                    </div>
+                                    <x-izin.status :izin="$izin" />
+                                    <x-izin.status :izin="$izin" part="stepper-compact" />
                                 </div>
                             </td>
                             <td class="px-5 py-3.5 text-right">
                                 <div class="flex items-center justify-end gap-1.5">
-                                      <flux:tooltip content="Lihat Detail">
-                                          <flux:button
-                                              href="{{ route('izin.show', $izin['id']) }}"
-                                              wire:navigate
-                                              icon="eye"
-                                              variant="subtle"
-                                              size="sm"
-                                              class="cursor-pointer"
-                                          >
-                                      </flux:tooltip>
-                                    </flux:button>
+                                    @php
+                                        $canConfirmHrd = ($izin['status'] ?? null) === '2' && (int) ($izin['hrd_checked'] ?? 0) !== 1;
+                                    @endphp
+                                    @if ($canConfirmHrd)
+                                        @can('izin.view.all')
+                                            <flux:tooltip content="Tinjau HRD">
+                                                <flux:button
+                                                    wire:click="openHrdConfirm({{ $izin['id'] }})"
+                                                    icon="clipboard-document-check"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    class="cursor-pointer text-emerald-600! hover:bg-emerald-50!"
+                                                    aria-label="Tinjau HRD"
+                                                />
+                                            </flux:tooltip>
+                                        @endcan
+                                    @endif
+                                    <flux:tooltip content="Lihat Detail">
+                                        <flux:button
+                                            href="{{ route('izin.show', $izin['id']) }}"
+                                            wire:navigate
+                                            icon="eye"
+                                            variant="subtle"
+                                            size="sm"
+                                            class="cursor-pointer"
+                                            aria-label="Lihat Detail"
+                                        />
+                                    </flux:tooltip>
                                     <flux:tooltip content="Unduh PDF">
                                         <flux:button
                                             wire:click="generatePDF({{ $izin['id'] }})"
@@ -446,120 +528,7 @@ new class extends Component {
 
         {{-- Cards (mobile) --}}
         <div class="space-y-3 p-3 md:hidden" wire:loading.class="pointer-events-none">
-            {{-- DUMMY UI: satu card statis untuk desain status "Disetujui IT" (hapus setelah logic siap) --}}
-            <article class="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="flex min-w-0 items-center gap-2">
-                        <flux:avatar size="xs" name="Budi Santoso" />
-                        <div class="min-w-0">
-                            <p class="truncate text-sm font-medium text-zinc-900">Budi Santoso</p>
-                            <p class="text-xs text-zinc-500 tabular-nums">30 Okt 2026</p>
-                        </div>
-                    </div>
-                    <flux:badge color="blue" size="sm" icon="check-circle" class="shrink-0">Disetujui IT</flux:badge>
-                </div>
-
-                <p class="mt-2.5 text-sm text-zinc-600 line-clamp-2">Cuti tahunan</p>
-
-                <div class="mt-4 flex items-start">
-                    <div class="flex w-14 flex-col items-center gap-1">
-                        <span class="flex size-5 items-center justify-center rounded-full bg-emerald-500 text-white">
-                            <flux:icon name="check" variant="micro" class="size-3" />
-                        </span>
-                        <span class="text-[10px] font-medium text-zinc-500">Diajukan</span>
-                    </div>
-                    <div class="mt-2.5 h-0.5 flex-1 rounded-full bg-emerald-300"></div>
-                    <div class="flex w-14 flex-col items-center gap-1">
-                        <span class="flex size-5 items-center justify-center rounded-full bg-blue-500 text-white">
-                            <flux:icon name="check" variant="micro" class="size-3" />
-                        </span>
-                        <span class="text-[10px] font-medium text-blue-600">IT</span>
-                    </div>
-                    <div class="mt-2.5 h-0.5 flex-1 rounded-full bg-blue-200"></div>
-                    <div class="flex w-14 flex-col items-center gap-1">
-                        <span class="relative flex size-5 items-center justify-center">
-                            <span class="absolute inline-flex size-full animate-ping rounded-full bg-amber-300 opacity-60"></span>
-                            <span class="relative size-3 rounded-full border-2 border-amber-400 bg-white"></span>
-                        </span>
-                        <span class="text-[10px] font-medium text-zinc-400">HRD</span>
-                    </div>
-                </div>
-
-                <div class="mt-3 grid grid-cols-2 gap-2 border-t border-zinc-100 pt-3">
-                    <flux:button icon="eye" variant="outline" size="sm" class="w-full cursor-pointer">Detail</flux:button>
-                    <flux:button icon="arrow-down-tray" variant="outline" size="sm" class="w-full cursor-pointer">PDF</flux:button>
-                </div>
-            </article>
-
-            {{-- DUMMY UI: status "Disetujui HRD" (final) --}}
-            <article class="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="flex min-w-0 items-center gap-2">
-                        <flux:avatar size="xs" name="Siti Rahma" />
-                        <div class="min-w-0">
-                            <p class="truncate text-sm font-medium text-zinc-900">Siti Rahma</p>
-                            <p class="text-xs text-zinc-500 tabular-nums">28 Okt 2026</p>
-                        </div>
-                    </div>
-                    <flux:badge color="green" size="sm" icon="check-badge" class="shrink-0">Disetujui HRD</flux:badge>
-                </div>
-
-                <p class="mt-2.5 text-sm text-zinc-600 line-clamp-2">Izin sakit</p>
-
-                <div class="mt-4 flex items-start">
-                    <div class="flex w-14 flex-col items-center gap-1">
-                        <span class="flex size-5 items-center justify-center rounded-full bg-emerald-500 text-white">
-                            <flux:icon name="check" variant="micro" class="size-3" />
-                        </span>
-                        <span class="text-[10px] font-medium text-zinc-500">Diajukan</span>
-                    </div>
-                    <div class="mt-2.5 h-0.5 flex-1 rounded-full bg-emerald-400"></div>
-                    <div class="flex w-14 flex-col items-center gap-1">
-                        <span class="flex size-5 items-center justify-center rounded-full bg-emerald-500 text-white">
-                            <flux:icon name="check" variant="micro" class="size-3" />
-                        </span>
-                        <span class="text-[10px] font-medium text-emerald-600">IT</span>
-                    </div>
-                    <div class="mt-2.5 h-0.5 flex-1 rounded-full bg-emerald-400"></div>
-                    <div class="flex w-14 flex-col items-center gap-1">
-                        <span class="flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white ring-4 ring-emerald-100">
-                            <flux:icon name="check" variant="micro" class="size-3" />
-                        </span>
-                        <span class="text-[10px] font-semibold text-emerald-700">HRD</span>
-                    </div>
-                </div>
-
-                <div class="mt-3 grid grid-cols-2 gap-2 border-t border-zinc-100 pt-3">
-                    <flux:button icon="eye" variant="outline" size="sm" class="w-full cursor-pointer">Detail</flux:button>
-                    <flux:button icon="arrow-down-tray" variant="outline" size="sm" class="w-full cursor-pointer">PDF</flux:button>
-                </div>
-            </article>
-
             @forelse ($this->data['data'] ?? [] as $izin)
-                @php
-                    $admin = (int) ($izin['status_admin'] ?? 1);
-                    $superadmin = (int) ($izin['status_superadmin'] ?? 1);
-
-                    if ($admin === 3 || $superadmin === 3) {
-                        $progress = 100;
-                        $progressColor = 'bg-rose-500';
-                    } elseif ($admin === 2 && $superadmin === 2) {
-                        $progress = 100;
-                        $progressColor = 'bg-emerald-500';
-                    } elseif ($admin === 2 || $superadmin === 2) {
-                        $progress = 50;
-                        $progressColor = 'bg-blue-500';
-                    } else {
-                        $progress = 25;
-                        $progressColor = 'bg-amber-500';
-                    }
-
-                    $statusLabel = match ($izin['status'] ?? null) {
-                        '2' => ['text' => 'Approved', 'color' => 'green'],
-                        '3' => ['text' => 'Rejected', 'color' => 'red'],
-                        default => ['text' => 'Pending', 'color' => 'yellow'],
-                    };
-                @endphp
                 <article wire:key="izin-mob-{{ $izin['id'] }}" class="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
                     <div class="flex items-start justify-between gap-3">
                         <div class="flex min-w-0 items-center gap-2">
@@ -569,17 +538,25 @@ new class extends Component {
                                 <p class="text-xs text-zinc-500 tabular-nums">{{ Carbon::parse($izin['start_date'])->format('d M Y') }}</p>
                             </div>
                         </div>
-                        <flux:badge color="{{ $statusLabel['color'] }}" size="sm" class="shrink-0">{{ $statusLabel['text'] }}</flux:badge>
+                        <x-izin.status :izin="$izin" />
                     </div>
 
                     <p class="mt-2.5 text-sm text-zinc-600 line-clamp-2">{{ $izin['reason'] ?? 'N/A' }}</p>
 
-                    <div class="mt-3 flex items-center gap-2">
-                        <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-100">
-                            <div class="{{ $progressColor }} h-full rounded-full transition-all duration-300" style="width: {{ $progress }}%"></div>
-                        </div>
-                        <span class="w-9 text-right text-[11px] font-medium text-zinc-500 tabular-nums">{{ $progress }}%</span>
-                    </div>
+                    <x-izin.status :izin="$izin" part="stepper" class="mt-4" />
+
+                    @if (($izin['status'] ?? null) === '2' && (int) ($izin['hrd_checked'] ?? 0) !== 1)
+                        @can('izin.view.all')
+                            <flux:button
+                                wire:click="openHrdConfirm({{ $izin['id'] }})"
+                                icon="clipboard-document-check"
+                                size="sm"
+                                class="mt-3 w-full cursor-pointer bg-emerald-600! text-white! hover:bg-emerald-700!"
+                            >
+                                Tinjau HRD
+                            </flux:button>
+                        @endcan
+                    @endif
 
                     <div class="mt-3 grid grid-cols-2 gap-2 border-t border-zinc-100 pt-3">
                         <a href="{{ route('izin.show', $izin['id']) }}" wire:navigate>
@@ -685,4 +662,131 @@ new class extends Component {
             </nav>
         @endif
     </div>
+
+    {{-- Modal konfirmasi HRD --}}
+    <flux:modal name="hrd-confirm-modal" class="w-full max-w-md" :dismissible="false">
+        <div class="space-y-5">
+            <div class="flex items-start gap-4">
+                <div class="grid size-11 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-600 ring-4 ring-emerald-50/50">
+                    <flux:icon name="clipboard-document-check" class="size-5" />
+                </div>
+                <div class="min-w-0 flex-1 space-y-1">
+                    <flux:heading size="lg">Tinjau izin sebagai HRD</flux:heading>
+                    <flux:text class="text-xs sm:text-sm text-zinc-600">
+                        Izin ini sudah disetujui IT. Pilih keputusan HRD di bawah ini.
+                    </flux:text>
+                </div>
+            </div>
+
+            <div class="rounded-lg border border-zinc-200 bg-zinc-50/70 p-3.5">
+                <div class="flex items-center gap-2.5">
+                    <flux:avatar size="xs" name="{{ $hrdConfirmName ?: '?' }}" />
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-medium text-zinc-900">{{ $hrdConfirmName }}</p>
+                        <p class="text-xs text-zinc-500 tabular-nums">{{ $hrdConfirmDate }}</p>
+                    </div>
+                </div>
+                <p class="mt-2.5 text-sm text-zinc-600 line-clamp-3">{{ $hrdConfirmReason }}</p>
+
+                <div class="mt-4 flex items-start">
+                    <div class="flex w-14 flex-col items-center gap-1">
+                        <span class="flex size-5 items-center justify-center rounded-full bg-emerald-500 text-white">
+                            <flux:icon name="check" variant="micro" class="size-3" />
+                        </span>
+                        <span class="text-[10px] font-medium text-zinc-500">Diajukan</span>
+                    </div>
+                    <div class="mt-2.5 h-0.5 flex-1 rounded-full bg-emerald-300"></div>
+                    <div class="flex w-14 flex-col items-center gap-1">
+                        <span class="flex size-5 items-center justify-center rounded-full bg-blue-500 text-white">
+                            <flux:icon name="check" variant="micro" class="size-3" />
+                        </span>
+                        <span class="text-[10px] font-medium text-blue-600">IT</span>
+                    </div>
+                    <div
+                        class="mt-2.5 h-0.5 flex-1 rounded-full transition-colors"
+                        x-bind:class="{
+                            'bg-red-300': $wire.hrdAction === 'reject',
+                            'bg-emerald-300': $wire.hrdAction === 'approve',
+                            'border-t-2 border-dashed border-zinc-300': ! $wire.hrdAction,
+                        }"
+                    ></div>
+                    <div class="flex w-14 flex-col items-center gap-1">
+                        <span x-show="$wire.hrdAction === 'approve'" class="flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white ring-4 ring-emerald-100">
+                            <flux:icon name="check" variant="micro" class="size-3" />
+                        </span>
+                        <span x-show="$wire.hrdAction === 'reject'" x-cloak class="flex size-5 items-center justify-center rounded-full bg-red-500 text-white ring-4 ring-red-100">
+                            <flux:icon name="x-mark" variant="micro" class="size-3" />
+                        </span>
+                        <span x-show="! $wire.hrdAction" class="size-5 rounded-full border-2 border-dashed border-zinc-300 bg-white"></span>
+                        <span
+                            class="text-[10px]"
+                            x-bind:class="{
+                                'font-semibold text-emerald-700': $wire.hrdAction === 'approve',
+                                'font-semibold text-red-600': $wire.hrdAction === 'reject',
+                                'font-medium text-zinc-400': ! $wire.hrdAction,
+                            }"
+                        >HRD</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3" role="radiogroup" aria-label="Keputusan HRD">
+                <button
+                    type="button"
+                    role="radio"
+                    x-on:click="$wire.$set('hrdAction', 'approve', false)"
+                    x-bind:aria-checked="$wire.hrdAction === 'approve'"
+                    class="flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border-2 p-3.5 text-center transition"
+                    x-bind:class="$wire.hrdAction === 'approve'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                        : 'border-zinc-200 bg-white text-zinc-600 hover:border-emerald-300 hover:bg-emerald-50/50'"
+                >
+                    <flux:icon name="check-circle" class="size-6" />
+                    <span class="text-sm font-semibold">Setujui</span>
+                    <span class="text-[11px] leading-tight opacity-80">Status jadi Disetujui HRD</span>
+                </button>
+
+                <button
+                    type="button"
+                    role="radio"
+                    x-on:click="$wire.$set('hrdAction', 'reject', false)"
+                    x-bind:aria-checked="$wire.hrdAction === 'reject'"
+                    class="flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border-2 p-3.5 text-center transition"
+                    x-bind:class="$wire.hrdAction === 'reject'
+                        ? 'border-red-500 bg-red-50 text-red-700'
+                        : 'border-zinc-200 bg-white text-zinc-600 hover:border-red-300 hover:bg-red-50/50'"
+                >
+                    <flux:icon name="x-circle" class="size-6" />
+                    <span class="text-sm font-semibold">Tolak</span>
+                    <span class="text-[11px] leading-tight opacity-80">Izin dibatalkan (status ditolak)</span>
+                </button>
+            </div>
+
+            <div x-show="$wire.hrdAction === 'reject'" x-cloak class="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-800">
+                <flux:icon name="exclamation-triangle" variant="micro" class="mt-0.5 size-4 shrink-0" />
+                <p>Penolakan tidak dapat dibatalkan. Pemohon akan melihat izinnya berstatus ditolak.</p>
+            </div>
+
+            <div class="flex justify-end gap-2">
+                <flux:modal.close>
+                    <flux:button variant="ghost">Batal</flux:button>
+                </flux:modal.close>
+                <flux:button
+                    wire:click="confirmHrd"
+                    wire:loading.attr="disabled"
+                    wire:target="confirmHrd"
+                    x-bind:disabled="! $wire.hrdAction"
+                    class="text-white!"
+                    x-bind:class="$wire.hrdAction === 'reject' ? 'bg-red-600! hover:bg-red-700!' : 'bg-emerald-600! hover:bg-emerald-700!'"
+                >
+                    <span
+                        wire:loading.remove
+                        wire:target="confirmHrd"
+                        x-text="$wire.hrdAction === 'approve' ? 'Setujui Izin' : ($wire.hrdAction === 'reject' ? 'Tolak Izin' : 'Pilih keputusan')"
+                    ></span>
+                    <span wire:loading wire:target="confirmHrd">Memproses...</span>
+                </flux:button>
+            </div>
+        </div>
+    </flux:modal>
 </div>

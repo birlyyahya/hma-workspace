@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\IzinNotifier;
 use App\Services\IzinWriter;
 use Carbon\Carbon;
 use Flux\Flux;
@@ -80,6 +81,12 @@ new class extends Component {
 
             return;
         }
+
+        app(IzinNotifier::class)->submitted([
+            'id' => data_get($result['body'], 'data.id'),
+            'reason' => $this->alasan,
+            'start_date' => $this->start_date,
+        ], Auth::user());
 
         Toaster::success('Izin berhasil diajukan!');
         $this->dispatch('izinAdded');

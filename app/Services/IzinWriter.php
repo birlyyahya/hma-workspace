@@ -59,6 +59,47 @@ class IzinWriter
     }
 
     /**
+     * Ubah status izin lewat update-izin-saya. Hanya `status` yang berubah, field izin lain
+     * dikirim ulang apa adanya. NON-idempotent — jangan retry 5xx.
+     *
+     * @param  array<string, mixed>  $izin  Data izin saat ini (hasil IzinCache::detail()['data'])
+     * @param  'hrd_checked'|'cancel'  $status  hrd_checked = konfirmasi HRD, cancel = tolak (status 3)
+     * @return array{ok: bool, body: array<string, mixed>, status: ?int, error: ?string}
+     */
+    public function updateIzinStatus(array $izin, string $status, string $username): array
+    {
+        $id = (int) ($izin['id'] ?? 0);
+
+        try {
+            $payload = [
+                'id' => (string) $id,
+                'start_date' => $izin['start_date'] ?? null,
+                'end_date' => $izin['end_date'] ?? null,
+                'start_time' => $izin['start_time'] ?? null,
+                'end_time' => $izin['end_time'] ?? null,
+                'alasan' => $izin['reason'] ?? null,
+                'deskripsi' => $izin['description'] ?? null,
+                'username' => $username,
+                'status' => $status,
+            ];
+
+            $response = $this->externalWrite(timeout: 10)
+                ->post($this->apiBase.'/global/izin/update-izin-saya', $payload);
+
+            $body = (array) $response->json();
+
+            return $this->result((bool) ($body['success'] ?? false), $body, $response->status(), [
+                'name' => 'izin',
+                'event' => 'updated',
+                'description' => ($status === 'cancel' ? 'Menolak' : 'Mengonfirmasi HRD').' izin #'.$id,
+                'properties' => ['id' => $id, 'status' => $status],
+            ]);
+        } catch (\Throwable $e) {
+            return $this->fail('updateIzinStatus', $e, ['id' => $id, 'status' => $status]);
+        }
+    }
+
+    /**
      * Buat atau perbarui SPD (multipart, timeout diperpanjang untuk upload lampiran).
      * - Tanpa $id → POST create-spd (NON-idempotent: double submit = SPD duplikat).
      * - Dengan $id → POST update-spd/{id} dengan _method=PUT (idempotent).
