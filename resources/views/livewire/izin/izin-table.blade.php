@@ -403,15 +403,16 @@ new class extends Component {
                             </td>
                             <td class="px-5 py-3.5 text-right">
                                 <div class="flex items-center justify-end gap-1.5">
-                                    <flux:button
-                                        href="{{ route('izin.show', $izin['id']) }}"
-                                        wire:navigate
-                                        icon="eye"
-                                        variant="outline"
-                                        size="sm"
-                                        class="cursor-pointer"
-                                    >
-                                        Detail
+                                      <flux:tooltip content="Lihat Detail">
+                                          <flux:button
+                                              href="{{ route('izin.show', $izin['id']) }}"
+                                              wire:navigate
+                                              icon="eye"
+                                              variant="subtle"
+                                              size="sm"
+                                              class="cursor-pointer"
+                                          >
+                                      </flux:tooltip>
                                     </flux:button>
                                     <flux:tooltip content="Unduh PDF">
                                         <flux:button

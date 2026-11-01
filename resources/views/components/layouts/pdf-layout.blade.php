@@ -236,7 +236,7 @@
 
         .signature-image img {
             max-width: 95%;
-            max-height: 96px;
+            max-height: 100px;
             object-fit: contain;
         }
 
