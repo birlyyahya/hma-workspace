@@ -285,7 +285,7 @@ class extends Component {
 }; ?>
 
 <div>
-    <div class="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div class="bg-zinc-50 dark:bg-zinc-950">
         {{-- ================= TOP BAR ================= --}}
         <div class="sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/90">
             <div class="mx-auto flex max-w-md items-center gap-3 px-4 py-3">

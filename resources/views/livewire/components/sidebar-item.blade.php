@@ -6,6 +6,17 @@ use Illuminate\Support\Facades\Log;
 use Livewire\Volt\Component;
 
 new class extends Component {
+    public function placeholder(): string
+    {
+        return <<<'HTML'
+        <div class="animate-pulse space-y-2 px-3 py-1" aria-hidden="true">
+            <div class="h-3 w-4/5 rounded bg-zinc-200"></div>
+            <div class="h-3 w-3/5 rounded bg-zinc-200"></div>
+            <div class="h-3 w-2/3 rounded bg-zinc-200"></div>
+        </div>
+        HTML;
+    }
+
     public function getProjectsProperty(): array
     {
         try {

@@ -88,7 +88,6 @@ new class extends Component {
     public function fetchData(): void
     {
         $this->data = app(IzinCache::class)->list($this->buildQuery());
-        $this->cacheExportRows();
     }
 
     public function openHrdConfirm(int $id): void
@@ -251,6 +250,7 @@ new class extends Component {
     protected function buildExportGroups(): array
     {
         $this->authorize('izin.view.all');
+        $this->cacheExportRows();
 
         $groupedRows = [];
         $rows = Cache::tags(['izin'])->get($this->exportRowsCacheKey(), $this->data['data'] ?? []);

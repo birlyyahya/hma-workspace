@@ -1,11 +1,11 @@
 <x-layouts.app.sidebar :title="$title ?? null">
-    <flux:main class="py-0! px-0! bg-white">
-        <div class="bg-zinc-50 border relative my-3 md:mr-2 rounded-2xl border-zinc-200 dark:border-zinc-700">
-            <div class="border-b px-6 py-2 items-center justify-between hidden md:flex sticky top-0 z-10 bg-zinc-50 rounded-t-2xl">
+    <flux:main class="flex min-h-0 flex-col overflow-hidden bg-white px-0! py-3! md:pr-2!">
+        <div class="relative flex min-h-0 flex-1 flex-col rounded-2xl border border-zinc-200 bg-zinc-50 dark:border-zinc-700">
+            <div class="hidden shrink-0 items-center justify-between rounded-t-2xl border-b bg-zinc-50 px-6 py-2 md:flex">
                 <livewire:components.breadcrumb />
                 <livewire:components.notification-header/>
             </div>
-            <div class="h-full max-h-196 overflow-auto px-4">
+            <div class="min-h-0 flex-1 overflow-auto px-4">
                 {{ $slot }}
             </div>
         </div>

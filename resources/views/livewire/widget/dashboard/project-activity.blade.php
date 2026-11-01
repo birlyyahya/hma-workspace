@@ -12,19 +12,10 @@ new class extends Component
     /** @var int Jumlah slice project teratas sebelum digabung ke "Lainnya". */
     public int $topLimit = 7;
 
-    /** Palet kategori — dipakai bersama oleh ApexCharts & legend kustom. */
-    private const PALETTE = [
-        '#8b5cf6', // violet
-        '#3b82f6', // blue
-        '#10b981', // emerald
-        '#f59e0b', // amber
-        '#f43f5e', // rose
-        '#06b6d4', // cyan
-        '#d946ef', // fuchsia
-        '#84cc16', // lime
-    ];
+    /** Satu keluarga warna: merah brand memudar menurut peringkat. */
+    private const PALETTE = ['#991b1b', '#b91c1c', '#dc2626', '#ef4444', '#f87171', '#fca5a5', '#fecaca'];
 
-    private const OTHER_COLOR = '#a1a1aa'; // zinc-400
+    private const OTHER_COLOR = '#cbd5e1';
 
     public function placeholder(): \Illuminate\Contracts\View\View
     {
@@ -137,145 +128,106 @@ new class extends Component
     }
 }; ?>
 
-<div class="bg-white rounded-2xl shadow-sm min-h-100 overflow-auto lg:overflow-hidden">
+<div class="bg-white rounded-2xl shadow-sm">
     @php $stats = $this->stats; @endphp
 
-    <div class="flex flex-wrap items-center justify-between gap-3 p-4 pb-0 sm:p-5 sm:pb-0">
-        <div class="flex items-center gap-3 min-w-0">
-            <div class="shrink-0 size-10 rounded-xl bg-emerald-50 ring-1 ring-emerald-100 flex items-center justify-center">
-                <flux:icon name="chart-pie" class="size-5 text-emerald-600" />
-            </div>
-            <div class="min-w-0">
-                <h2 class="text-base font-semibold text-zinc-900 leading-tight">Aktivitas Project</h2>
-                <p class="text-xs text-zinc-500">
-                    Distribusi aktivitas DAR &middot;
-                    {{ Carbon::parse($stats['range']['from'])->translatedFormat('d M') }} –
-                    {{ Carbon::parse($stats['range']['to'])->translatedFormat('d M Y') }}
-                </p>
-            </div>
-        </div>
-        <flux:badge size="sm" color="emerald" variant="pill" class="shrink-0">
-            {{ $stats['project_count'] }} project aktif
-        </flux:badge>
+    <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-5 pt-5 sm:px-6 sm:pt-6">
+        <h2 class="text-base font-semibold tracking-tight text-zinc-900">Aktivitas Project</h2>
+        <p class="text-xs text-zinc-500 tabular-nums">
+            @if ($stats['total'] > 0)
+                {{ $stats['project_count'] }} project &middot;
+            @endif
+            {{ Carbon::parse($stats['range']['from'])->translatedFormat('d M') }} –
+            {{ Carbon::parse($stats['range']['to'])->translatedFormat('d M Y') }}
+        </p>
     </div>
 
     @if ($stats['total'] === 0)
-        <div class="p-4 sm:p-5">
-            <div class="rounded-xl border border-dashed border-zinc-200 p-8 text-center sm:p-10">
-                <div class="mx-auto size-12 rounded-full bg-zinc-100 flex items-center justify-center">
-                    <flux:icon name="chart-pie" class="size-6 text-zinc-400" />
-                </div>
-                <p class="mt-3 text-sm font-medium text-zinc-600">Belum ada aktivitas</p>
-                <p class="mt-0.5 text-xs text-zinc-400">Tidak ada aktivitas DAR terkait project dalam 2 minggu terakhir</p>
-            </div>
+        <div class="px-5 py-14 text-center sm:px-6">
+            <p class="text-sm font-medium text-zinc-700">Belum ada aktivitas</p>
+            <p class="mt-1 text-xs text-zinc-500">Tidak ada aktivitas DAR terkait project dalam 2 minggu terakhir</p>
         </div>
     @else
-        <div class="grid grid-cols-1 gap-6 p-4 sm:p-5 lg:grid-cols-5 lg:items-center lg:gap-2">
+        <div class="grid grid-cols-1 gap-6 px-5 pb-5 pt-4 sm:px-6 sm:pb-6 lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-center lg:gap-10">
 
             {{-- Donut --}}
-            <div class="relative z-10 mx-auto flex h-52 w-52 items-center justify-center sm:h-60 sm:w-60 lg:col-span-2 lg:h-64 lg:w-full" wire:ignore
+            <div class="relative mx-auto size-56 lg:size-64" wire:ignore
                 x-data="{
                     chart: null,
                     slices: @js($stats['slices']),
-                    truncate(label, max = 34) {
-                        return label.length > max ? label.slice(0, max - 1).trimEnd() + '…' : label;
-                    },
                     init() {
                         this.$nextTick(() => {
                             if (!window.ApexCharts || this.chart) return;
                             this.chart = new ApexCharts(this.$refs.donut, {
-                                chart: { type: 'donut', height: '100%', fontFamily: 'inherit', animations: { speed: 500 } },
+                                chart: { type: 'donut', height: '100%', fontFamily: 'inherit', animations: { speed: 400 } },
                                 series: this.slices.map(s => s.count),
-                                labels: this.slices.map(s => this.truncate(s.code ? `[${s.code}] ${s.name}` : s.name)),
+                                labels: this.slices.map(s => (s.code ? `[${s.code}] ` : '') + s.name),
                                 colors: this.slices.map(s => s.color),
-                                stroke: { width: 2, colors: ['#ffffff'] },
+                                stroke: { width: 3, colors: ['#ffffff'] },
                                 dataLabels: { enabled: false },
                                 legend: { show: false },
-                                plotOptions: { pie: { expandOnClick: false, donut: { size: '74%', labels: { show: false } } } },
-                                tooltip: {
-                                    theme: 'light',
-                                    y: { formatter: (val) => val + ' aktivitas' },
-                                    style: { fontSize: '12px' },
-                                },
-                                states: { hover: { filter: { type: 'lighten', value: 0.08 } } },
-                                responsive: [{ breakpoint: 640, options: { chart: { height: '100%' } } }],
+                                plotOptions: { pie: { expandOnClick: false, donut: { size: '78%', labels: { show: false } } } },
+                                tooltip: { theme: 'light', y: { formatter: (val) => val + ' aktivitas' } },
+                                states: { hover: { filter: { type: 'none' } }, active: { filter: { type: 'none' } } },
                             });
                             this.chart.render();
                         });
                     },
                     destroy() { this.chart?.destroy(); },
                 }">
-                <div x-ref="donut" class="h-full w-full"></div>
+                <div x-ref="donut" class="size-full"></div>
 
-                {{-- Total di tengah donut --}}
                 <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <span class="text-2xl font-bold text-zinc-900 tabular-nums leading-none sm:text-3xl">{{ $stats['total'] }}</span>
-                    <span class="mt-1 text-[11px] font-medium uppercase tracking-wide text-zinc-400">Aktivitas</span>
+                    <span class="text-4xl font-semibold tracking-tight text-zinc-900 tabular-nums leading-none">{{ $stats['total'] }}</span>
+                    <span class="mt-1.5 text-xs text-zinc-500">aktivitas DAR</span>
                 </div>
             </div>
 
-            {{-- Ranking / legend kustom --}}
-            <div class="min-w-0 lg:col-span-3">
-                @if ($stats['top'])
-                    <div class="mb-3 flex items-center gap-2 rounded-xl bg-zinc-50 px-3 py-2.5 ring-1 ring-zinc-100">
-                        <flux:icon name="trophy" class="size-4 text-amber-500 shrink-0" />
-                        <p class="text-xs text-zinc-500 min-w-0 truncate">
-                            Paling aktif
-                            <span class="font-semibold text-zinc-900">
-                                @if ($stats['top']['code'])
-                                    <span class="text-zinc-400">[{{ $stats['top']['code'] }}]</span>
-                                @endif
-                                {{ $stats['top']['name'] }}
-                            </span>
-                        </p>
-                        <span class="ml-auto shrink-0 text-xs font-semibold text-zinc-900 tabular-nums">{{ $stats['top']['pct'] }}%</span>
-                    </div>
-                @endif
+            {{-- Peringkat = legenda --}}
+            <ul class="min-w-0 divide-y divide-zinc-100">
+                @foreach ($stats['slices'] as $slice)
+                    <li wire:key="slice-{{ $loop->index }}" class="py-2.5" @if ($slice['is_other']) x-data="{ open: false }" @endif>
+                        <div class="flex items-center gap-3">
+                            <span class="size-2.5 shrink-0 rounded-full" style="background-color: {{ $slice['color'] }}" aria-hidden="true"></span>
 
-                <div class="space-y-2 max-h-64 overflow-y-auto pr-1">
-                    @foreach ($stats['slices'] as $slice)
-                        <div wire:key="slice-{{ $loop->index }}" class="group" @if ($slice['is_other']) x-data="{ open: false }" @endif>
-                            <div class="flex items-center gap-2.5 {{ $slice['is_other'] ? 'cursor-pointer' : '' }}"
-                                @if ($slice['is_other']) @click="open = ! open" @endif>
-                                <span class="size-2.5 rounded-full shrink-0" style="background-color: {{ $slice['color'] }}"></span>
-                                <p class="min-w-0 flex-1 truncate text-sm text-zinc-700">
+                            @if ($slice['is_other'])
+                                <button type="button" x-on:click="open = ! open" x-bind:aria-expanded="open"
+                                    class="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 text-start text-sm text-zinc-800">
+                                    <span class="truncate">{{ $slice['name'] }}</span>
+                                    <flux:icon name="chevron-down" x-bind:class="open ? 'rotate-180' : ''" class="size-3.5 shrink-0 text-zinc-500 transition-transform motion-reduce:transition-none" />
+                                </button>
+                            @else
+                                <p class="min-w-0 flex-1 truncate text-sm text-zinc-800">
                                     @if ($slice['code'])
-                                        <span class="text-zinc-400">[{{ $slice['code'] }}]</span>
+                                        <span class="tabular-nums text-zinc-500">[{{ $slice['code'] }}]</span>
                                     @endif
                                     {{ $slice['name'] }}
                                 </p>
-                                <span class="shrink-0 text-xs text-zinc-400 tabular-nums">{{ $slice['count'] }}</span>
-                                <span class="shrink-0 w-11 text-right text-xs font-semibold text-zinc-900 tabular-nums">{{ $slice['pct'] }}%</span>
-                                @if ($slice['is_other'])
-                                    <flux:icon name="chevron-down" x-bind:class="open ? 'rotate-180' : ''" class="size-3.5 shrink-0 text-zinc-400 transition-transform" />
-                                @endif
-                            </div>
-                            <div class="mt-1.5 ml-5 h-1.5 rounded-full bg-zinc-100 overflow-hidden">
-                                <div class="h-full rounded-full transition-all duration-500"
-                                    style="width: {{ $slice['pct'] }}%; background-color: {{ $slice['color'] }}"></div>
-                            </div>
-
-                            @if ($slice['is_other'])
-                                <div x-show="open" x-collapse class="mt-2 ml-5 space-y-1.5 border-l border-zinc-200 pl-3">
-                                    @foreach ($slice['members'] as $member)
-                                        <div wire:key="slice-{{ $loop->parent->index }}-member-{{ $loop->index }}" class="flex items-center gap-2">
-                                            <p class="min-w-0 flex-1 truncate text-xs text-zinc-500">
-                                                @if ($member['code'])
-                                                    <span class="text-zinc-400">[{{ $member['code'] }}]</span>
-                                                @endif
-                                                {{ $member['name'] }}
-                                            </p>
-                                            <span class="shrink-0 text-[11px] text-zinc-400 tabular-nums">{{ $member['count'] }}</span>
-                                            <span class="shrink-0 w-9 text-right text-[11px] font-medium text-zinc-600 tabular-nums">{{ $member['pct'] }}%</span>
-                                        </div>
-                                    @endforeach
-                                </div>
                             @endif
+
+                            <span class="shrink-0 text-xs tabular-nums text-zinc-500">{{ $slice['count'] }}</span>
+                            <span class="w-12 shrink-0 text-end text-sm font-semibold tabular-nums text-zinc-900">{{ $slice['pct'] }}%</span>
                         </div>
-                    @endforeach
-                </div>
-            </div>
+
+                        @if ($slice['is_other'])
+                            <ul x-show="open" x-collapse class="mt-2 ml-5 space-y-1.5 border-s border-zinc-200 ps-3">
+                                @foreach ($slice['members'] as $member)
+                                    <li wire:key="slice-{{ $loop->parent->index }}-member-{{ $loop->index }}" class="flex items-center gap-3">
+                                        <p class="min-w-0 flex-1 truncate text-xs text-zinc-600">
+                                            @if ($member['code'])
+                                                <span class="tabular-nums text-zinc-500">[{{ $member['code'] }}]</span>
+                                            @endif
+                                            {{ $member['name'] }}
+                                        </p>
+                                        <span class="text-xs tabular-nums text-zinc-500">{{ $member['count'] }}</span>
+                                        <span class="w-10 text-end text-xs font-medium tabular-nums text-zinc-700">{{ $member['pct'] }}%</span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @endif
+                    </li>
+                @endforeach
+            </ul>
         </div>
     @endif
 </div>
-
