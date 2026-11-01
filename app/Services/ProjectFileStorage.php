@@ -114,7 +114,7 @@ class ProjectFileStorage
      * nama unduhan harus datang dari metadata. "inline" agar preview iframe/
      * img tetap jalan; browser tetap memakai filename saat menyimpan.
      */
-    public function presignedGetUrl(string $key, int $ttlMinutes = 10, ?string $downloadName = null): string
+    public function presignedGetUrl(string $key, int $ttlMinutes = 5, ?string $downloadName = null): string
     {
         try {
             $params = [
@@ -131,7 +131,7 @@ class ProjectFileStorage
             $command = $this->signingClient()->getCommand('GetObject', $params);
 
             return (string) $this->signingClient()
-                ->createPresignedRequest($command, "+{$ttlMinutes} minutes")
+                ->createPresignedRequest($command, "+{$ttlMinutes} second")
                 ->getUri();
         } catch (\Throwable $e) {
             throw $this->wrap('presignedGetUrl', $e, ['key' => $key]);
