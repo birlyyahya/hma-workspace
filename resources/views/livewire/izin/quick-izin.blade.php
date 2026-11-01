@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\IzinCache;
+use App\Services\IzinNotifier;
 use App\Services\IzinPdfComposer;
 use App\Services\IzinWriter;
 use Carbon\Carbon;
@@ -104,6 +105,13 @@ class extends Component {
         }
 
         $this->createdIzinId = $this->resolveCreatedIzinId($result['body']);
+
+        app(IzinNotifier::class)->submitted([
+            'id' => $this->createdIzinId,
+            'reason' => $this->alasan,
+            'start_date' => $this->start_date,
+        ], Auth::user());
+
         $this->dispatch('izinAdded');
         Toaster::success('Izin berhasil diajukan!');
         $this->step = 'success';

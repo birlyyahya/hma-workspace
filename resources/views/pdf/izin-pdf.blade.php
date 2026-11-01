@@ -19,6 +19,7 @@ $endDate = data_get($izin, 'end_date');
 $startTime = data_get($izin, 'start_time');
 $endTime = data_get($izin, 'end_time');
 $createdAt = data_get($izin, 'created_at');
+$ttdHRD = data_get($izin, 'ttd_hrd');
 
 $approvalSignatures = data_get($izin, 'approval_signatures', []);
 
@@ -184,9 +185,10 @@ $tanggalTtd = $createdAt
                                 </div>
 
                                 <div class="signature-image">
+                                    <img src="{{ $ttdHRD }}" alt="Tanda tangan HRD">
                                 </div>
-
                                 <div class="signature-footer">
+                                    {{ data_get($izin, 'hrd_checked') ? 'Ariyo' : '' }}
                                 </div>
                             </td>
                     </tr>

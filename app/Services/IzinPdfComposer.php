@@ -43,6 +43,12 @@ class IzinPdfComposer
             data_get($izin, 'url_sign') ?: $pemohon->getAttribute('signature')
         );
 
+        if($izin['hrd_checked']){
+            $izin['ttd_hrd'] = $this->signatureToDataUri(
+                User::with('role')->where('role_id', '11')->first()->getAttribute('signature')
+            );
+        }
+
         $izin['approval_signatures'] = $approvers->values()->map(function (User $approver) use ($izin) {
             $isDirector = $approver->hasRole(['direktur', 'director', 'gm']);
             $isManager = $approver->hasRole('manager');

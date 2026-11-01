@@ -4,6 +4,9 @@ use App\Notifications\AnnouncementPublished;
 use App\Notifications\DarActivityClosed;
 use App\Notifications\DarActivityCreated;
 use App\Notifications\DarCommentReceived;
+use App\Notifications\IzinHrdConfirmed;
+use App\Notifications\IzinHrdRejected;
+use App\Notifications\IzinSubmitted;
 use App\Notifications\SpdApproved;
 use App\Notifications\TaskAssignedNotification;
 use Illuminate\Notifications\DatabaseNotification;
@@ -130,6 +133,39 @@ new class extends Component {
                 'color' => 'bg-amber-500',
                 'preview' => ['type' => 'link', 'title' => strip_tags($data['task'] ?? 'SPD'), 'meta' => $data['destination'] ?? ''],
                 'url' => isset($data['spd_id']) ? route('izin.spd-preview', ['id' => $data['spd_id']]) : null,
+            ],
+            IzinSubmitted::class => [
+                'kind' => 'izin',
+                'actor' => $data['applicant_name'] ?? 'Seseorang',
+                'headline' => 'mengajukan izin baru, perlu konfirmasi HRD',
+                'subject' => '',
+                'context' => 'Izin',
+                'icon' => 'clock',
+                'color' => 'bg-amber-500',
+                'preview' => ['type' => 'link', 'title' => $data['reason'] ?? 'Izin', 'meta' => isset($data['start_date']) ? \Carbon\Carbon::parse($data['start_date'])->locale('id')->translatedFormat('d M Y') : ''],
+                'url' => ! empty($data['izin_id']) ? route('izin.show', ['id' => $data['izin_id']]) : route('izin.laporan-pengajuan'),
+            ],
+            IzinHrdConfirmed::class => [
+                'kind' => 'izin',
+                'actor' => 'HRD',
+                'headline' => 'telah menyetujui izin kamu',
+                'subject' => '',
+                'context' => 'Izin',
+                'icon' => 'check-badge',
+                'color' => 'bg-emerald-500',
+                'preview' => ['type' => 'link', 'title' => $data['reason'] ?? 'Izin', 'meta' => isset($data['start_date']) ? \Carbon\Carbon::parse($data['start_date'])->locale('id')->translatedFormat('d M Y') : ''],
+                'url' => isset($data['izin_id']) ? route('izin.show', ['id' => $data['izin_id']]) : null,
+            ],
+            IzinHrdRejected::class => [
+                'kind' => 'izin',
+                'actor' => 'HRD',
+                'headline' => 'menolak izin kamu',
+                'subject' => '',
+                'context' => 'Izin',
+                'icon' => 'x-circle',
+                'color' => 'bg-red-500',
+                'preview' => ['type' => 'link', 'title' => $data['reason'] ?? 'Izin', 'meta' => isset($data['start_date']) ? \Carbon\Carbon::parse($data['start_date'])->locale('id')->translatedFormat('d M Y') : ''],
+                'url' => isset($data['izin_id']) ? route('izin.show', ['id' => $data['izin_id']]) : null,
             ],
             AnnouncementPublished::class => [
                 'kind' => 'announcement',

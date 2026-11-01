@@ -124,8 +124,6 @@ class extends Component {
                             <flux:textarea icon="check" readonly>{{ $data['description'] ?? '-' }}</flux:textarea>
                         </div>
                     </div>
-                    <div class="bg-white rounded-lg">
-                    </div>
                 </div>
             </div>
         </div>
